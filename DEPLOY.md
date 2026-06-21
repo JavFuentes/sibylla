@@ -43,8 +43,13 @@ ver los datos se accede con `?key=TU_CLAVE` en la URL.
 - En CI, la key se configura como *secret* de GitHub (`DASHBOARD_KEY`).
 
 Los datos de cada ejecución se persisten en `data/runs.json` (ignorado por git).
-Entre ejecuciones de CI, este archivo se preserva vía `actions/cache@v4` para
-acumular historial. En local, el historial crece con cada `--html`.
+En CI el historial vive en el **host**, no en el cache de Actions: cada corrida
+descarga el `runs.json` del servidor, le añade la corrida nueva y lo vuelve a
+subir (read-modify-write protegido por el `concurrency` del workflow). Se guarda
+en una ruta privada fuera de la raíz pública (`DEPLOY_DATA_PATH`, por defecto
+`~/.sibylla/runs.json`), así que no se sirve por web. El cache de Actions solo
+guarda las traducciones (regenerables); el historial ya no depende de él, que se
+evicta a los 7 días. En local, el historial crece con cada `--html`.
 
 ### El LLM es de *build-time*, no del visitante
 
@@ -115,7 +120,7 @@ cierto tiempo. Tres vías, de más a menos automática:
 ### A) GitHub Actions → subir al host por SSH *(recomendada; ya incluida)*
 
 El workflow [`.github/workflows/regenerate.yml`](.github/workflows/regenerate.yml)
-corre en `cron`, regenera el sitio en CI y lo sube a tu host por `rsync`/SSH.
+corre en `cron`, regenera el sitio en CI y lo sube a tu host por `scp`/SSH.
 Tu clave de IA y las credenciales del host viven como **secrets cifrados de
 GitHub** — nunca en el repo (que es público).
 
@@ -130,6 +135,7 @@ Configura en *Settings → Secrets and variables → Actions* del repo:
 | `DEPLOY_KEY` | Clave **privada** SSH autorizada en el host. **Secret.** |
 | `DEPLOY_PATH` | Ruta de la raíz pública en el host (p. ej. `/home/usuario/public_html`). |
 | `DEPLOY_PORT` | Puerto SSH (opcional; por defecto `22`). |
+| `DEPLOY_DATA_PATH` | *Variable* (no secret) con la ruta privada para `runs.json`, fuera del web root. Opcional; por defecto `.sibylla` (relativa al home SSH). |
 
 Disparo manual: pestaña *Actions → Regenerar sitio Sibylla → Run workflow*.
 

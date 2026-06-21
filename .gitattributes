@@ -1,0 +1,6 @@
+# Normaliza saltos de línea. Estos archivos se ejecutan en Linux (runners de CI
+# y el host de deploy): deben quedar en LF aunque se editen en Windows, o bash
+# rompe en here-docs, `case` y delimitadores con un `\r` colado.
+*.sh   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf

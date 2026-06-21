@@ -1,8 +1,15 @@
-# Regenera la web estática de Sibylla y la sube al hosting por SSH (rsync).
+# Regenera la web estática de Sibylla y la sube al hosting por SSH (scp).
 #
 # El LLM es de build-time: traduce las tarjetas a los 4 idiomas en CI y hornea
 # el HTML. Las claves viven como *secrets* cifrados del repo, NUNCA en el código
 # (este repo es público). Ver DEPLOY.md §4 para la lista de secrets.
+#
+# El historial de métricas (data/runs.json) se persiste en el HOST, no en el
+# cache de Actions: antes de generar se descarga el runs.json del servidor y
+# después se vuelve a subir ya con la corrida nueva añadida. Así el dashboard
+# acumula el historial de forma duradera. (El cache de Actions se evicta a los
+# 7 días sin accesos y se reinicia si cambia la key — por eso NO lo usamos para
+# el historial.) El cache solo guarda las traducciones, que sí son regenerables.
 name: Regenerar sitio Sibylla
 
 on:
@@ -10,7 +17,8 @@ on:
     - cron: "0 11 * * *"   # diario a las 11:00 UTC (ajusta a tu gusto)
   workflow_dispatch: {}     # permite disparo manual desde la pestaña Actions
 
-# Evita corridas solapadas si una tarda más que el intervalo.
+# Evita corridas solapadas: garantiza que el read-modify-write de runs.json en
+# el host nunca se pise entre dos corridas.
 concurrency:
   group: regenerate
   cancel-in-progress: false
@@ -18,6 +26,12 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      # Ruta donde se guarda el historial de métricas en el host. Relativa al
+      # home del usuario SSH (= fuera de la raíz pública, no se sirve por web).
+      # Overridable con la variable de repo DEPLOY_DATA_PATH. Usa una ruta
+      # relativa o absoluta, NO con '~' (no se expande entre comillas).
+      REMOTE_DATA: ${{ vars.DEPLOY_DATA_PATH || '.sibylla' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -30,17 +44,71 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      # Cache de traducciones y métricas entre corridas: solo se re-traduce
-      # y se acumula el historial de runs. data/ está en .gitignore.
-      - name: Restaurar cache (traducciones + métricas de runs)
+      # Solo traducciones: son regenerables y cachearlas ahorra costo de LLM.
+      # El historial (runs.json) ya NO se cachea aquí; vive en el host.
+      - name: Restaurar cache de traducciones
         uses: actions/cache@v4
         with:
-          path: |
-            data/translations.json
-            data/runs.json
+          path: data/translations.json
           key: data-cache-${{ github.run_id }}
           restore-keys: |
             data-cache-
+
+      - name: Preparar clave SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      # Descarga el historial acumulado del host ANTES de generar, para que la
+      # corrida nueva se añada encima en vez de empezar de cero.
+      - name: Descargar historial de métricas del host
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -euo pipefail
+          source .github/scripts/ssh_retry.sh
+          PORT="${DEPLOY_PORT:-22}"
+          mkdir -p data
+
+          probar_ssh() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
+          descargar()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json" data/runs.json; }
+
+          # Si el host es inalcanzable ABORTAMOS: generar con historial vacío y
+          # luego subirlo machacaría el runs.json bueno que vive en el servidor.
+          echo "→ Probando conectividad SSH (con reintentos)..."
+          reintentar "test SSH (pre-descarga)" probar_ssh || {
+            echo "ERROR: host inalcanzable; abortando para no perder el historial del servidor."
+            exit 1
+          }
+
+          # ¿Existe ya el historial remoto?  0 = sí · 1 = no · otro = error SSH.
+          set +e
+          ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "test -f '$REMOTE_DATA/runs.json'"
+          rc=$?
+          set -e
+          case "$rc" in
+            0)
+              echo "→ Historial remoto encontrado; descargando..."
+              reintentar "descarga de runs.json" descargar || {
+                echo "ERROR: no se pudo descargar runs.json pese a existir; abortando."
+                exit 1
+              }
+              echo "✓ runs.json descargado ($(wc -c < data/runs.json) bytes)."
+              ;;
+            1)
+              echo "ⓘ Aún no hay historial en el host (primera corrida); uso el local como semilla."
+              ;;
+            *)
+              echo "ERROR: fallo SSH (rc=$rc) al comprobar runs.json; abortando para no machacar el historial."
+              exit 1
+              ;;
+          esac
 
       - name: Generar sitio (con traducción de tarjetas)
         env:
@@ -53,63 +121,51 @@ jobs:
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python -m sibylla.cli --topics ai,medicine --with-x --html --translate auto
 
-      - name: Subir web/ al host por SCP (SSH)
+      - name: Subir web/ y persistir historial en el host (scp)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
           set -euo pipefail
+          source .github/scripts/ssh_retry.sh
           PORT="${DEPLOY_PORT:-22}"
-          HOST="${DEPLOY_HOST}"
-          USER="${DEPLOY_USER}"
-          PATH_REMOTO="${DEPLOY_PATH}"
-          RETRIES=5            # nº de intentos por operación (súbelo si fail2ban es agresivo)
 
           echo "→ Verificando que web/ existe y tiene contenido..."
           ls -la web/
 
-          echo "→ Preparando clave SSH..."
-          mkdir -p ~/.ssh
-          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
-
-          # Reintenta un comando con backoff exponencial (10s,20s,40s,80s; tope 90s).
-          # Absorbe timeouts/baneos transitorios del host (fail2ban) y las IP
-          # rotatorias de los runners. En el camino feliz el comando entra al
-          # primer intento y no añade ninguna espera.
-          reintentar() {
-            local desc="$1"; shift
-            local demora=10 n=1
-            while true; do
-              if "$@"; then return 0; fi
-              if [ "$n" -ge "$RETRIES" ]; then
-                echo "✗ $desc: falló tras $RETRIES intentos." >&2
-                return 1
-              fi
-              echo "  ⟳ $desc: intento $n/$RETRIES falló; reintento en ${demora}s..." >&2
-              sleep "$demora"
-              n=$((n + 1)); demora=$((demora * 2))
-              if [ "$demora" -gt 90 ]; then demora=90; fi
-            done
-          }
-
-          probar_ssh() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$USER@$HOST" "echo 'SSH OK'"; }
-          subir_scp()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html web/robots.txt web/sitemap.xml "$USER@$HOST:$PATH_REMOTO/"; }
+          probar_ssh()     { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo 'SSH OK'"; }
+          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
+          crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
+          subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }
 
           echo "→ Probando conectividad SSH (con reintentos)..."
           reintentar "test de conectividad SSH" probar_ssh || {
-            echo "ERROR: No se pudo conectar por SSH a $USER@$HOST:$PORT tras $RETRIES intentos."
+            echo "ERROR: No se pudo conectar por SSH a $DEPLOY_USER@$DEPLOY_HOST:$PORT tras varios intentos."
             exit 1
           }
 
           echo "→ Subiendo web/ con scp (con reintentos)..."
-          reintentar "subida SCP de web/" subir_scp || {
-            echo "ERROR: No se pudo subir web/ a $PATH_REMOTO tras $RETRIES intentos."
+          reintentar "subida SCP de web/" subir_web || {
+            echo "ERROR: No se pudo subir web/ a $DEPLOY_PATH tras varios intentos."
             exit 1
           }
 
-          echo "✅ Deploy completado a $PATH_REMOTO"
+          # Persistir el historial ya con la corrida nueva añadida.
+          if [ -f data/runs.json ]; then
+            echo "→ Persistiendo runs.json en el host ($REMOTE_DATA)..."
+            reintentar "crear dir de datos remoto" crear_data_dir || {
+              echo "ERROR: no se pudo crear $REMOTE_DATA en el host."
+              exit 1
+            }
+            reintentar "subida de runs.json" subir_runs || {
+              echo "ERROR: no se pudo subir runs.json (¡historial no persistido!)."
+              exit 1
+            }
+            echo "✓ Historial persistido en $REMOTE_DATA/runs.json"
+          else
+            echo "ⓘ No hay data/runs.json que persistir (¿generación sin métricas?)."
+          fi
+
+          echo "✅ Deploy completado a $DEPLOY_PATH"
