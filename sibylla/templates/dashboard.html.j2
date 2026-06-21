@@ -66,6 +66,7 @@
 
   /* Cards de resumen */
   .resumen-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin:28px 0 42px; }
+  .resumen-grid.x-visible{ grid-template-columns:repeat(5,1fr); }
   .resumen-card{ background:var(--panel); border:1px solid var(--panel-borde);
     border-radius:var(--radio); padding:22px 20px; text-align:center;
     backdrop-filter:blur(6px); transition:.25s; }
@@ -91,38 +92,74 @@
     background:linear-gradient(90deg, rgba(94,230,224,.65), rgba(217,184,95,.5)); }
   .barra-row .barra-val{ width:80px; flex:none; text-align:right; color:var(--marfil-2);
     font-variant-numeric:tabular-nums; }
+  .barra-row.dim{ opacity:.3; }
 
   /* Tabla de historial */
   .historial h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.14em;
     font-size:1.15rem; color:var(--marfil); margin:44px 0 20px; }
+
+  /* Grupos por día */
+  .day-group{ margin-bottom:24px; }
+  .day-header{ display:flex; align-items:center; gap:14px; padding:10px 14px;
+    background:var(--panel); border:1px solid var(--panel-borde); border-radius:var(--radio);
+    cursor:pointer; user-select:none; transition:.2s; margin-bottom:4px; }
+  .day-header:hover{ border-color:rgba(242,221,147,.4); }
+  .day-header .day-label{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.12em;
+    font-size:.95rem; color:var(--marfil); flex:1; }
+  .day-header .day-stats{ display:flex; gap:24px; font-size:.78rem; color:var(--marfil-2);
+    font-variant-numeric:tabular-nums; }
+  .day-header .day-arrow{ color:var(--oro); font-size:1.2rem; transition:transform .25s;
+    width:20px; text-align:center; }
+  .day-group.collapsed .day-arrow{ transform:rotate(-90deg); }
+  .day-group.collapsed .day-body{ display:none; }
+  .day-body{ border:1px solid rgba(217,184,95,.08); border-top:0; border-radius:0 0 var(--radio) var(--radio);
+    overflow:hidden; }
+
+  /* Tabla */
   table{ width:100%; border-collapse:collapse; font-size:.82rem; }
   thead th{ text-align:left; font-weight:500; font-size:.72rem; letter-spacing:.1em;
-    text-transform:uppercase; color:var(--tenue); padding:0 14px 12px; border-bottom:1px solid rgba(217,184,95,.16); }
-  tbody td{ padding:12px 14px; border-bottom:1px solid rgba(217,184,95,.08);
+    text-transform:uppercase; color:var(--tenue); padding:8px 12px 10px;
+    border-bottom:1px solid rgba(217,184,95,.16); background:rgba(13,19,34,.5); }
+  tbody td{ padding:10px 12px; border-bottom:1px solid rgba(217,184,95,.06);
     color:var(--marfil-2); white-space:nowrap; }
-  tbody tr:hover{ background:rgba(217,184,95,.04); }
+  tbody tr.main-row{ cursor:pointer; transition:background .15s; }
+  tbody tr.main-row:hover{ background:rgba(217,184,95,.05); }
+  tbody tr.main-row:nth-child(4n+1),
+  tbody tr.main-row:nth-child(4n+2){ background:rgba(94,230,224,.018); }
+  tbody tr.main-row:nth-child(4n+1):hover,
+  tbody tr.main-row:nth-child(4n+2):hover{ background:rgba(217,184,95,.06); }
+  tbody tr.main-row.expanded{ background:rgba(94,230,224,.06); }
   .tokens-cell{ color:var(--cian-claro); font-variant-numeric:tabular-nums; }
   .cost-cell{ color:var(--oro-claro); font-variant-numeric:tabular-nums; }
-  .mode-badge{ display:inline-block; padding:2px 10px; border-radius:12px; font-size:.68rem;
-    letter-spacing:.08em; text-transform:uppercase; }
-  .mode-ia{ background:rgba(94,230,224,.12); color:var(--cian-claro);
-    border:1px solid rgba(94,230,224,.3); }
-  .mode-det{ background:rgba(142,137,121,.12); color:var(--tenue);
-    border:1px solid rgba(142,137,121,.3); }
+  .duration-cell{ color:var(--tenue); font-variant-numeric:tabular-nums; }
 
-  /* Detalle expandible */
-  details.run-detail{ margin:0; }
-  details.run-detail summary{ cursor:pointer; list-style:none; }
-  details.run-detail summary::-webkit-details-marker{ display:none; }
-  tbody tr:has(details) td{ padding:0; }
-  .run-summary-row{ display:contents; }
-  .run-summary-row td{ padding:12px 14px; }
-  .detail-inner{ padding:4px 14px 14px; border-bottom:1px solid rgba(217,184,95,.08); }
-  .detail-inner h4{ font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.1em;
-    color:var(--tenue); margin:0 0 8px; text-transform:uppercase; }
-  .detail-inner table{ font-size:.76rem; margin:0; }
-  .detail-inner thead th{ font-size:.68rem; padding:0 14px 8px; }
-  .detail-inner tbody td{ padding:6px 14px; border:0; }
+  /* Fila de detalle */
+  tr.detail-row{ display:none; }
+  tr.detail-row.visible{ display:table-row; }
+  tr.detail-row td{ padding:0; border-bottom:1px solid rgba(217,184,95,.12); }
+  .detail-inner{ padding:14px 24px 18px; display:flex; gap:32px; flex-wrap:wrap; }
+  .detail-section{ min-width:220px; flex:1; }
+  .detail-section h4{ font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.1em;
+    color:var(--tenue); margin:0 0 10px; text-transform:uppercase; }
+  .detail-section table{ font-size:.76rem; margin:0; }
+  .detail-section thead th{ font-size:.68rem; padding:0 14px 6px; background:transparent; }
+  .detail-section tbody td{ padding:5px 14px; border:0; }
+  .x-detail{ display:flex; gap:20px; font-size:.78rem; color:var(--marfil-2); }
+  .x-detail .x-label{ color:var(--tenue); }
+  .x-detail .x-val{ color:var(--oro-claro); font-variant-numeric:tabular-nums; }
+
+  /* Badges */
+  .badges{ display:flex; gap:5px; flex-wrap:nowrap; }
+  .badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:.66rem;
+    letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+  .badge-ia{ background:rgba(94,230,224,.12); color:var(--cian-claro);
+    border:1px solid rgba(94,230,224,.3); }
+  .badge-det{ background:rgba(142,137,121,.12); color:var(--tenue);
+    border:1px solid rgba(142,137,121,.3); }
+  .badge-tl{ background:rgba(242,221,147,.1); color:var(--oro-claro);
+    border:1px solid rgba(242,221,147,.25); }
+  .badge-x{ background:rgba(134,181,166,.12); color:var(--tier3);
+    border:1px solid rgba(134,181,166,.3); }
 
   /* Vacío */
   .vacio{ text-align:center; padding:60px 0; color:var(--tenue); }
@@ -150,10 +187,12 @@
   /* Responsive */
   @media (max-width:860px){
     .resumen-grid{ grid-template-columns:repeat(2,1fr); }
+    .resumen-grid.x-visible{ grid-template-columns:repeat(3,1fr); }
   }
   @media (max-width:480px){
     .lienzo-central{ padding:0 16px; }
     .resumen-grid{ grid-template-columns:1fr 1fr; gap:10px; }
+    .resumen-grid.x-visible{ grid-template-columns:1fr 1fr; }
     .resumen-card{ padding:16px 12px; }
     .resumen-card .valor{ font-size:1.3rem; }
     .barra-row .run-id{ width:100px; font-size:.7rem; }
@@ -162,6 +201,8 @@
     thead th, tbody td{ padding:8px 8px; }
     .hero{ padding:32px 0 20px; }
     .hero h1{ font-size:1.4rem; }
+    .day-header{ flex-wrap:wrap; }
+    .day-header .day-stats{ gap:12px; }
   }
 </style>
 </head>
@@ -190,7 +231,7 @@
 </div>
 {% endif %}
 
-<!-- ---- Contenido del dashboard (oculto si hay key, visible si no) ---- -->
+<!-- ---- Contenido del dashboard ---- -->
 <div id="dash-data"{% if not dash_key_hash %} class="visible"{% endif %}>
 
 <main class="lienzo-central">
@@ -202,7 +243,7 @@
 
   {% if runs %}
   <!-- ---- Resumen ---- -->
-  <div class="resumen-grid">
+  <div class="resumen-grid{% if summary.has_x %} x-visible{% endif %}">
     <div class="resumen-card">
       <div class="valor">{{ summary.runs_n }}</div>
       <div class="label">Ejecuciones</div>
@@ -215,9 +256,15 @@
       <div class="valor">{{ summary.items_total }}</div>
       <div class="label">Ítems procesados</div>
     </div>
+    {% if summary.has_x %}
+    <div class="resumen-card">
+      <div class="valor">${{ "%.3f"|format(summary.x_cost) }}</div>
+      <div class="label">Costo X ({{ summary.x_reads_total }} posts)</div>
+    </div>
+    {% endif %}
     <div class="resumen-card">
       <div class="valor">${{ "%.2f"|format(summary.cost_total) }}</div>
-      <div class="label">Costo estimado</div>
+      <div class="label">Costo total</div>
     </div>
   </div>
 
@@ -225,6 +272,7 @@
   <section class="token-barras">
     <h2>Tokens por ejecución</h2>
     {% for r in runs %}
+    {% if r.tokens_total > 0 %}
     {% set pct = (r.tokens_total / max_token * 100) if max_token else 0 %}
     <div class="barra-row">
       <span class="run-id" title="{{ r.ts }}">{{ r.run_id }}</span>
@@ -233,75 +281,127 @@
       </div>
       <span class="barra-val">{{ "{:,}".format(r.tokens_total) }}</span>
     </div>
+    {% endif %}
     {% endfor %}
+    {% if summary.runs_with_llm == 0 %}
+    <div class="barra-row dim">
+      <span class="run-id">—</span>
+      <div class="barra-track"></div>
+      <span class="barra-val">sin datos</span>
+    </div>
+    {% endif %}
   </section>
 
-  <!-- ---- Tabla de historial ---- -->
+  <!-- ---- Tabla de historial (agrupado por día) ---- -->
   <section class="historial">
     <h2>Historial</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Ejecución</th>
-          <th>Fecha</th>
-          <th>Temas</th>
-          <th>Ítems</th>
-          <th>X posts</th>
-          <th>Modo</th>
-          <th>Tokens</th>
-          <th>Costo</th>
-          <th>Dur.</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for r in runs %}
-        <tr id="{{ r.run_id }}">
-          <td>
-          {% if r.calls or r.x_reads %}
-          <details class="run-detail">
-            <summary>{{ r.run_id }}</summary>
-            <tr><td colspan="9">
+
+    {% for day in days %}
+    <div class="day-group" id="day-{{ loop.index }}">
+      <div class="day-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <span class="day-arrow">▼</span>
+        <span class="day-label">{{ day.label }}</span>
+        <span class="day-stats">
+          <span>{{ day.runs_n }} ejec.</span>
+          {% if day.tokens_day > 0 %}
+          <span>{{ "{:,}".format(day.tokens_day) }} tok.</span>
+          {% endif %}
+          {% if day.cost_day > 0 %}
+          <span>${{ "%.4f"|format(day.cost_day) }}</span>
+          {% endif %}
+        </span>
+      </div>
+      <div class="day-body">
+      <table>
+        <thead>
+          <tr>
+            <th></th>
+            <th>Hora</th>
+            <th>Temas</th>
+            <th>Ítems</th>
+            <th>Tokens</th>
+            <th>Costo</th>
+            <th>Dur.</th>
+            <th>Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in day.runs %}
+          {% set detail_id = "det-" ~ day.label ~ "-" ~ loop.index %}
+          <tr class="main-row" data-detail="{{ detail_id }}" onclick="toggleDetail('{{ detail_id }}', this)">
+            <td style="width:28px; color:var(--tenue); font-size:.7rem; text-align:right; padding-right:4px;">
+              {{ loop.index }}
+            </td>
+            <td style="color:var(--marfil);">{{ r.ts.split(",")[1].strip() if "," in r.ts else r.ts }}</td>
+            <td>{{ r.topics }}</td>
+            <td>{{ r.items_final }}</td>
+            <td class="tokens-cell">{% if r.tokens_total > 0 %}{{ "{:,}".format(r.tokens_total) }}{% else %}—{% endif %}</td>
+            <td class="cost-cell">{% if r.cost > 0 %}${{ "%.4f"|format(r.cost) }}{% else %}—{% endif %}</td>
+            <td class="duration-cell">{{ "%.1f"|format(r.duration_s) }}s</td>
+            <td>
+              <span class="badges">
+                {% if r.mode == "IA" %}
+                <span class="badge badge-ia">IA</span>
+                {% else %}
+                <span class="badge badge-det">DET</span>
+                {% endif %}
+                {% if r.translate %}
+                <span class="badge badge-tl" title="Traducido">🌐</span>
+                {% endif %}
+                {% if r.has_x %}
+                <span class="badge badge-x" title="{{ r.x_reads }} posts X">X{{ r.x_reads }}</span>
+                {% endif %}
+              </span>
+            </td>
+          </tr>
+          <tr class="detail-row" id="{{ detail_id }}">
+            <td></td>
+            <td colspan="7">
             <div class="detail-inner">
-              {% if r.x_reads %}
-              <h4>X / Twitter — {{ r.x_reads }} post(s) leídos ≈ ${{ "%.5f"|format(r.x_cost) }}</h4>
+              {% if r.has_x %}
+              <div class="detail-section">
+                <h4>X / Twitter</h4>
+                <div class="x-detail">
+                  <span><span class="x-label">Posts leídos:</span> <span class="x-val">{{ r.x_reads }}</span></span>
+                  <span><span class="x-label">Costo:</span> <span class="x-val">${{ "%.5f"|format(r.x_cost) }}</span></span>
+                </div>
+              </div>
               {% endif %}
               {% if r.calls %}
-              <h4>Desglose de llamadas LLM</h4>
-              <table>
-                <thead><tr><th>Propósito</th><th>Modelo</th><th>Input</th><th>Output</th><th>Total</th><th>Costo</th></tr></thead>
-                <tbody>
-                {% for c in r.calls %}
-                <tr>
-                  <td>{{ c.purpose }}</td>
-                  <td style="font-size:.7rem;">{{ c.model }}</td>
-                  <td class="tokens-cell">{{ "{:,}".format(c.input) }}</td>
-                  <td class="tokens-cell">{{ "{:,}".format(c.output) }}</td>
-                  <td class="tokens-cell">{{ "{:,}".format(c.total) }}</td>
-                  <td class="cost-cell">{% if c.cost is not none %}${{ "%.5f"|format(c.cost) }}{% else %}—{% endif %}</td>
-                </tr>
-                {% endfor %}
-                </tbody>
-              </table>
+              <div class="detail-section">
+                <h4>Llamadas LLM</h4>
+                <table>
+                  <thead><tr><th>Propósito</th><th>Modelo</th><th>Input</th><th>Output</th><th>Total</th><th>Costo</th></tr></thead>
+                  <tbody>
+                  {% for c in r.calls %}
+                  <tr>
+                    <td>{{ c.purpose }}</td>
+                    <td style="font-size:.7rem;">{{ c.model_short }}</td>
+                    <td class="tokens-cell">{{ "{:,}".format(c.input) }}</td>
+                    <td class="tokens-cell">{{ "{:,}".format(c.output) }}</td>
+                    <td class="tokens-cell">{{ "{:,}".format(c.total) }}</td>
+                    <td class="cost-cell">{% if c.cost is not none %}${{ "%.5f"|format(c.cost) }}{% else %}—{% endif %}</td>
+                  </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% endif %}
+              {% if not r.has_x and not r.calls %}
+              <div class="detail-section">
+                <p style="color:var(--tenue); font-size:.8rem;">Sin llamadas externas en esta ejecución.</p>
+              </div>
               {% endif %}
             </div>
-            </td></tr>
-          </details>
-          {% else %}
-          {{ r.run_id }}
-          {% endif %}
-          </td>
-          <td>{{ r.ts }}</td>
-          <td>{{ r.topics }}</td>
-          <td>{{ r.items_final }}</td>
-          <td>{% if r.x_reads %}{{ r.x_reads }}{% else %}—{% endif %}</td>
-          <td><span class="mode-badge {{ 'mode-ia' if r.mode == 'IA' else 'mode-det' }}">{{ r.mode }}</span></td>
-          <td class="tokens-cell">{{ "{:,}".format(r.tokens_total) }}</td>
-          <td class="cost-cell">{% if r.cost > 0 %}${{ "%.4f"|format(r.cost) }}{% else %}—{% endif %}</td>
-          <td>{{ "%.1f"|format(r.duration_s) }}s</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endfor %}
+
   </section>
 
   {% else %}
@@ -333,7 +433,7 @@
   var locked=document.getElementById('dash-locked');
   var params=new URLSearchParams(location.search);
   var key=params.get('key')||'';
-  if(!key){ return; }  // sin ?key= -> se queda el candado
+  if(!key){ return; }
 
   if(window.crypto&&crypto.subtle){
     var enc=new TextEncoder().encode(key);
@@ -347,19 +447,42 @@
       }
     }).catch(function(){});
   }else{
-    // Fallback para navegadores sin SubtleCrypto (http local, navegadores viejos).
-    // Menos seguro pero evita que el dashboard sea inaccesible en entornos
-    // donde crypto.subtle no está disponible (HTTP).
     if(key.length>=8 && djb2(key)===djb2_expected()){
       locked.style.display='none';
       data.className='visible';
     }
   }
-  // djb2 no criptográfico para el fallback — suficiente contra miradas casuales
   function djb2(s){ var h=5381; for(var i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))|0; } return h>>>0; }
   function djb2_expected(){ return {{ djb2_fallback }}; }
 })();
 </script>
 {% endif %}
+
+<script>
+/* Toggle de fila de detalle: click en cualquier fila principal expande/colapsa su detalle. */
+function toggleDetail(id, row){
+  var detail=document.getElementById(id);
+  if(!detail) return;
+  var visible=detail.classList.contains('visible');
+  // Cerrar todas las demás
+  var allDetails=document.querySelectorAll('tr.detail-row.visible');
+  var allRows=document.querySelectorAll('tr.main-row.expanded');
+  allDetails.forEach(function(d){ d.classList.remove('visible'); });
+  allRows.forEach(function(r){ r.classList.remove('expanded'); });
+  // Abrir esta si no estaba abierta
+  if(!visible){
+    detail.classList.add('visible');
+    row.classList.add('expanded');
+  }
+}
+
+/* Colapsar todos los grupos de día por defecto (excepto el más reciente). */
+(function(){
+  var groups=document.querySelectorAll('.day-group');
+  groups.forEach(function(g, i){
+    if(i > 0) g.classList.add('collapsed');
+  });
+})();
+</script>
 </body>
 </html>
