@@ -66,18 +66,50 @@ jobs:
           HOST="${DEPLOY_HOST}"
           USER="${DEPLOY_USER}"
           PATH_REMOTO="${DEPLOY_PATH}"
+          RETRIES=5            # nº de intentos por operación (súbelo si fail2ban es agresivo)
+
           echo "→ Verificando que web/ existe y tiene contenido..."
           ls -la web/
+
           echo "→ Preparando clave SSH..."
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
-          echo "→ Probando conectividad SSH..."
-          ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$USER@$HOST" "echo 'SSH OK'" || {
-            echo "ERROR: No se pudo conectar por SSH a $USER@$HOST:$PORT"
+
+          # Reintenta un comando con backoff exponencial (10s,20s,40s,80s; tope 90s).
+          # Absorbe timeouts/baneos transitorios del host (fail2ban) y las IP
+          # rotatorias de los runners. En el camino feliz el comando entra al
+          # primer intento y no añade ninguna espera.
+          reintentar() {
+            local desc="$1"; shift
+            local demora=10 n=1
+            while true; do
+              if "$@"; then return 0; fi
+              if [ "$n" -ge "$RETRIES" ]; then
+                echo "✗ $desc: falló tras $RETRIES intentos." >&2
+                return 1
+              fi
+              echo "  ⟳ $desc: intento $n/$RETRIES falló; reintento en ${demora}s..." >&2
+              sleep "$demora"
+              n=$((n + 1)); demora=$((demora * 2))
+              if [ "$demora" -gt 90 ]; then demora=90; fi
+            done
+          }
+
+          probar_ssh() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$USER@$HOST" "echo 'SSH OK'"; }
+          subir_scp()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html web/robots.txt web/sitemap.xml "$USER@$HOST:$PATH_REMOTO/"; }
+
+          echo "→ Probando conectividad SSH (con reintentos)..."
+          reintentar "test de conectividad SSH" probar_ssh || {
+            echo "ERROR: No se pudo conectar por SSH a $USER@$HOST:$PORT tras $RETRIES intentos."
             exit 1
           }
-          echo "→ Subiendo web/ con scp..."
-          scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html web/robots.txt web/sitemap.xml "$USER@$HOST:$PATH_REMOTO/"
+
+          echo "→ Subiendo web/ con scp (con reintentos)..."
+          reintentar "subida SCP de web/" subir_scp || {
+            echo "ERROR: No se pudo subir web/ a $PATH_REMOTO tras $RETRIES intentos."
+            exit 1
+          }
+
           echo "✅ Deploy completado a $PATH_REMOTO"
