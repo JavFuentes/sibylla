@@ -136,6 +136,17 @@
   .pie .lema{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--tenue);
     font-size:.95rem; margin:16px 0 0; }
 
+  /* Acceso restringido */
+  #dash-locked{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-height:60vh; text-align:center; padding:40px 20px; }
+  #dash-locked .lock-icon{ font-size:3rem; margin-bottom:20px; color:var(--oro); }
+  #dash-locked h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.16em;
+    font-size:1.3rem; color:var(--marfil); margin:0 0 12px; }
+  #dash-locked p{ font-family:'Cormorant Garamond',serif; font-style:italic;
+    color:var(--marfil-2); font-size:1rem; max-width:40ch; }
+  #dash-data{ display:none; }
+  #dash-data.visible{ display:block; }
+
   /* Responsive */
   @media (max-width:860px){
     .resumen-grid{ grid-template-columns:repeat(2,1fr); }
@@ -169,6 +180,18 @@
     </nav>
   </div>
 </header>
+
+{% if dash_key_hash %}
+<!-- ---- Acceso restringido (sin key correcta) ---- -->
+<div id="dash-locked">
+  <div class="lock-icon" aria-hidden="true">&#x1f512;</div>
+  <h2>Acceso restringido</h2>
+  <p>Este dashboard es privado. Usa la clave de acceso para ver las métricas.</p>
+</div>
+{% endif %}
+
+<!-- ---- Contenido del dashboard (oculto si hay key, visible si no) ---- -->
+<div id="dash-data"{% if not dash_key_hash %} class="visible"{% endif %}>
 
 <main class="lienzo-central">
 
@@ -223,6 +246,7 @@
           <th>Fecha</th>
           <th>Temas</th>
           <th>Ítems</th>
+          <th>X posts</th>
           <th>Modo</th>
           <th>Tokens</th>
           <th>Costo</th>
@@ -233,11 +257,15 @@
         {% for r in runs %}
         <tr id="{{ r.run_id }}">
           <td>
-          {% if r.calls %}
+          {% if r.calls or r.x_reads %}
           <details class="run-detail">
             <summary>{{ r.run_id }}</summary>
-            <tr><td colspan="8">
+            <tr><td colspan="9">
             <div class="detail-inner">
+              {% if r.x_reads %}
+              <h4>X / Twitter — {{ r.x_reads }} post(s) leídos ≈ ${{ "%.5f"|format(r.x_cost) }}</h4>
+              {% endif %}
+              {% if r.calls %}
               <h4>Desglose de llamadas LLM</h4>
               <table>
                 <thead><tr><th>Propósito</th><th>Modelo</th><th>Input</th><th>Output</th><th>Total</th><th>Costo</th></tr></thead>
@@ -254,6 +282,7 @@
                 {% endfor %}
                 </tbody>
               </table>
+              {% endif %}
             </div>
             </td></tr>
           </details>
@@ -264,6 +293,7 @@
           <td>{{ r.ts }}</td>
           <td>{{ r.topics }}</td>
           <td>{{ r.items_final }}</td>
+          <td>{% if r.x_reads %}{{ r.x_reads }}{% else %}—{% endif %}</td>
           <td><span class="mode-badge {{ 'mode-ia' if r.mode == 'IA' else 'mode-det' }}">{{ r.mode }}</span></td>
           <td class="tokens-cell">{{ "{:,}".format(r.tokens_total) }}</td>
           <td class="cost-cell">{% if r.cost > 0 %}${{ "%.4f"|format(r.cost) }}{% else %}—{% endif %}</td>
@@ -290,5 +320,46 @@
     <p class="lema">Dashboard generado {{ generado }}</p>
   </div>
 </footer>
+
+</div>{# /dash-data #}
+
+{% if dash_key_hash %}
+<script>
+/* Control de acceso al dashboard: compara SHA-256 de ?key= contra el hash
+   horneado en el HTML. Sin key correcta, solo se ve "Acceso restringido". */
+(function(){
+  var expected="{{ dash_key_hash }}";
+  var data=document.getElementById('dash-data');
+  var locked=document.getElementById('dash-locked');
+  var params=new URLSearchParams(location.search);
+  var key=params.get('key')||'';
+  if(!key){ return; }  // sin ?key= -> se queda el candado
+
+  if(window.crypto&&crypto.subtle){
+    var enc=new TextEncoder().encode(key);
+    crypto.subtle.digest('SHA-256',enc).then(function(hash){
+      var hex=Array.from(new Uint8Array(hash)).map(function(b){
+        return ('00'+b.toString(16)).slice(-2);
+      }).join('');
+      if(hex===expected){
+        locked.style.display='none';
+        data.className='visible';
+      }
+    }).catch(function(){});
+  }else{
+    // Fallback para navegadores sin SubtleCrypto (http local, navegadores viejos).
+    // Menos seguro pero evita que el dashboard sea inaccesible en entornos
+    // donde crypto.subtle no está disponible (HTTP).
+    if(key.length>=8 && djb2(key)===djb2_expected()){
+      locked.style.display='none';
+      data.className='visible';
+    }
+  }
+  // djb2 no criptográfico para el fallback — suficiente contra miradas casuales
+  function djb2(s){ var h=5381; for(var i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))|0; } return h>>>0; }
+  function djb2_expected(){ return {{ djb2_fallback }}; }
+})();
+</script>
+{% endif %}
 </body>
 </html>

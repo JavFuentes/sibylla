@@ -320,6 +320,12 @@ def _x_save_usage(month: str, reads: int) -> None:
     p.write_text(json.dumps({"month": month, "reads": reads}), encoding="utf-8")
 
 
+def x_usage_reads() -> int:
+    """Devuelve las lecturas acumuladas de X en el mes actual (0 si no hay archivo)."""
+    _, reads = _x_load_usage()
+    return reads
+
+
 def fetch_x(source: Source, query: str, limit: int, monthly_budget: int) -> list[NewsItem]:
     """Recent search de X. DE PAGO (~$0.005/post leído). Tope mensual DURO.
 

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from .config import OUTPUT_DIR
 from .digest import render_digest
-from .fetchers import TOPIC_CONFIG
+from .fetchers import TOPIC_CONFIG, x_usage_reads
 from .i18n import load_translations, resolve_lang, t
 from .llm import LLMError
 from .models import RunRecord
@@ -77,7 +77,13 @@ def main(argv: list[str] | None = None) -> int:
         sources = base
 
     resolved_sources = sources or list(DEFAULT_FREE_SOURCES)
+
+    x_before = x_usage_reads() if "x_twitter" in resolved_sources else 0
     items, meta, raw_count = run_pipeline(topics, sources_filter=sources, limit=args.max_per_source)
+    x_after = x_usage_reads() if "x_twitter" in resolved_sources else 0
+    x_reads = x_after - x_before
+    x_cost = round(x_reads * 0.005, 6)  # ~$0.005/post
+
     lang = resolve_lang(args.lang, meta)
     tr = load_translations(lang)
 
@@ -144,6 +150,8 @@ def main(argv: list[str] | None = None) -> int:
         llm_calls=llm_calls,
         tokens_total=tokens_total,
         duration_s=round(duration, 1),
+        x_reads=x_reads,
+        x_cost=x_cost,
     )
     from .metrics import record_run
     record_run(record)

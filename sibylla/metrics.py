@@ -44,22 +44,30 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
 }
 
 
+def _match_model(model_lower: str) -> tuple[float, float] | None:
+    """Busca el modelo en la tabla de precios. Acepta prefijo proveedor:modelo."""
+    candidates = [model_lower]
+    if ":" in model_lower:
+        candidates.append(model_lower.rsplit(":", 1)[1])
+    best_key = ""
+    best_price = None
+    for cand in candidates:
+        for key, prices in _MODEL_PRICING.items():
+            if cand.startswith(key) and len(key) > len(best_key):
+                best_key = key
+                best_price = prices
+    return best_price
+
+
 def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float | None:
     """Estima el costo en USD de una llamada. None si el modelo no está en la tabla."""
     if input_tokens <= 0 and output_tokens <= 0:
         return 0.0
     model_lower = model.lower().replace(" ", "-")
-    # Prefiere la clave más larga que haga startswith (evita q gpt-5.4 gane sobre gpt-5.4-mini).
-    best_key = ""
-    best_price = None
-    for key, prices in _MODEL_PRICING.items():
-        if model_lower.startswith(key) and len(key) > len(best_key):
-            best_key = key
-            best_price = prices
-    if best_price is not None:
-        price_in, price_out = best_price
-    else:
+    prices = _match_model(model_lower)
+    if prices is None:
         return None
+    price_in, price_out = prices
     return (input_tokens / 1_000_000) * price_in + (output_tokens / 1_000_000) * price_out
 
 
@@ -93,6 +101,8 @@ def load_runs(path=RUNS_PATH) -> list[RunRecord]:
                 llm_calls=d.get("llm_calls", []),
                 tokens_total=d.get("tokens_total", 0),
                 duration_s=d.get("duration_s", 0.0),
+                x_reads=d.get("x_reads", 0),
+                x_cost=d.get("x_cost", 0.0),
             ))
         return runs
     except (OSError, json.JSONDecodeError, (ValueError, TypeError)):
@@ -121,4 +131,6 @@ def _as_dict(r: RunRecord) -> dict:
         "llm_calls": r.llm_calls,
         "tokens_total": r.tokens_total,
         "duration_s": r.duration_s,
+        "x_reads": r.x_reads,
+        "x_cost": r.x_cost,
     }

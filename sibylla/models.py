@@ -120,3 +120,5 @@ class RunRecord:
     llm_calls: list[dict]    # [{"purpose":"summarize"|"translate_{lang}", "model":"...", "input":N, "output":N}]
     tokens_total: int
     duration_s: float
+    x_reads: int = 0         # número de posts leídos de X en esta ejecución
+    x_cost: float = 0.0      # costo estimado en USD de las lecturas de X (≈$0.005/post)

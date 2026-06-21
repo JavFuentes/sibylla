@@ -18,11 +18,33 @@ web/
   en.html      ← inglés
   it.html      ← italiano
   pt.html      ← portugués
+  dashboard.html ← métricas del proyecto (privado, ver §1.1)
 ```
 
 > **`web/` está en `.gitignore`**: es un *artefacto generado*, no se versiona.
 > Desplegar = **regenerar** `web/` y **subir su contenido** a la raíz pública del
 > hosting. No hay nada que "compilar" en el servidor.
+
+### 1.1 Dashboard de métricas (privado)
+
+El pipeline genera `web/dashboard.html` con métricas de cada ejecución:
+- Historial de regeneraciones (fecha, temas, fuentes, ítems procesados)
+- Consumo de tokens por llamada LLM (summarize + traducciones por idioma)
+- Costo estimado en USD según precios actualizados de DeepSeek, OpenAI y Anthropic
+
+El dashboard es **privado**: requiere una clave de acceso configurada en
+`DASHBOARD_KEY`. Sin la key, la página muestra "Acceso restringido". Para
+ver los datos se accede con `?key=TU_CLAVE` en la URL.
+
+- La clave **nunca** aparece en texto claro en el HTML: solo se hornea su hash
+  SHA-256.
+- En local, si `DASHBOARD_KEY` no está definida, el dashboard se muestra sin
+  restricción (modo desarrollo).
+- En CI, la key se configura como *secret* de GitHub (`DASHBOARD_KEY`).
+
+Los datos de cada ejecución se persisten en `data/runs.json` (ignorado por git).
+Entre ejecuciones de CI, este archivo se preserva vía `actions/cache@v4` para
+acumular historial. En local, el historial crece con cada `--html`.
 
 ### El LLM es de *build-time*, no del visitante
 
@@ -103,6 +125,7 @@ Configura en *Settings → Secrets and variables → Actions* del repo:
 | --- | --- |
 | `LLM_PROVIDER`, `LLM_MODEL` | Proveedor y modelo de IA (pueden ir como *Variables* en vez de *Secrets*). |
 | `LLM_API_KEY` | Clave del proveedor de IA. **Secret.** |
+| `DASHBOARD_KEY` | Clave de acceso al dashboard de métricas. **Secret.** |
 | `DEPLOY_HOST`, `DEPLOY_USER` | Host y usuario SSH/SFTP del hosting. |
 | `DEPLOY_KEY` | Clave **privada** SSH autorizada en el host. **Secret.** |
 | `DEPLOY_PATH` | Ruta de la raíz pública en el host (p. ej. `/home/usuario/public_html`). |

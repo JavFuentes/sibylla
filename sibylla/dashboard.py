@@ -1,6 +1,8 @@
 """Genera dashboard.html con métricas del proyecto: historial de ejecuciones y consumo de tokens."""
 from __future__ import annotations
 
+import hashlib
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -23,12 +25,13 @@ def _format_dt(dt: datetime) -> str:
 
 
 def _run_cost(run: RunRecord) -> float:
-    """Costo total estimado de una ejecución."""
+    """Costo total estimado de una ejecución (LLM + X)."""
     total = 0.0
     for call in run.llm_calls:
         c = estimate_cost(call.get("model", ""), call.get("input", 0), call.get("output", 0))
         if c is not None:
             total += c
+    total += run.x_cost
     return total
 
 
@@ -62,6 +65,8 @@ def _prep_runs(runs: list[RunRecord]) -> list[dict[str, Any]]:
             "duration_s": r.duration_s,
             "calls": calls,
             "calls_n": len(calls),
+            "x_reads": r.x_reads,
+            "x_cost": r.x_cost,
         })
     return items
 
@@ -83,10 +88,21 @@ def _summary(runs: list[RunRecord], prep: list[dict[str, Any]]) -> dict[str, Any
     }
 
 
+def _djb2(s: str) -> int:
+    """Hash djb2 no criptográfico (fallback si crypto.subtle no está disponible)."""
+    h = 5381
+    for ch in s:
+        h = ((h << 5) + h + ord(ch)) & 0xFFFFFFFF
+    return h
+
+
 def render_dashboard(out_dir: Path | None = None) -> Path:
     """Genera web/dashboard.html y devuelve la ruta.
 
     Siempre genera aunque no haya ejecuciones registradas (muestra "sin datos").
+    Si DASHBOARD_KEY está configurada en el entorno, el HTML incluye control de
+    acceso: sin ?key=<valor> en la URL solo se ve "Acceso restringido".
+    Sin DASHBOARD_KEY el contenido es público (modo desarrollo local).
     """
     out_dir = out_dir or SITE_DIR
     runs = load_runs()
@@ -95,6 +111,9 @@ def render_dashboard(out_dir: Path | None = None) -> Path:
     max_token = summary["max_tokens_run"] or 1
 
     ahora = _format_dt(datetime.now(timezone.utc))
+
+    dash_key = (os.getenv("DASHBOARD_KEY") or "").strip()
+    dash_key_hash = hashlib.sha256(dash_key.encode()).hexdigest() if dash_key else ""
 
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -107,6 +126,8 @@ def render_dashboard(out_dir: Path | None = None) -> Path:
         runs=prep,
         summary=summary,
         max_token=max_token,
+        dash_key_hash=dash_key_hash,
+        djb2_fallback=_djb2(dash_key) if dash_key else 0,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "dashboard.html"
