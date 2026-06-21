@@ -1,0 +1,67 @@
+{
+  "_meta": { "language": "English", "code": "en" },
+
+  "cli": {
+    "no_items": "No items retrieved. Check topics/sources or your connection.",
+    "no_llm": "No LLM configured in .env. Using deterministic summary.",
+    "llm_unavailable": "LLM unavailable ({error}). Using deterministic summary.",
+    "summarizing": "Summarizing with {provider} ({model})…",
+    "result_line": "✅ {count} items · {mode} -> {path}",
+    "mode_ai": "AI",
+    "mode_deterministic": "deterministic list",
+    "web_generated": "🌐 Static web -> {path}"
+  },
+
+  "digest": {
+    "title": "# Sibylla — Summary ({topics})",
+    "generated": "_Generated {date} · {count} items after deduplication_",
+    "tier_footer": "Tiers: **T1** primary/peer-review · **T2** journalism · **T3** aggregator/discussion. Each item links to its original source.",
+    "no_date": "n/d"
+  },
+
+  "summarize": {
+    "lang_name": "English",
+    "system_prompt": "You are Sibylla, an assistant that writes science and technology news summaries. ALWAYS write in {lang}. Strict rules:\n- Use ONLY the items I provide; do not invent facts, figures, or links.\n- Each story links to its source with real Markdown links taken from the 'url' field.\n- Group items covering the same news story into a single entry.\n- Mark confidence by tier: T1 = primary/peer-review (high), T2 = journalism (medium), T3 = aggregator/discussion (signal, unconfirmed).\n- If a story only appears in T3, say so ('under discussion / unconfirmed').\n- Prioritize what is important and recent. Be concise and easy to scan.\nReturn ONLY Markdown, no preamble.",
+    "user_prompt": "Topic(s): {topics}\nDate: {date}\n\nWrite the summary. For each topic include 3-6 key stories. Per story: short bold title, 2-3 synthesis sentences in {lang}, links to the sources, and a confidence label.\n\nAvailable items (JSON):\n{items_json}",
+    "header": "# Sibylla — Summary ({topics})\n_Generated {date} · written by {provider}:{model} · {count} items analyzed_\n\n"
+  },
+
+  "web": {
+    "page_title": "Sibylla — What is happening. What will happen.",
+    "nav_present": "What's happening",
+    "nav_sources": "Sources",
+    "nav_about": "About",
+    "hero_eyebrow": "Reads · filters · ranks · anticipates",
+    "hero_heading": "What is happening.",
+    "hero_subtitle": "Sibylla gathers the most reliable science and technology sources, separates signal from noise, and shows you what is happening today — and what is brewing. Always linking to the original source.",
+    "hero_cta": "See what's happening",
+    "hero_how": "How it works",
+    "hero_timestamp": "Last reading · {date} · {count} signals across {sources} sources",
+    "section_heading": "What is happening",
+    "section_subtitle": "Today's pulse in science and technology",
+    "observes": "Sibylla observes",
+    "warns": "Sibylla warns",
+    "warn_text": "Items marked with a gold seal (I) come from a primary or peer-reviewed source. Silver (II) is journalism; treat it as context, not revealed truth. Green (III) is an aggregator or discussion: weak signal, unconfirmed.",
+    "portal_subtitle": "your reporter · reads the present, anticipates the future",
+    "tier1_label": "primary / peer-reviewed",
+    "tier2_label": "journalism",
+    "tier3_label": "aggregator / discussion",
+    "footer_motto": "Does not republish: detects the news and links to the original source. · sibylla.cl",
+    "voice": "I have read {count} signals across {sources} sources and sorted them by reliability; these are the ones that deserve your attention.",
+    "no_date": "n/d",
+    "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "topics": {
+      "ai": "Artificial Intelligence",
+      "computing": "Computing",
+      "space": "Space",
+      "physics": "Physics",
+      "biotech": "Biotechnology",
+      "medicine": "Medicine",
+      "neuroscience": "Neuroscience",
+      "climate": "Climate",
+      "energy": "Energy",
+      "general_science": "Science",
+      "general_tech": "Technology"
+    }
+  }
+}

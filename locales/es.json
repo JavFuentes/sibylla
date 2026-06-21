@@ -1,0 +1,67 @@
+{
+  "_meta": { "language": "español", "code": "es" },
+
+  "cli": {
+    "no_items": "No se obtuvieron ítems. Revisa los temas/fuentes o la conexión.",
+    "no_llm": "Sin LLM configurado en .env. Uso el resumen determinista.",
+    "llm_unavailable": "LLM no disponible ({error}). Uso el resumen determinista.",
+    "summarizing": "Resumiendo con {provider} ({model})…",
+    "result_line": "✅ {count} ítems · {mode} -> {path}",
+    "mode_ai": "IA",
+    "mode_deterministic": "lista determinista",
+    "web_generated": "🌐 Web estática -> {path}"
+  },
+
+  "digest": {
+    "title": "# Sibylla — Resumen ({topics})",
+    "generated": "_Generado {date} · {count} ítems tras deduplicar_",
+    "tier_footer": "Tiers: **T1** primaria/peer-review · **T2** periodismo · **T3** agregador/discusión. Cada ítem enlaza a su fuente original.",
+    "no_date": "s/f"
+  },
+
+  "summarize": {
+    "lang_name": "español",
+    "system_prompt": "Eres Sibylla, un asistente que redacta resúmenes de noticias de ciencia y tecnología. Escribe SIEMPRE en {lang}. Reglas estrictas:\n- Usa ÚNICAMENTE los ítems que te paso; no inventes hechos, cifras ni enlaces.\n- Cada historia enlaza a su fuente con enlaces Markdown reales tomados del campo 'url'.\n- Agrupa en una sola historia los ítems que tratan de la misma noticia.\n- Marca la confianza según el tier: T1 = primaria/peer-review (alta), T2 = periodismo (media), T3 = agregador/discusión (señal, sin confirmar).\n- Si una historia solo aparece en T3, dilo ('en discusión / sin confirmar').\n- Prioriza lo importante y reciente. Sé conciso y fácil de hojear.\nDevuelve SOLO Markdown, sin preámbulos.",
+    "user_prompt": "Tema(s): {topics}\nFecha: {date}\n\nRedacta el resumen. Para cada tema incluye 3-6 historias clave. Por historia: título corto en negrita, 2-3 frases de síntesis en {lang}, los enlaces a las fuentes y una etiqueta de confianza.\n\nÍtems disponibles (JSON):\n{items_json}",
+    "header": "# Sibylla — Resumen ({topics})\n_Generado {date} · redactado por {provider}:{model} · {count} ítems analizados_\n\n"
+  },
+
+  "web": {
+    "page_title": "Sibylla — Lo que está sucediendo. Lo que sucederá.",
+    "nav_present": "Lo que sucede",
+    "nav_sources": "Fuentes",
+    "nav_about": "Acerca",
+    "hero_eyebrow": "Lee · filtra · jerarquiza · anticipa",
+    "hero_heading": "Lo que está sucediendo.",
+    "hero_subtitle": "Sibylla reúne las fuentes más fiables de ciencia y tecnología, separa la señal del ruido y te muestra lo que ocurre hoy — y lo que se está gestando. Siempre con enlace a la fuente original.",
+    "hero_cta": "Ver lo que sucede",
+    "hero_how": "Cómo funciona",
+    "hero_timestamp": "Última lectura · {date} · {count} señales en {sources} fuentes",
+    "section_heading": "Lo que está sucediendo",
+    "section_subtitle": "El pulso de hoy en ciencia y tecnología",
+    "observes": "Sibylla observa",
+    "warns": "Sibylla advierte",
+    "warn_text": "Lo marcado con sello dorado (I) viene de fuente primaria o revisada por pares. La plata (II) es periodismo; trátalo como contexto, no como verdad revelada. El verde (III) es agregador o discusión: señal débil, sin confirmar.",
+    "portal_subtitle": "tu reportera · lee el presente, anticipa el futuro",
+    "tier1_label": "primaria / revisada por pares",
+    "tier2_label": "periodismo",
+    "tier3_label": "agregador / discusión",
+    "footer_motto": "No republica: detecta la noticia y enlaza a la fuente original. · sibylla.cl",
+    "voice": "He leído {count} señales en {sources} fuentes y las he ordenado por confiabilidad; estas son las que merecen tu atención.",
+    "no_date": "s/f",
+    "months": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
+    "topics": {
+      "ai": "Inteligencia artificial",
+      "computing": "Computación",
+      "space": "Espacio",
+      "physics": "Física",
+      "biotech": "Biotecnología",
+      "medicine": "Medicina",
+      "neuroscience": "Neurociencia",
+      "climate": "Clima",
+      "energy": "Energía",
+      "general_science": "Ciencia",
+      "general_tech": "Tecnología"
+    }
+  }
+}

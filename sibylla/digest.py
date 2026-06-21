@@ -1,20 +1,19 @@
-"""Renderiza los ítems rankeados en un resumen Markdown con enlaces a la fuente.
+"""Render determinista de los ítems rankeados a Markdown con enlaces a la fuente.
 
-NOTA: esta versión arma el resumen de forma determinista (sin LLM). El gancho
-`summarize_items()` queda listo para enchufar más adelante una síntesis con
-Claude (la "procesamiento de la información" que se verá después).
+Usa el módulo i18n para generar el resumen en el idioma pedido.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from .i18n import load_translations, t
 from .models import NewsItem
 
 TIER_LABEL = {1: "T1", 2: "T2", 3: "T3"}
 
 
-def _meta_line(it: NewsItem) -> str:
-    date = f"{it.published:%Y-%m-%d}" if it.published else "s/f"
+def _meta_line(it: NewsItem, no_date: str) -> str:
+    date = f"{it.published:%Y-%m-%d}" if it.published else no_date
     bits = [it.source_name, date, TIER_LABEL.get(it.tier, f"T{it.tier}")]
     if it.extra.get("points"):
         bits.append(f"▲{it.extra['points']} HN")
@@ -22,17 +21,19 @@ def _meta_line(it: NewsItem) -> str:
 
 
 def render_digest(items: list[NewsItem], topics: list[str], meta: dict,
-                  max_per_topic: int = 12) -> str:
+                  lang: str = "es", max_per_topic: int = 12) -> str:
+    tr = load_translations(lang)
     now = datetime.now(timezone.utc)
     out: list[str] = []
-    out.append(f"# Sibylla — Resumen ({', '.join(topics)})")
-    out.append(f"_Generado {now:%Y-%m-%d %H:%M UTC} · {len(items)} ítems tras deduplicar_")
+    out.append(t(tr, "digest.title", topics=", ".join(topics)))
+    out.append(t(tr, "digest.generated", date=f"{now:%Y-%m-%d %H:%M UTC}", count=len(items)))
 
     by_topic: dict[str, list[NewsItem]] = {}
     for it in items:
         key = it.topics[0] if it.topics else "otros"
         by_topic.setdefault(key, []).append(it)
 
+    no_date = t(tr, "digest.no_date")
     for topic in topics:
         group = by_topic.get(topic, [])[:max_per_topic]
         if not group:
@@ -40,16 +41,13 @@ def render_digest(items: list[NewsItem], topics: list[str], meta: dict,
         out.append(f"\n## {topic}\n")
         for it in group:
             out.append(f"- **[{it.title}]({it.url})**  ")
-            out.append(f"  <sub>{_meta_line(it)}</sub>")
+            out.append(f"  <sub>{_meta_line(it, no_date)}</sub>")
             if it.summary:
                 snippet = it.summary[:240] + ("…" if len(it.summary) > 240 else "")
                 out.append(f"  {snippet}")
 
     out.append("\n---")
-    out.append(
-        "<sub>Tiers: **T1** primaria/peer-review · **T2** periodismo · "
-        "**T3** agregador/discusión. Cada ítem enlaza a su fuente original.</sub>"
-    )
+    out.append(f"<sub>{t(tr, 'digest.tier_footer')}</sub>")
     return "\n".join(out)
 
 

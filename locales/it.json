@@ -1,0 +1,67 @@
+{
+  "_meta": { "language": "italiano", "code": "it" },
+
+  "cli": {
+    "no_items": "Nessun elemento ottenuto. Controlla gli argomenti/fonti o la connessione.",
+    "no_llm": "Nessun LLM configurato in .env. Uso il riepilogo deterministico.",
+    "llm_unavailable": "LLM non disponibile ({error}). Uso il riepilogo deterministico.",
+    "summarizing": "Riassumendo con {provider} ({model})…",
+    "result_line": "✅ {count} elementi · {mode} -> {path}",
+    "mode_ai": "IA",
+    "mode_deterministic": "lista deterministica",
+    "web_generated": "🌐 Sito statico -> {path}"
+  },
+
+  "digest": {
+    "title": "# Sibylla — Riepilogo ({topics})",
+    "generated": "_Generato {date} · {count} elementi dopo deduplica_",
+    "tier_footer": "Tier: **T1** primaria/revisione paritaria · **T2** giornalismo · **T3** aggregatore/discussione. Ogni elemento rimanda alla fonte originale.",
+    "no_date": "n/d"
+  },
+
+  "summarize": {
+    "lang_name": "italiano",
+    "system_prompt": "Sei Sibylla, un'assistente che redige riepiloghi di notizie di scienza e tecnologia. Scrivi SEMPRE in {lang}. Regole rigorose:\n- Usa SOLO gli elementi che ti passo; non inventare fatti, cifre né collegamenti.\n- Ogni storia rimanda alla fonte con link Markdown reali presi dal campo 'url'.\n- Raggruppa in un'unica storia gli elementi che trattano la stessa notizia.\n- Segna l'affidabilità in base al tier: T1 = primaria/revisione paritaria (alta), T2 = giornalismo (media), T3 = aggregatore/discussione (segnale, non confermato).\n- Se una storia appare solo in T3, dillo ('in discussione / non confermato').\n- Dai priorità a ciò che è importante e recente. Sii conciso e facile da scorrere.\nRestituisci SOLO Markdown, senza preamboli.",
+    "user_prompt": "Argomento/i: {topics}\nData: {date}\n\nRedigi il riepilogo. Per ogni argomento includi 3-6 storie chiave. Per ogni storia: titolo breve in grassetto, 2-3 frasi di sintesi in {lang}, i link alle fonti e un'etichetta di affidabilità.\n\nElementi disponibili (JSON):\n{items_json}",
+    "header": "# Sibylla — Riepilogo ({topics})\n_Generato {date} · redatto da {provider}:{model} · {count} elementi analizzati_\n\n"
+  },
+
+  "web": {
+    "page_title": "Sibylla — Ciò che sta accadendo. Ciò che accadrà.",
+    "nav_present": "Cosa succede",
+    "nav_sources": "Fonti",
+    "nav_about": "Informazioni",
+    "hero_eyebrow": "Legge · filtra · classifica · anticipa",
+    "hero_heading": "Ciò che sta accadendo.",
+    "hero_subtitle": "Sibylla raccoglie le fonti più affidabili di scienza e tecnologia, separa il segnale dal rumore e ti mostra ciò che accade oggi — e ciò che si sta preparando. Sempre con link alla fonte originale.",
+    "hero_cta": "Vedi cosa succede",
+    "hero_how": "Come funziona",
+    "hero_timestamp": "Ultima lettura · {date} · {count} segnali in {sources} fonti",
+    "section_heading": "Ciò che sta accadendo",
+    "section_subtitle": "Il polso di oggi in scienza e tecnologia",
+    "observes": "Sibylla osserva",
+    "warns": "Sibylla avverte",
+    "warn_text": "Gli elementi col sigillo d'oro (I) provengono da fonte primaria o con revisione paritaria. L'argento (II) è giornalismo; consideralo come contesto, non come verità rivelata. Il verde (III) è aggregatore o discussione: segnale debole, non confermato.",
+    "portal_subtitle": "la tua reporter · legge il presente, anticipa il futuro",
+    "tier1_label": "primaria / revisione paritaria",
+    "tier2_label": "giornalismo",
+    "tier3_label": "aggregatore / discussione",
+    "footer_motto": "Non ripubblica: individua la notizia e rimanda alla fonte originale. · sibylla.cl",
+    "voice": "Ho letto {count} segnali in {sources} fonti e li ho ordinati per affidabilità; questi sono quelli che meritano la tua attenzione.",
+    "no_date": "n/d",
+    "months": ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"],
+    "topics": {
+      "ai": "Intelligenza artificiale",
+      "computing": "Informatica",
+      "space": "Spazio",
+      "physics": "Fisica",
+      "biotech": "Biotecnologia",
+      "medicine": "Medicina",
+      "neuroscience": "Neuroscienze",
+      "climate": "Clima",
+      "energy": "Energia",
+      "general_science": "Scienza",
+      "general_tech": "Tecnologia"
+    }
+  }
+}

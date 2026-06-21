@@ -4,6 +4,7 @@ Uso:
     python -m sibylla.cli --topics ai,medicine --max-per-source 10
     python -m sibylla.cli --topics space --sources google_news_rss,arxiv_api
     python -m sibylla.cli --topics ai --summarize off   # solo lista, sin LLM
+    python -m sibylla.cli --lang en --html               # web en inglés
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from datetime import datetime
 from .config import OUTPUT_DIR
 from .digest import render_digest
 from .fetchers import TOPIC_CONFIG
+from .i18n import load_translations, resolve_lang, t
 from .llm import LLMError
 from .pipeline import DEFAULT_FREE_SOURCES, run_pipeline
 from .summarize import summarize_digest
@@ -49,6 +51,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--summarize", choices=["auto", "off"], default="auto",
                         help="auto: redacta con LLM si está configurado en .env; off: solo lista determinista")
     parser.add_argument("--out", default=None, help="ruta del archivo de salida (.md)")
+    parser.add_argument("--html", action="store_true",
+                        help="genera también la web estática (web/index.html) desde los ítems")
+    parser.add_argument("--html-out", default=None,
+                        help="ruta de salida de la web (def. web/index.html)")
+    parser.add_argument("--lang", default=None,
+                        help="idioma del resumen y la web: es, en, it, pt (def. según config, SIBYLLA_LANG, o 'es')")
     parser.add_argument("-q", "--quiet", action="store_true", help="menos logs")
     args = parser.parse_args(argv)
 
@@ -63,11 +71,13 @@ def main(argv: list[str] | None = None) -> int:
         sources = base
 
     items, meta = run_pipeline(topics, sources_filter=sources, limit=args.max_per_source)
+    lang = resolve_lang(args.lang, meta)
+    tr = load_translations(lang)
+
     if not items:
-        print("No se obtuvieron ítems. Revisa los temas/fuentes o la conexión.")
+        print(t(tr, "cli.no_items"))
         return 1
 
-    lang = meta.get("default_user_language", "es")
     markdown = None
     if args.summarize != "off":
         try:
@@ -79,20 +89,28 @@ def main(argv: list[str] | None = None) -> int:
 
     used_llm = markdown is not None
     if markdown is None:
-        markdown = render_digest(items, topics, meta)
+        markdown = render_digest(items, topics, meta, lang=lang)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     out_path = args.out or (OUTPUT_DIR / f"digest-{datetime.now():%Y%m%d-%H%M}.md")
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(markdown)
 
-    modo = "IA" if used_llm else "lista determinista"
-    print(f"\n✅ {len(items)} ítems · {modo} -> {out_path}\n")
+    modo = t(tr, "cli.mode_ai") if used_llm else t(tr, "cli.mode_deterministic")
+    print(f"\n{t(tr, 'cli.result_line', count=len(items), mode=modo, path=out_path)}\n")
     print("--- vista previa ---")
     preview = markdown.splitlines()
     print("\n".join(preview[:30]))
     if len(preview) > 30:
         print(f"... (+{len(preview) - 30} líneas en el archivo)")
+
+    if args.html:
+        from .web import build_all_sites
+        paths = build_all_sites(items, topics, meta)
+        print(f"\n🌐 Web estática generada:")
+        for p in paths:
+            print(f"  {p}")
+
     return 0
 
 

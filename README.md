@@ -84,5 +84,5 @@ Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro
 ## Notas
 
 - **Seguridad:** nunca subas `.env` (tiene claves reales). Ver [AGENTS.md](AGENTS.md).
-- **Licencia:** por definir (sugerido MIT).
+- **Licencia:** [MIT](LICENSE).
 - Para contribuir o trabajar con agentes de IA, lee [AGENTS.md](AGENTS.md).
