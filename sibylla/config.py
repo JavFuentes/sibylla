@@ -1,6 +1,7 @@
 """Carga del registro de fuentes (config/sources.yaml) y del entorno (.env)."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -62,3 +63,8 @@ def load_registry(path: Path = CONFIG_PATH) -> tuple[dict, list[Source]]:
 
 def index_by_id(sources: list[Source]) -> dict[str, Source]:
     return {s.id: s for s in sources}
+
+
+def get_site_url() -> str:
+    """URL base del sitio público, sin barra final. Lee SIBYLLA_SITE_URL del .env; si no, usa el fallback."""
+    return os.getenv("SIBYLLA_SITE_URL", "https://sibylla.cl").rstrip("/")

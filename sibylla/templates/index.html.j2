@@ -35,11 +35,12 @@
   </div>
 </div>
 {%- endmacro %}
-{% macro tarjeta(c) -%}
+{% macro tarjeta(c, also_in='') -%}
 <article class="carta" style="--sello:{{ c.seal_color }};">
   <h4><a href="{{ c.url }}">{{ c.title }}</a></h4>
   <div class="fuente"><span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span> {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
   {% if c.snippet %}<p class="resumen">{{ c.snippet }}</p>{% endif %}
+  {% if c.related %}<p class="tambien">{{ also_in }}: {% for r in c.related %}<a href="{{ r.url }}">{{ r.source_name }}</a>{% if not loop.last %} <span class="sep">·</span> {% endif %}{% endfor %}{% if c.related_extra %} <span class="sep">·</span> +{{ c.related_extra }}{% endif %}</p>{% endif %}
 </article>
 {%- endmacro %}
 <!-- ARCHIVO GENERADO por sibylla/web.py — NO editar a mano. El diseño vive en sibylla/templates/index.html.j2 -->
@@ -63,6 +64,27 @@
 </script>{% endif %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ t.page_title }}</title>
+{% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{{ site_url }}/{{ page_file }}">
+{%- for lc in all_langs %}
+<link rel="alternate" hreflang="{{ lc }}" href="{{ site_url }}/{{ lc }}.html">
+{%- endfor %}
+<link rel="alternate" hreflang="x-default" href="{{ site_url }}/index.html">
+<meta property="og:title" content="{{ t.page_title }}">
+{% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
+<meta property="og:url" content="{{ site_url }}/{{ page_file }}">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="{{ og_locale }}">
+<meta property="og:site_name" content="Sibylla">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ t.page_title }}">
+{% if meta_description %}<meta name="twitter:description" content="{{ meta_description }}">{% endif %}
+<script type="application/ld+json">
+[
+{{ jsonld }}
+]
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
@@ -247,6 +269,11 @@
   .carta .fuente{ display:flex; align-items:center; gap:10px; font-size:.76rem; letter-spacing:.04em;
     color:var(--tenue); margin-bottom:12px; flex-wrap:wrap; }
   .carta .resumen{ font-size:.92rem; color:var(--marfil-2); line-height:1.6; margin:0; }
+  .carta .tambien{ margin:12px 0 0; padding-top:10px; border-top:1px solid var(--panel-borde);
+    font-size:.72rem; letter-spacing:.03em; color:var(--tenue); line-height:1.5; }
+  .carta .tambien a{ color:var(--marfil-2); text-decoration:none; border-bottom:1px solid transparent;
+    transition:color .2s, border-color .2s; }
+  .carta .tambien a:hover{ color:var(--cian); border-bottom-color:rgba(94,230,224,.4); }
 
   .sello{ width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center;
     font-family:'Cinzel',serif; font-size:.72rem; }
@@ -424,7 +451,7 @@
       <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
     </span></div>
     <div class="rejilla">
-      {% for c in g.cards %}{{ tarjeta(c) }}{% endfor %}
+      {% for c in g.cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
     </div>
     {% if loop.first and grupos|length > 1 %}
     {{ apunte(t.warns, t.warn_text) }}

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .config import ROOT
+from .config import ROOT, get_site_url
 from .i18n import load_translations, t
 from .models import NewsItem
 from .translate import load_cache, save_cache, translate_cards
@@ -31,6 +31,12 @@ SITE_DIR = ROOT / "web"  # salida: web/{index,es,en,it,pt}.html
 # Etiqueta del idioma en su propia lengua (mayúsculas, para el selector).
 LANG_LABELS = {"es": "ESPAÑOL", "en": "ENGLISH", "it": "ITALIANO", "pt": "PORTUGUÊS"}
 ALL_LANGS = ["es", "en", "it", "pt"]
+
+# Mapa de código de idioma → locale de Open Graph (sin guion bajo, con guion).
+OG_LOCALE: dict[str, str] = {"es": "es_CL", "en": "en_US", "it": "it_IT", "pt": "pt_BR"}
+
+# Máximo de medios "También en" que se listan en una tarjeta; el resto se resume como "+N".
+_RELATED_CAP = 3
 
 # Tier -> (numeral romano, clase CSS del sello, color del acento de la tarjeta).
 _SEAL = {
@@ -76,6 +82,8 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     tr = (translations or {}).get(it.dedup_key)
     title = tr["title"] if tr else it.title
     snippet = tr["snippet"] if tr else _snippet(it.summary)
+    # Otros medios con la misma historia (capados a 3; el resto, "+N").
+    rel = it.related or []
     return {
         "url": it.url,
         "title": title,
@@ -85,6 +93,8 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         "seal_class": clase,
         "seal_color": color,
         "snippet": snippet,
+        "related": [{"source_name": r["source_name"], "url": r["url"]} for r in rel[:_RELATED_CAP]],
+        "related_extra": max(0, len(rel) - _RELATED_CAP),
     }
 
 
@@ -137,10 +147,53 @@ def _agrupar(items: list[NewsItem], topics: list[str],
     return grupos
 
 
+def _render_jsonld(site_url: str, description: str,
+                   cards: list[dict], lang: str) -> str:
+    """Genera un bloque JSON-LD con WebSite + ItemList (NewsArticle)."""
+    import json as _json
+
+    def esc(s: str) -> str:
+        return (s or "").replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ")
+
+    partes: list[str] = []
+
+    # WebSite.
+    partes.append(
+        '{"@context":"https://schema.org","@type":"WebSite",'
+        f'"name":"Sibylla","url":"{site_url}","description":"{esc(description)}",'
+        f'"inLanguage":"{lang}"'
+        '}'
+    )
+
+    # ItemList con NewsArticle incrustados.
+    if cards:
+        items_json: list[str] = []
+        for i, c in enumerate(cards, start=1):
+            items_json.append(
+                '{"@type":"ListItem","position":' + str(i) + ','
+                '"item":{"@type":"NewsArticle",'
+                f'"headline":"{esc(c["title"])}",'
+                f'"url":"{esc(c["url"])}",'
+                f'"datePublished":"{esc(c["date"])}",'
+                '"sourceOrganization":{"@type":"Organization",'
+                f'"name":"{esc(c["source_name"])}"'
+                '},'
+                f'"description":"{esc(c["snippet"])}"'
+                '}}'
+            )
+        partes.append(
+            '{"@context":"https://schema.org","@type":"ItemList",'
+            f'"itemListElement":[{",".join(items_json)}]'
+            '}'
+        )
+
+    return "\n".join(partes)
+
+
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
-                  lang: str = "es", max_por_tema: int = 6,
-                  is_landing: bool = False,
-                  translations: dict | None = None) -> dict:
+                   lang: str = "es", max_por_tema: int = 6,
+                   is_landing: bool = False,
+                   translations: dict | None = None) -> dict:
     """Construye el contexto que recibe la plantilla."""
     tr = load_translations(lang)
     tw = tr["web"]
@@ -162,6 +215,19 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     # Para que el JS de auto-detección sepa a dónde redirigir.
     lang_files = {lc: f"{lc}.html" for lc in ALL_LANGS}
 
+    # Variables SEO.
+    site_url = get_site_url()
+    page_file = "index.html" if is_landing else f"{lang}.html"
+    meta_description = tw.get("meta_description", "")
+    og_locale = OG_LOCALE.get(lang, f"{lang}_{lang.upper()}")
+
+    # JSON-LD WebSite + ItemList con todas las tarjetas visibles.
+    all_cards: list[dict] = []
+    for g in grupos:
+        for c in g["cards"]:
+            all_cards.append(c)
+    jsonld = _render_jsonld(site_url, meta_description, all_cards, lang)
+
     return {
         "lang": lang,
         "is_landing": is_landing,
@@ -176,6 +242,11 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "grupos": grupos,
         "observa": observa,
         "t": tw,
+        "site_url": site_url,
+        "page_file": page_file,
+        "meta_description": meta_description,
+        "og_locale": og_locale,
+        "jsonld": jsonld,
     }
 
 
@@ -231,9 +302,71 @@ def _build_translations(items: list[NewsItem], topics: list[str],
     return by_lang
 
 
+def _write_robots(site_url: str) -> Path:
+    """Escribe web/robots.txt."""
+    content = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        f"Sitemap: {site_url}/sitemap.xml\n"
+    )
+    out = SITE_DIR / "robots.txt"
+    out.write_text(content, encoding="utf-8")
+    return out
+
+
+def _write_sitemap(site_url: str, lastmod: str) -> Path:
+    """Escribe web/sitemap.xml con todas las páginas y anotaciones hreflang."""
+    urls: list[str] = []
+    # Páginas de idioma.
+    for lang in ALL_LANGS:
+        loc = f"{site_url}/{lang}.html"
+        alts = "\n".join(
+            f'    <xhtml:link rel="alternate" hreflang="{lc}" href="{site_url}/{lc}.html"/>'
+            for lc in ALL_LANGS
+        )
+        default = f'    <xhtml:link rel="alternate" hreflang="x-default" href="{site_url}/index.html"/>'
+        urls.append(
+            f"  <url>\n"
+            f"    <loc>{loc}</loc>\n"
+            f"    <lastmod>{lastmod}</lastmod>\n"
+            f"    <changefreq>hourly</changefreq>\n"
+            f"    <priority>0.9</priority>\n"
+            f"{alts}\n"
+            f"{default}\n"
+            f"  </url>"
+        )
+    # Página de aterrizaje (x-default).
+    loc_index = f"{site_url}/index.html"
+    alts_index = "\n".join(
+        f'    <xhtml:link rel="alternate" hreflang="{lc}" href="{site_url}/{lc}.html"/>'
+        for lc in ALL_LANGS
+    )
+    default_index = f'    <xhtml:link rel="alternate" hreflang="x-default" href="{loc_index}"/>'
+    urls.append(
+        f"  <url>\n"
+        f"    <loc>{loc_index}</loc>\n"
+        f"    <lastmod>{lastmod}</lastmod>\n"
+        f"    <changefreq>hourly</changefreq>\n"
+        f"    <priority>1.0</priority>\n"
+        f"{alts_index}\n"
+        f"{default_index}\n"
+        f"  </url>"
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+        '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+        + "\n".join(urls) +
+        "\n</urlset>\n"
+    )
+    out = SITE_DIR / "sitemap.xml"
+    out.write_text(xml, encoding="utf-8")
+    return out
+
+
 def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
-                    max_por_tema: int = 6, translate: bool = True,
-                    translate_tracker: list[dict] | None = None) -> list[Path]:
+                     max_por_tema: int = 6, translate: bool = True,
+                     translate_tracker: list[dict] | None = None) -> list[Path]:
     """Genera un HTML por idioma + index.html de aterrizaje con auto-detección.
 
     Estructura generada:
@@ -268,6 +401,12 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     out_landing = SITE_DIR / "index.html"
     out_landing.write_text(html_landing, encoding="utf-8")
     paths.append(out_landing)
+
+    # Archivos SEO auxiliares.
+    ahora = datetime.now(timezone.utc)
+    site_url = get_site_url()
+    paths.append(_write_robots(site_url))
+    paths.append(_write_sitemap(site_url, ahora.strftime("%Y-%m-%d")))
 
     return paths
 

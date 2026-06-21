@@ -16,7 +16,8 @@
     "title": "# Sibylla — Resumo ({topics})",
     "generated": "_Gerado {date} · {count} itens após deduplicação_",
     "tier_footer": "Tiers: **T1** primária/revisão por pares · **T2** jornalismo · **T3** agregador/discussão. Cada item tem link para a fonte original.",
-    "no_date": "s/d"
+    "no_date": "s/d",
+    "also_in": "também em"
   },
 
   "summarize": {
@@ -33,6 +34,7 @@
 
   "web": {
     "page_title": "Sibylla — O que está acontecendo. O que acontecerá.",
+    "meta_description": "Sibylla reúne as fontes mais confiáveis de ciência e tecnologia, separa o sinal do ruído e mostra o que acontece hoje em IA, medicina, espaço, física e mais. Sempre com link para a fonte original.",
     "nav_present": "O que acontece",
     "nav_github": "GitHub",
     "nav_about": "Sobre",
@@ -57,6 +59,7 @@
     "footer_motto": "Não republica: detecta a notícia e vincula à fonte original. · sibylla.cl",
     "voice": "Li {count} sinais em {sources} fontes e os ordenei por confiabilidade; estes são os que merecem sua atenção.",
     "no_date": "s/d",
+    "also_in": "Também em",
     "months": ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"],
     "topics": {
       "ai": "Inteligência artificial",
