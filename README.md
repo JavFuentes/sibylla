@@ -4,7 +4,7 @@
 
 Sibylla revisa cada cierto tiempo temas que te interesan (empezando por **ciencia y tecnología**) y te entrega un resumen ordenado. No republica el contenido: **detecta la noticia y enlaza a una fuente fiable**. El diseño es agnóstico de tema (se escala por configuración) y agnóstico de proveedor de IA (conectas la API que quieras, o ninguna).
 
-> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La automatización periódica y la entrega (email/web) están en el roadmap.
+> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La web estática multilingüe (4 idiomas) está operativa. La automatización periódica y la entrega por email están en el roadmap.
 
 ---
 
@@ -21,14 +21,18 @@ Sibylla revisa cada cierto tiempo temas que te interesan (empezando por **cienci
 
 ```
  FUENTES                INGESTA               PROCESO                SALIDA
-┌──────────────┐   ┌────────────────┐   ┌──────────────────┐   ┌──────────────┐
-│ APIs (arXiv, │   │ fetchers.py    │   │ pipeline.py      │   │ digest.py /  │
-│ PubMed)      │──▶│ normaliza a    │──▶│ dedupe + rank +  │──▶│ summarize.py │
-│ Google News  │   │ NewsItem;      │   │ diversify;       │   │ -> Markdown  │
-│ Hacker News  │   │ relevancia     │   │ por tema         │   │ con enlaces  │
-│ Medios RSS   │   │ por tema       │   │                  │   │ (output/)    │
-│ X (opcional) │   └────────────────┘   └──────────────────┘   └──────────────┘
-└──────────────┘                                              IA opcional (llm.py)
+┌──────────────┐   ┌────────────────┐   ┌──────────────────┐   ┌──────────────────┐
+│ APIs (arXiv, │   │ fetchers.py    │   │ pipeline.py      │   │ digest.py /      │
+│ PubMed)      │──▶│ normaliza a    │──▶│ dedupe + rank +  │──▶│ summarize.py     │
+│ Google News  │   │ NewsItem;      │   │ diversify;       │   │ -> Markdown      │
+│ Hacker News  │   │ relevancia     │   │ por tema         │   │ (output/)        │
+│ Medios RSS   │   │ por tema       │   │                  │   ├──────────────────┤
+│ X (opcional) │   └────────────────┘   └──────────────────┘   │ web.py           │
+└──────────────┘        │                                    │ -> HTML estático │
+                   i18n.py +                                  │ (web/*.html)     │
+                   locales/{es,en,it,pt}                      │ 4 idiomas        │
+                   (traducciones)                             └──────────────────┘
+                                                  IA opcional (llm.py)
 ```
 
 Cada ítem conserva su **URL de origen** y su **tier de confianza**. Ver [`config/README.md`](config/README.md) para el registro de fuentes y los tiers.
@@ -56,9 +60,15 @@ python -m sibylla.cli --topics space --sources google_news_rss,arxiv_api
 # Forzar solo lista (sin IA), o incluir X (DE PAGO, con tope de presupuesto)
 python -m sibylla.cli --topics ai --summarize off
 python -m sibylla.cli --topics ai --with-x
+
+# Generar también web estática (español por defecto)
+python -m sibylla.cli --topics ai,medicine --html
+
+# Web en inglés + resumen Markdown en inglés
+python -m sibylla.cli --topics space --lang en --html
 ```
 
-El resumen se escribe en `output/digest-AAAAMMDD-HHMM.md`.
+El resumen se escribe en `output/digest-AAAAMMDD-HHMM.md`. La web se genera en `web/{index,es,en,it,pt}.html`.
 
 Temas disponibles: `ai, computing, space, physics, biotech, medicine, neuroscience, climate, energy, general_science, general_tech`.
 
@@ -68,6 +78,7 @@ Toda la configuración sensible vive en `.env` (que **no** se sube al repo). Cop
 
 - **IA (opcional):** `LLM_PROVIDER` (`anthropic` / `openai` / `openrouter` / `openai_compatible` / `ollama`), `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`.
 - **X / Twitter (opcional, de pago):** `X_BEARER_TOKEN` (+ claves). El tope mensual de lecturas vive en `config/sources.yaml` (`x_twitter.monthly_read_budget`) y el uso se cuenta en `data/x_usage.json`.
+- **Idioma de salida:** `SIBYLLA_LANG` (`es`, `en`, `it`, `pt`). Si no se define, se usa `default_user_language` de `config/sources.yaml`. Fallback: `es`.
 - **Otras (opcionales):** `NCBI_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`, `GUARDIAN_API_KEY`, `REDDIT_*`, `BLUESKY_*`.
 
 Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro curado por tiers).
@@ -78,11 +89,13 @@ Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro
 - [x] Resumen con IA multi-proveedor (con fallback determinista)
 - [x] Calidad: relevancia bilingüe, diversidad, URLs limpias de medios
 - [x] Más fuentes (medios RSS + español + X con presupuesto)
-- [ ] **Automatización periódica + entrega (email / web en sibylla.cl)**
+- [x] Web estática multilingüe (4 idiomas: es, en, it, pt) generada desde el pipeline
+- [ ] Automatización periódica + entrega por email
 - [ ] Resolver URLs de Google News (formato opaco actual) — mitigado con medios directos
 
 ## Notas
 
 - **Seguridad:** nunca subas `.env` (tiene claves reales). Ver [AGENTS.md](AGENTS.md).
+- **Tests:** lógica de dominio pura (URLs, relevancia bilingüe). Ver [TEST.md](TEST.md).
 - **Licencia:** [MIT](LICENSE).
 - Para contribuir o trabajar con agentes de IA, lee [AGENTS.md](AGENTS.md).
