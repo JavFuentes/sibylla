@@ -106,7 +106,7 @@ def _agrupar(items: list[NewsItem], topics: list[str],
 
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                   lang: str = "es", max_por_tema: int = 6,
-                  is_landing: bool = False) -> dict:
+                   is_landing: bool = False) -> dict:
     """Construye el contexto que recibe la plantilla."""
     tr = load_translations(lang)
     tw = tr["web"]

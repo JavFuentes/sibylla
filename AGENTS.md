@@ -63,6 +63,19 @@ web/             # sitio estático generado — ignorado por git
 
 `run_pipeline(topics, sources, limit)` → por cada fuente `fetch_source` → `dedupe` (URL canónica / título) → `rank` (`tier × frescura` + bonus HN) → `diversify` (máx. 3 por fuente y tema). El CLer decide si resumir con IA (`summarize_digest`, si hay LLM) o con el render determinista (`render_digest`).
 
+## Web (ver `web.py`)
+
+La web se renderiza desde `sibylla/templates/index.html.j2` (fuente de verdad). **Nunca edites `web/*.html` a mano**; se sobrescriben en cada corrida. Para cambiar diseño/textos:
+- **CSS/estructura** → `templates/index.html.j2`
+- **Textos UI** → `locales/{es,en,it,pt}.json` (sección `"web"`)
+- **Contenido** → lo genera el pipeline automáticamente
+
+### Selector de tarjetas por tema
+
+Cada `.tema` tiene un control `− N +` (valores 0, 2, 4, 6) que el usuario ajusta en el navegador. Persiste en `localStorage` como JSON `{"topic_id": n}`. El JS (`querySelector('.carta')` por rejilla adyacente) oculta/muestra tarjetas sin recargar.
+
+**Implicación para traducción futura:** cuando se traduzcan tarjetas con LLM (estrategia B+A), solo se traducen las N visibles según `sibylla_cards`, ahorrando tokens.
+
 ## Seguridad (importante)
 
 - **Nunca** commitees `.env` (claves reales de X / IA). Está en `.gitignore`; mantenlo así.

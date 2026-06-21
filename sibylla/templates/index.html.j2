@@ -186,6 +186,11 @@
   .boton.fantasma:hover{ border-color:var(--oro-claro); color:var(--oro-claro); }
   .marca-tiempo{ margin-top:26px; font-size:.8rem; letter-spacing:.06em; color:var(--tenue);
     display:flex; align-items:center; gap:10px; }
+  .card-ctrl{ display:flex; align-items:center; gap:2px; flex:none; }
+  .card-ctrl-btn{ background:none; border:none; color:var(--tenue); cursor:pointer;
+    font-size:.78rem; padding:0 3px; line-height:1; transition:color .2s; }
+  .card-ctrl-btn:hover{ color:var(--oro-claro); }
+  .card-ctrl-val{ color:var(--marfil-2); font-size:.72rem; min-width:1.2em; text-align:center; }
   .pulso{ width:8px; height:8px; border-radius:50%; background:var(--cian);
     box-shadow:0 0 0 0 rgba(94,230,224,.6); animation:latir 2.4s infinite; }
   @keyframes latir{ 0%{ box-shadow:0 0 0 0 rgba(94,230,224,.5);} 70%{ box-shadow:0 0 0 9px rgba(94,230,224,0);} 100%{ box-shadow:0 0 0 0 rgba(94,230,224,0);} }
@@ -412,7 +417,12 @@
     {{ apunte(t.observes, observa) }}
 
     {% for g in grupos %}
-    <div class="tema"><h3>{{ g.label }}</h3><span class="raya"></span></div>
+    <div class="tema" data-topic="{{ g.id }}"><h3>{{ g.label }}</h3><span class="raya"></span>
+    <span class="card-ctrl">
+      <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+      <span class="card-ctrl-val">6</span>
+      <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+    </span></div>
     <div class="rejilla">
       {% for c in g.cards %}{{ tarjeta(c) }}{% endfor %}
     </div>
@@ -449,6 +459,48 @@
       try{localStorage.setItem('sibylla_lang',code);}catch(_){}
     });
   }
+})();
+/* Selector de tarjetas por tema (0,2,4,6). Uno por cada .tema. */
+(function(){
+  var steps=[0,2,4,6];
+  function load(){ try{ return JSON.parse(localStorage.getItem('sibylla_cards')||'{}'); }catch(_){ return {}; } }
+  function save(o){ try{ localStorage.setItem('sibylla_cards',JSON.stringify(o)); }catch(_){} }
+  function apply(topic, n){
+    var rej=document.querySelector('.tema[data-topic="'+topic+'"]');
+    if(!rej)return;
+    rej=rej.nextElementSibling;
+    if(!rej||!rej.classList.contains('rejilla'))return;
+    var cards=rej.querySelectorAll('.carta');
+    for(var i=0;i<cards.length;i++) cards[i].style.display=i<n?'':'none';
+  }
+  function updateVal(topic, n){
+    var tema=document.querySelector('.tema[data-topic="'+topic+'"]');
+    if(!tema)return;
+    var val=tema.querySelector('.card-ctrl-val');
+    if(val) val.textContent=n;
+  }
+  function step(btn, dir){
+    var tema=btn.closest('.tema');
+    if(!tema)return;
+    var topic=tema.dataset.topic;
+    var cur=load()[topic];
+    if(cur===undefined) cur=6;
+    var idx=steps.indexOf(cur);
+    var next=steps[Math.min(steps.length-1, Math.max(0, idx+dir))];
+    var o=load(); o[topic]=next; save(o);
+    apply(topic, next); updateVal(topic, next);
+  }
+  /* Inicializar */
+  var saved=load();
+  document.querySelectorAll('.tema[data-topic]').forEach(function(tema){
+    var topic=tema.dataset.topic;
+    var n=saved[topic]!==undefined?saved[topic]:6;
+    apply(topic, n); updateVal(topic, n);
+  });
+  /* Vincular botones */
+  document.querySelectorAll('.card-ctrl-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){ step(this, parseInt(this.dataset.dir)); });
+  });
 })();
 </script>
 </body>

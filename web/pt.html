@@ -128,6 +128,11 @@
   .boton.fantasma:hover{ border-color:var(--oro-claro); color:var(--oro-claro); }
   .marca-tiempo{ margin-top:26px; font-size:.8rem; letter-spacing:.06em; color:var(--tenue);
     display:flex; align-items:center; gap:10px; }
+  .card-ctrl{ display:flex; align-items:center; gap:2px; flex:none; }
+  .card-ctrl-btn{ background:none; border:none; color:var(--tenue); cursor:pointer;
+    font-size:.78rem; padding:0 3px; line-height:1; transition:color .2s; }
+  .card-ctrl-btn:hover{ color:var(--oro-claro); }
+  .card-ctrl-val{ color:var(--marfil-2); font-size:.72rem; min-width:1.2em; text-align:center; }
   .pulso{ width:8px; height:8px; border-radius:50%; background:var(--cian);
     box-shadow:0 0 0 0 rgba(94,230,224,.6); animation:latir 2.4s infinite; }
   @keyframes latir{ 0%{ box-shadow:0 0 0 0 rgba(94,230,224,.5);} 70%{ box-shadow:0 0 0 9px rgba(94,230,224,0);} 100%{ box-shadow:0 0 0 0 rgba(94,230,224,0);} }
@@ -325,7 +330,7 @@
       </div>
       <div class="marca-tiempo">
         <span class="pulso" aria-hidden="true"></span>
-        Última leitura · 21 jun 2026, 11:47 UTC · 108 sinais em 14 fontes
+        Última leitura · 21 jun 2026, 12:25 UTC · 121 sinais em 14 fontes
       </div>
     </div>
 
@@ -351,11 +356,16 @@
   <span class="busto" aria-hidden="true"></span>
   <div class="dice">
     <span class="quien">Sibylla observa</span>
-    <p>«Li 108 sinais em 14 fontes e os ordenei por confiabilidade; estes são os que merecem sua atenção.»</p>
+    <p>«Li 121 sinais em 14 fontes e os ordenei por confiabilidade; estes são os que merecem sua atenção.»</p>
   </div>
 </div>
 
-    <div class="tema"><h3>Inteligência artificial</h3><span class="raya"></span></div>
+    <div class="tema" data-topic="ai"><h3>Inteligência artificial</h3><span class="raya"></span>
+    <span class="card-ctrl">
+      <button class="card-ctrl-btn" aria-label="Menos cartões" data-dir="-1">&minus;</button>
+      <span class="card-ctrl-val">6</span>
+      <button class="card-ctrl-btn" aria-label="Mais cartões" data-dir="1">+</button>
+    </span></div>
     <div class="rejilla">
 <article class="carta" style="--sello:#C7CEDB;">
   <h4><a href="https://phys.org/news/2026-06-climate-boosts-soybean-production-worsens.html">Climate change boosts soybean production but worsens bean quality</a></h4>
@@ -383,7 +393,12 @@
     <p>«Os itens com selo dourado (I) vêm de fonte primária ou revisada por pares. O prata (II) é jornalismo; trate como contexto, não como verdade revelada. O verde (III) é agregador ou discussão: sinal fraco, não confirmado.»</p>
   </div>
 </div>
-    <div class="tema"><h3>Medicina</h3><span class="raya"></span></div>
+    <div class="tema" data-topic="medicine"><h3>Medicina</h3><span class="raya"></span>
+    <span class="card-ctrl">
+      <button class="card-ctrl-btn" aria-label="Menos cartões" data-dir="-1">&minus;</button>
+      <span class="card-ctrl-val">6</span>
+      <button class="card-ctrl-btn" aria-label="Mais cartões" data-dir="1">+</button>
+    </span></div>
     <div class="rejilla">
 <article class="carta" style="--sello:#F2DD93;">
   <h4><a href="https://pubmed.ncbi.nlm.nih.gov/42322127/">5x-Multiplier Versus 3-Tier Model: A Pragmatic Randomized Clinical Trial for Discharge Opioid Prescriptions After Intra-Abdominal Cancer Surgery.</a></h4>
@@ -392,18 +407,18 @@
   <h4><a href="https://pubmed.ncbi.nlm.nih.gov/42322120/">Customized three dimensionally printed palatal stents: A randomized controlled clinical trial.</a></h4>
   <div class="fuente"><span class="sello t1">I</span> PubMed (NCBI E-utilities) › Clinical advances in periodontics <span class="sep">·</span> 20 jun 2026</div>
 </article><article class="carta" style="--sello:#C7CEDB;">
+  <h4><a href="https://www.scientificamerican.com/article/can-glp-1s-boost-testosterone-levels/">Can GLP-1s boost testosterone levels?</a></h4>
+  <div class="fuente"><span class="sello t2">II</span> Scientific American <span class="sep">·</span> 21 jun 2026</div>
+<p class="resumen">Preliminary study finds that testosterone levels increase or stabilize in people taking GLP-1 medications</p></article><article class="carta" style="--sello:#C7CEDB;">
   <h4><a href="https://www.sciencedaily.com/releases/2026/06/260620100422.htm">Scientists discover neurons must break their DNA to build the brain</a></h4>
   <div class="fuente"><span class="sello t2">II</span> ScienceDaily <span class="sep">·</span> 21 jun 2026</div>
 <p class="resumen">As newborn neurons make their way through the developing brain, they must squeeze through incredibly tight spaces to reach their final destinations. Researchers discovered that this physical journey routinely causes…</p></article><article class="carta" style="--sello:#C7CEDB;">
   <h4><a href="https://www.sciencedaily.com/releases/2026/06/260619020520.htm">Major review finds vaping likely causes lung and oral cancer</a></h4>
   <div class="fuente"><span class="sello t2">II</span> ScienceDaily <span class="sep">·</span> 21 jun 2026</div>
-<p class="resumen">Researchers have concluded that nicotine vapes are likely to cause lung and oral cancers, based on evidence ranging from human biomarkers to animal and laboratory studies. The findings challenge the idea that vaping is…</p></article><article class="carta" style="--sello:#C7CEDB;">
-  <h4><a href="https://phys.org/news/2026-06-radio-scans-alien-tech-latest.html">Radio scans find no alien tech from the latest interstellar comet</a></h4>
-  <div class="fuente"><span class="sello t2">II</span> Phys.org (+ MedicalXpress, TechXplore) <span class="sep">·</span> 20 jun 2026</div>
-<p class="resumen">The group leading the charge in the search for extraterrestrial life has given the all clear: An interstellar comet looks to be completely natural and free of any alien tech.</p></article><article class="carta" style="--sello:#C7CEDB;">
-  <h4><a href="https://phys.org/news/2026-06-faster-aptamer-screening-synthetic-alternatives.html">Faster aptamer screening finds synthetic alternatives to antibodies in days instead of months</a></h4>
-  <div class="fuente"><span class="sello t2">II</span> Phys.org (+ MedicalXpress, TechXplore) <span class="sep">·</span> 20 jun 2026</div>
-<p class="resumen">Aptamers are short DNA or RNA strands that can recognize and bind to a specific target molecule with high precision. Similar to antibodies, they can be used to detect these molecules or modulate their activity. Unlike…</p></article>    </div>
+<p class="resumen">Researchers have concluded that nicotine vapes are likely to cause lung and oral cancers, based on evidence ranging from human biomarkers to animal and laboratory studies. The findings challenge the idea that vaping is…</p></article><article class="carta" style="--sello:#F2DD93;">
+  <h4><a href="https://pubmed.ncbi.nlm.nih.gov/42322070/">Project Sickle Cure: A Prospective, International Observational Study of Hematopoietic Cell Transplantation for Sickle Cell Disease.</a></h4>
+  <div class="fuente"><span class="sello t1">I</span> PubMed (NCBI E-utilities) › European journal of haematology <span class="sep">·</span> 19 jun 2026</div>
+</article>    </div>
   </section>
 
 </main>
@@ -430,6 +445,48 @@
       try{localStorage.setItem('sibylla_lang',code);}catch(_){}
     });
   }
+})();
+/* Selector de tarjetas por tema (0,2,4,6). Uno por cada .tema. */
+(function(){
+  var steps=[0,2,4,6];
+  function load(){ try{ return JSON.parse(localStorage.getItem('sibylla_cards')||'{}'); }catch(_){ return {}; } }
+  function save(o){ try{ localStorage.setItem('sibylla_cards',JSON.stringify(o)); }catch(_){} }
+  function apply(topic, n){
+    var rej=document.querySelector('.tema[data-topic="'+topic+'"]');
+    if(!rej)return;
+    rej=rej.nextElementSibling;
+    if(!rej||!rej.classList.contains('rejilla'))return;
+    var cards=rej.querySelectorAll('.carta');
+    for(var i=0;i<cards.length;i++) cards[i].style.display=i<n?'':'none';
+  }
+  function updateVal(topic, n){
+    var tema=document.querySelector('.tema[data-topic="'+topic+'"]');
+    if(!tema)return;
+    var val=tema.querySelector('.card-ctrl-val');
+    if(val) val.textContent=n;
+  }
+  function step(btn, dir){
+    var tema=btn.closest('.tema');
+    if(!tema)return;
+    var topic=tema.dataset.topic;
+    var cur=load()[topic];
+    if(cur===undefined) cur=6;
+    var idx=steps.indexOf(cur);
+    var next=steps[Math.min(steps.length-1, Math.max(0, idx+dir))];
+    var o=load(); o[topic]=next; save(o);
+    apply(topic, next); updateVal(topic, next);
+  }
+  /* Inicializar */
+  var saved=load();
+  document.querySelectorAll('.tema[data-topic]').forEach(function(tema){
+    var topic=tema.dataset.topic;
+    var n=saved[topic]!==undefined?saved[topic]:6;
+    apply(topic, n); updateVal(topic, n);
+  });
+  /* Vincular botones */
+  document.querySelectorAll('.card-ctrl-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){ step(this, parseInt(this.dataset.dir)); });
+  });
 })();
 </script>
 </body>
