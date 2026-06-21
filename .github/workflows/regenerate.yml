@@ -48,7 +48,7 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
         run: python -m sibylla.cli --topics ai,medicine --html --translate auto
 
-      - name: Subir web/ al host por rsync (SSH)
+      - name: Subir web/ al host por SCP (SSH)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
@@ -58,12 +58,21 @@ jobs:
         run: |
           set -euo pipefail
           PORT="${DEPLOY_PORT:-22}"
+          HOST="${DEPLOY_HOST}"
+          USER="${DEPLOY_USER}"
+          PATH_REMOTO="${DEPLOY_PATH}"
           echo "→ Verificando que web/ existe y tiene contenido..."
-          ls -laR web/ | head -40
-          echo "→ Conectando a $DEPLOY_USER@$DEPLOY_HOST:$PORT..."
+          ls -la web/
+          echo "→ Preparando clave SSH..."
           mkdir -p ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p "$PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
-          echo "→ keyscan terminado, intentando rsync..."
-          rsync -avz -e "ssh -p $PORT -i ~/.ssh/id_deploy -o StrictHostKeyChecking=accept-new" web/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+          echo "→ Probando conectividad SSH..."
+          ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$USER@$HOST" "echo 'SSH OK'" || {
+            echo "ERROR: No se pudo conectar por SSH a $USER@$HOST:$PORT"
+            exit 1
+          }
+          echo "→ Subiendo web/ con scp..."
+          scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html "$USER@$HOST:$PATH_REMOTO/"
+          echo "✅ Deploy completado a $PATH_REMOTO"
