@@ -92,7 +92,8 @@ en tiempo de *build*, y se hornea en el HTML. Claves:
   `src_title` para invalidar si la fuente cambia el título. Regenerar solo re-traduce ítems nuevos.
 - **Degradación elegante:** sin LLM o ante error, `translate_cards` devuelve solo aciertos del cache
   y las tarjetas restantes caen a su idioma original (`_tarjeta` hace el fallback por `dedup_key`).
-  Nunca rompe el build.
+  Nunca rompe el build. Si el modelo omite ítems en un lote, se reintenta **una vez** solo los que
+  falten (`_MAX_ATTEMPTS`); lo que siga faltando queda sin cachear y se reintenta en la próxima corrida.
 - **Prompts** en cada locale bajo `"translate"` (sin llaves literales: solo `{lang}` y `{items_json}`,
   para no romper `str.format` de `i18n.t`).
 - **CLI:** `--translate auto` (defecto) traduce si hay LLM; `--translate off` deja el idioma original.

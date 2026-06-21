@@ -167,3 +167,47 @@ def test_translate_cards_todo_en_cache_no_necesita_llm(monkeypatch):
     cards = [{"id": "u:1", "title": "Orig", "snippet": "x"}]
     out = translate_cards(cards, "en", cache)
     assert out == {"u:1": {"title": "T", "snippet": "S"}}
+
+
+# ---------------------------------------------------------------------------
+# translate_cards — reintento de ids faltantes (proveedor falso, sin red)
+# ---------------------------------------------------------------------------
+class _FakeProvider:
+    """Proveedor de prueba: devuelve respuestas predefinidas, una por llamada."""
+    name = "fake"
+    model = "fake-1"
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = 0
+
+    def complete(self, system, user, **kwargs):
+        resp = self._responses[self.calls]
+        self.calls += 1
+        return resp
+
+
+def test_translate_cards_reintenta_los_faltantes(monkeypatch):
+    """Si el 1er lote omite un id, se reintenta solo ese y se completa."""
+    cards = [{"id": "u:1", "title": "A", "snippet": "a"},
+             {"id": "u:2", "title": "B", "snippet": "b"}]
+    resp1 = json.dumps([{"id": "u:1", "title": "TA", "snippet": "sa"}])  # omite u:2
+    resp2 = json.dumps([{"id": "u:2", "title": "TB", "snippet": "sb"}])  # lo devuelve
+    fake = _FakeProvider([resp1, resp2])
+    monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
+    out = translate_cards(cards, "pt", {})
+    assert out == {"u:1": {"title": "TA", "snippet": "sa"},
+                   "u:2": {"title": "TB", "snippet": "sb"}}
+    assert fake.calls == 2  # hubo exactamente un reintento
+
+
+def test_translate_cards_reintento_acotado_a_uno(monkeypatch):
+    """Si tras el reintento sigue faltando un id, no se reintenta más; cae al original."""
+    cards = [{"id": "u:1", "title": "A", "snippet": "a"},
+             {"id": "u:2", "title": "B", "snippet": "b"}]
+    resp = json.dumps([{"id": "u:1", "title": "TA", "snippet": "sa"}])  # siempre omite u:2
+    fake = _FakeProvider([resp, resp])
+    monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
+    out = translate_cards(cards, "pt", {})
+    assert out == {"u:1": {"title": "TA", "snippet": "sa"}}  # u:2 no está -> original
+    assert fake.calls == 2  # 1 lote + 1 reintento, y se detiene

@@ -34,6 +34,11 @@ log = logging.getLogger("sibylla")
 
 CACHE_PATH = ROOT / "data" / "translations.json"
 
+# Lotes de traducción: 1 intento inicial + 1 reintento de los ids que el modelo
+# no devuelva (los LLM a veces omiten elementos de un lote). Lo que siga
+# faltando cae al idioma original y se reintenta en la próxima corrida.
+_MAX_ATTEMPTS = 2
+
 
 # ---------------------------------------------------------------------------
 # Cache
@@ -143,6 +148,9 @@ def translate_cards(cards: list[dict], lang: str, cache: dict,
     `cards` son dicts {"id", "title", "snippet"} (id = dedup_key del NewsItem).
     Usa y ACTUALIZA `cache` in place. Sin LLM configurado o ante error, devuelve
     solo los aciertos del cache (el resto cae al original aguas arriba).
+
+    Si el modelo omite ítems en el lote, reintenta UNA vez solo los que falten
+    (ver `_MAX_ATTEMPTS`); lo que siga faltando cae al original.
     """
     if not cards:
         return {}
@@ -159,11 +167,23 @@ def translate_cards(cards: list[dict], lang: str, cache: dict,
     if provider is None:
         return hits
 
-    try:
-        fresh = _translate_batch(misses, lang, provider, max_tokens=max_tokens)
-    except Exception as exc:  # noqa: BLE001 — una traducción fallida nunca rompe el build
-        log.warning("Fallo al traducir a %s (%s). Tarjetas en idioma original.", lang, exc)
-        return hits
+    # Traduce en lote; si el modelo no devuelve algún id, reintenta SOLO los que
+    # falten. Una traducción fallida nunca rompe el build (se cae al original).
+    fresh: dict[str, dict] = {}
+    pendientes = misses
+    for intento in range(_MAX_ATTEMPTS):
+        try:
+            got = _translate_batch(pendientes, lang, provider, max_tokens=max_tokens)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Fallo al traducir a %s (%s). Las restantes quedan en idioma original.", lang, exc)
+            break
+        fresh.update(got)
+        pendientes = [c for c in pendientes if c["id"] not in fresh]
+        if not pendientes:
+            break
+        if intento + 1 < _MAX_ATTEMPTS:
+            log.info("Reintentando %d tarjeta(s) que %s no devolvió para %s…",
+                     len(pendientes), provider.name, lang)
 
     # Persistir las nuevas traducciones en el cache (con src_title para invalidar).
     lang_cache = cache.setdefault(lang, {})
