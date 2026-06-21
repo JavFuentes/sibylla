@@ -4,7 +4,7 @@
 
 Sibylla revisa cada cierto tiempo temas que te interesan (empezando por **ciencia y tecnología**) y te entrega un resumen ordenado. No republica el contenido: **detecta la noticia y enlaza a una fuente fiable**. El diseño es agnóstico de tema (se escala por configuración) y agnóstico de proveedor de IA (conectas la API que quieras, o ninguna).
 
-> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La web estática multilingüe (4 idiomas) está operativa. La automatización periódica y la entrega por email están en el roadmap.
+> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La web estática multilingüe (4 idiomas) está operativa, con el contenido de las tarjetas traducido por IA al idioma de cada página. El despliegue y la automatización periódica están documentados ([DEPLOY.md](DEPLOY.md)); la entrega por email sigue en el roadmap.
 
 ---
 
@@ -15,6 +15,7 @@ Sibylla revisa cada cierto tiempo temas que te interesan (empezando por **cienci
 - **Filtro de relevancia bilingüe** (ES/EN, sin tildes) y **deduplicación** por URL canónica / título.
 - **Ranking** por `tier × frescura` y **diversidad** (una sola fuente no tapa al resto).
 - **Resumen con IA opcional y multi-proveedor:** Anthropic (Claude), OpenAI, OpenRouter, cualquier endpoint compatible o **Ollama** (local). Sin LLM, genera una lista determinista.
+- **Web estática multilingüe con contenido localizado:** una página por idioma (es/en/it/pt); los títulos y snippets de las tarjetas se traducen con IA al idioma de cada página (estrategia B+A: solo lo visible, con cache en `data/`). Sin LLM, las tarjetas quedan en el idioma original de la fuente.
 - **X / Twitter opcional** con **tope de presupuesto mensual duro** (es de pago por uso).
 
 ## Arquitectura
@@ -61,10 +62,13 @@ python -m sibylla.cli --topics space --sources google_news_rss,arxiv_api
 python -m sibylla.cli --topics ai --summarize off
 python -m sibylla.cli --topics ai --with-x
 
-# Generar también web estática (español por defecto)
+# Generar también web estática (4 idiomas; tarjetas traducidas por IA si hay LLM)
 python -m sibylla.cli --topics ai,medicine --html
 
-# Web en inglés + resumen Markdown en inglés
+# Dejar las tarjetas en el idioma original de la fuente (sin traducir contenido)
+python -m sibylla.cli --topics ai,medicine --html --translate off
+
+# Web + resumen Markdown en inglés
 python -m sibylla.cli --topics space --lang en --html
 ```
 

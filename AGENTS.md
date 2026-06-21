@@ -16,6 +16,7 @@ sibylla/
   llm.py         # capa LLM agnóstica de proveedor (requests puro, sin SDKs)
   i18n.py        # internacionalización simple (JSON sin dependencias)
   web.py         # genera web estática a partir de los ítems del pipeline
+  translate.py   # traduce tarjetas de la web (título+snippet) con LLM; cache en data/
   cli.py         # punto de entrada: python -m sibylla.cli
   templates/     # plantillas Jinja2 de la web (index.html.j2)
 config/
@@ -25,8 +26,11 @@ locales/         # traducciones JSON (es, en, it, pt)
 tests/           # tests unitarios (pytest, sin red)
   test_models.py    # canonicalize_url, clean_text, NewsItem
   test_relevance.py # _strip_accents, is_relevant, classify_topics
+.github/workflows/
+  regenerate.yml # automatización: regenera y sube web/ por SSH (cron)
+DEPLOY.md        # guía genérica de despliegue + automatización (ver también)
 .env(.example)   # claves (NO se sube .env); plantilla en .env.example
-data/            # estado local (p. ej. x_usage.json) — ignorado por git
+data/            # estado local (x_usage.json, translations.json) — ignorado por git
 output/          # resúmenes generados — ignorado por git
 web/             # sitio estático generado — ignorado por git
 ```
@@ -74,7 +78,31 @@ La web se renderiza desde `sibylla/templates/index.html.j2` (fuente de verdad). 
 
 Cada `.tema` tiene un control `− N +` (valores 0, 2, 4, 6) que el usuario ajusta en el navegador. Persiste en `localStorage` como JSON `{"topic_id": n}`. El JS (`querySelector('.carta')` por rejilla adyacente) oculta/muestra tarjetas sin recargar.
 
-**Implicación para traducción futura:** cuando se traduzcan tarjetas con LLM (estrategia B+A), solo se traducen las N visibles según `sibylla_cards`, ahorrando tokens.
+### Localización de contenido (estrategia B+A — implementada)
+
+La "cáscara" de la web (UI) se traduce de forma estática vía `locales/*.json` (**A**).
+El **contenido** de las tarjetas (título + snippet) se traduce con LLM en `translate.py` (**B**),
+en tiempo de *build*, y se hornea en el HTML. Claves:
+
+- **El LLM es de build-time, no del visitante.** Las 4 páginas se pre-traducen al generar;
+  el visitante solo descarga HTML ya traducido. La API key es secreto del *operador*.
+- **Solo se traducen las tarjetas renderizadas** (≤ `max_por_tema` por tema, vía `_rendered_items`),
+  nunca el overflow → ahorra tokens.
+- **Cache** en `data/translations.json` (ignorado por git), por `{lang: {dedup_key: {...}}}` con
+  `src_title` para invalidar si la fuente cambia el título. Regenerar solo re-traduce ítems nuevos.
+- **Degradación elegante:** sin LLM o ante error, `translate_cards` devuelve solo aciertos del cache
+  y las tarjetas restantes caen a su idioma original (`_tarjeta` hace el fallback por `dedup_key`).
+  Nunca rompe el build.
+- **Prompts** en cada locale bajo `"translate"` (sin llaves literales: solo `{lang}` y `{items_json}`,
+  para no romper `str.format` de `i18n.t`).
+- **CLI:** `--translate auto` (defecto) traduce si hay LLM; `--translate off` deja el idioma original.
+
+### Despliegue y automatización
+
+`web/` es estático e ignorado por git: desplegar = **regenerar** y **subir** su contenido a la raíz
+pública de cualquier hosting. Guía genérica (sin proveedor concreto) en **[DEPLOY.md](DEPLOY.md)**, y
+workflow de GitHub Actions en `.github/workflows/regenerate.yml`. Las claves van solo como *secrets*
+de CI o en `.env` local — **nunca** en el repo (es público).
 
 ## Seguridad (importante)
 

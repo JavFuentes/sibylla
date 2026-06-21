@@ -1,0 +1,66 @@
+# Regenera la web estática de Sibylla y la sube al hosting por SSH (rsync).
+#
+# El LLM es de build-time: traduce las tarjetas a los 4 idiomas en CI y hornea
+# el HTML. Las claves viven como *secrets* cifrados del repo, NUNCA en el código
+# (este repo es público). Ver DEPLOY.md §4 para la lista de secrets.
+name: Regenerar sitio Sibylla
+
+on:
+  schedule:
+    - cron: "0 11 * * *"   # diario a las 11:00 UTC (ajusta a tu gusto)
+  workflow_dispatch: {}     # permite disparo manual desde la pestaña Actions
+
+# Evita corridas solapadas si una tarda más que el intervalo.
+concurrency:
+  group: regenerate
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # Cache de traducciones entre corridas: solo se re-traduce lo nuevo.
+      # data/ está en .gitignore; este cache lo persiste GitHub, no el repo.
+      - name: Restaurar cache de traducciones
+        uses: actions/cache@v4
+        with:
+          path: data/translations.json
+          key: translations-${{ github.run_id }}
+          restore-keys: |
+            translations-
+
+      - name: Generar sitio (con traducción de tarjetas)
+        env:
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: python -m sibylla.cli --topics ai,medicine --html --translate auto
+
+      - name: Subir web/ al host por rsync (SSH)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          PORT="${DEPLOY_PORT:-22}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "$PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Sube el contenido de web/ a la raíz pública. Añade --delete si quieres
+          # que el destino sea un espejo exacto (borra archivos ajenos al sitio).
+          rsync -az -e "ssh -p $PORT -i ~/.ssh/id_deploy" web/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"

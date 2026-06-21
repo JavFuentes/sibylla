@@ -50,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="incluye X/Twitter (DE PAGO; tope mensual en sources.yaml). Off por defecto")
     parser.add_argument("--summarize", choices=["auto", "off"], default="auto",
                         help="auto: redacta con LLM si está configurado en .env; off: solo lista determinista")
+    parser.add_argument("--translate", choices=["auto", "off"], default="auto",
+                        help="auto: traduce las tarjetas de la web al idioma de cada página si hay LLM; off: deja el idioma original")
     parser.add_argument("--out", default=None, help="ruta del archivo de salida (.md)")
     parser.add_argument("--html", action="store_true",
                         help="genera también la web estática (web/index.html) desde los ítems")
@@ -106,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.html:
         from .web import build_all_sites
-        paths = build_all_sites(items, topics, meta)
+        paths = build_all_sites(items, topics, meta, translate=(args.translate != "off"))
         print(f"\n🌐 Web estática generada:")
         for p in paths:
             print(f"  {p}")

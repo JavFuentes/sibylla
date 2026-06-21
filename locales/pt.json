@@ -26,6 +26,11 @@
     "header": "# Sibylla — Resumo ({topics})\n_Gerado {date} · redigido por {provider}:{model} · {count} itens analisados_\n\n"
   },
 
+  "translate": {
+    "system_prompt": "Você é um tradutor profissional de manchetes de ciência e tecnologia. Traduza para {lang} os textos que eu fornecer. Regras:\n- Traduza APENAS o texto; conserve nomes próprios, marcas, siglas e termos técnicos consagrados.\n- Não invente nem acrescente informações; não expanda abreviaturas.\n- Mantenha um registro jornalístico e comprimento semelhante ao original.\n- Se um texto já estiver em {lang}, devolva-o sem alterações.\nResponda APENAS com um array JSON (sem texto extra, sem markdown). Cada elemento conserva o mesmo valor de id do item e acrescenta os campos title e snippet traduzidos.",
+    "user_prompt": "Traduza para {lang}. Retorne um array JSON com um elemento por item; cada um com id (igual ao da entrada), title e snippet traduzidos.\n\nItens (JSON):\n{items_json}"
+  },
+
   "web": {
     "page_title": "Sibylla — O que está acontecendo. O que acontecerá.",
     "nav_present": "O que acontece",

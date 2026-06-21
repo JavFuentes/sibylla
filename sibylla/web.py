@@ -23,6 +23,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .config import ROOT
 from .i18n import load_translations, t
 from .models import NewsItem
+from .translate import load_cache, save_cache, translate_cards
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 SITE_DIR = ROOT / "web"  # salida: web/{index,es,en,it,pt}.html
@@ -64,40 +65,73 @@ def _label(topic: str, topic_labels: dict[str, str]) -> str:
     return topic_labels.get(topic, topic.replace("_", " ").capitalize())
 
 
-def _tarjeta(it: NewsItem, months: list[str], no_date: str) -> dict:
-    """Aplana un NewsItem a las claves que consume la plantilla."""
+def _tarjeta(it: NewsItem, months: list[str], no_date: str,
+             translations: dict | None = None) -> dict:
+    """Aplana un NewsItem a las claves que consume la plantilla.
+
+    Si `translations` trae una entrada para este ítem (por `dedup_key`), usa el
+    título y snippet traducidos; si no, cae al texto original.
+    """
     roman, clase, color = _SEAL.get(it.tier, _SEAL[3])
+    tr = (translations or {}).get(it.dedup_key)
+    title = tr["title"] if tr else it.title
+    snippet = tr["snippet"] if tr else _snippet(it.summary)
     return {
         "url": it.url,
-        "title": it.title,
+        "title": title,
         "source_name": it.source_name,
         "date": _fecha(it.published, months, no_date),
         "seal_roman": roman,
         "seal_class": clase,
         "seal_color": color,
-        "snippet": _snippet(it.summary),
+        "snippet": snippet,
     }
+
+
+def _primario(it: NewsItem) -> str:
+    """Tema principal del ítem ('otros' si no tiene)."""
+    return it.topics[0] if it.topics else "otros"
+
+
+def _orden_temas(items: list[NewsItem], topics: list[str]) -> list[str]:
+    """Orden de temas a mostrar: primero los pedidos, luego los demás que
+    aparezcan en los ítems; sin repetir."""
+    orden = list(topics) + [_primario(it) for it in items]
+    vistos: set[str] = set()
+    salida: list[str] = []
+    for t in orden:
+        if t not in vistos:
+            vistos.add(t)
+            salida.append(t)
+    return salida
+
+
+def _rendered_items(items: list[NewsItem], topics: list[str],
+                    max_por_tema: int) -> list[NewsItem]:
+    """Los NewsItem que se renderizarán como tarjetas (≤ max_por_tema por tema).
+
+    Misma regla de selección que `_agrupar`, pero devuelve los ítems en vez de
+    las tarjetas: lo usa la traducción para tocar solo lo visible (estrategia B+A).
+    """
+    salida: list[NewsItem] = []
+    for t in _orden_temas(items, topics):
+        salida.extend([it for it in items if _primario(it) == t][:max_por_tema])
+    return salida
 
 
 def _agrupar(items: list[NewsItem], topics: list[str],
              max_por_tema: int, topic_labels: dict[str, str],
-             months: list[str], no_date: str) -> list[dict]:
+             months: list[str], no_date: str,
+             translations: dict | None = None) -> list[dict]:
     """Agrupa los ítems por su tema principal, en el orden pedido en `topics`.
 
     Los temas que aparezcan en los ítems pero no en `topics` (p. ej. 'otros')
     se añaden al final, para no perder señales.
     """
-    def primario(it: NewsItem) -> str:
-        return it.topics[0] if it.topics else "otros"
-
     grupos: list[dict] = []
-    vistos: set[str] = set()
-    orden = list(topics) + [t for t in (primario(it) for it in items) if t not in topics]
-    for t in orden:
-        if t in vistos:
-            continue
-        vistos.add(t)
-        cartas = [_tarjeta(it, months, no_date) for it in items if primario(it) == t][:max_por_tema]
+    for t in _orden_temas(items, topics):
+        cartas = [_tarjeta(it, months, no_date, translations)
+                  for it in items if _primario(it) == t][:max_por_tema]
         if cartas:
             grupos.append({"id": t, "label": _label(t, topic_labels), "cards": cartas})
     return grupos
@@ -105,7 +139,8 @@ def _agrupar(items: list[NewsItem], topics: list[str],
 
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                   lang: str = "es", max_por_tema: int = 6,
-                  is_landing: bool = False) -> dict:
+                  is_landing: bool = False,
+                  translations: dict | None = None) -> dict:
     """Construye el contexto que recibe la plantilla."""
     tr = load_translations(lang)
     tw = tr["web"]
@@ -115,7 +150,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
 
     ahora = datetime.now(timezone.utc)
     n_fuentes = len({it.source_id for it in items})
-    grupos = _agrupar(items, topics, max_por_tema, topic_labels, months, no_date)
+    grupos = _agrupar(items, topics, max_por_tema, topic_labels, months, no_date, translations)
     observa = t(tr, "web.voice", count=len(items), sources=n_fuentes)
     ts = _instante(ahora, months)
     hero_ts = t(tr, "web.hero_timestamp", date=ts, count=len(items), sources=n_fuentes)
@@ -146,7 +181,8 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
 
 def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 lang: str = "es", max_por_tema: int = 6,
-                is_landing: bool = False) -> str:
+                is_landing: bool = False,
+                translations: dict | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -154,7 +190,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
         trim_blocks=True, lstrip_blocks=True,
     )
     tmpl = env.get_template("index.html.j2")
-    return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema, is_landing))
+    return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
+                                       is_landing, translations))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -167,8 +204,32 @@ def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
         )
 
 
+def _build_translations(items: list[NewsItem], topics: list[str],
+                        max_por_tema: int) -> dict[str, dict]:
+    """Traduce las tarjetas RENDERIZADAS a cada idioma (estrategia B+A).
+
+    Devuelve {lang: {dedup_key: {title, snippet}}}. Usa y actualiza el cache en
+    disco (`data/translations.json`). Sin LLM configurado, los mapas quedan
+    vacíos y las tarjetas caen a su idioma original aguas abajo.
+    """
+    rendered = _rendered_items(items, topics, max_por_tema)
+    # Cards únicas por dedup_key (deduplica por si un ítem se contara dos veces).
+    cards: list[dict] = []
+    vistos: set[str] = set()
+    for it in rendered:
+        if it.dedup_key in vistos:
+            continue
+        vistos.add(it.dedup_key)
+        cards.append({"id": it.dedup_key, "title": it.title, "snippet": _snippet(it.summary)})
+
+    cache = load_cache()
+    by_lang = {lang: translate_cards(cards, lang, cache) for lang in ALL_LANGS}
+    save_cache(cache)
+    return by_lang
+
+
 def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
-                    max_por_tema: int = 6) -> list[Path]:
+                    max_por_tema: int = 6, translate: bool = True) -> list[Path]:
     """Genera un HTML por idioma + index.html de aterrizaje con auto-detección.
 
     Estructura generada:
@@ -177,20 +238,27 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
         web/en.html     → inglés
         web/it.html     → italiano
         web/pt.html     → portugués
+
+    Si `translate` es True y hay LLM configurado, las tarjetas (título + snippet)
+    se traducen al idioma de cada página; si no, quedan en su idioma original.
     """
     _assert_min_items(items)
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
+    by_lang = _build_translations(items, topics, max_por_tema) if translate else {}
+
     # Páginas por idioma (sin auto-detección).
     for lang in ALL_LANGS:
-        html = render_html(items, topics, meta, lang=lang, max_por_tema=max_por_tema, is_landing=False)
+        html = render_html(items, topics, meta, lang=lang, max_por_tema=max_por_tema,
+                           is_landing=False, translations=by_lang.get(lang))
         out = SITE_DIR / f"{lang}.html"
         out.write_text(html, encoding="utf-8")
         paths.append(out)
 
     # Página de aterrizaje (español + JS de auto-detección).
-    html_landing = render_html(items, topics, meta, lang="es", max_por_tema=max_por_tema, is_landing=True)
+    html_landing = render_html(items, topics, meta, lang="es", max_por_tema=max_por_tema,
+                               is_landing=True, translations=by_lang.get("es"))
     out_landing = SITE_DIR / "index.html"
     out_landing.write_text(html_landing, encoding="utf-8")
     paths.append(out_landing)
