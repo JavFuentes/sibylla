@@ -35,8 +35,12 @@ def _payload(items: list[NewsItem], max_items: int) -> list[dict]:
 
 
 def summarize_digest(items: list[NewsItem], topics: list[str], lang: str = "es",
-                     max_items: int = 24, max_tokens: int = 2500) -> str | None:
-    """Redacta el resumen con el LLM configurado. None si no hay LLM."""
+                     max_items: int = 24, max_tokens: int = 2500) -> tuple[str, list[dict]] | None:
+    """Redacta el resumen con el LLM configurado.
+
+    Retorna (markdown, llm_calls) o None si no hay LLM.
+    llm_calls: [{"purpose":"summarize", "model":..., "input":N, "output":N}]
+    """
     provider = get_provider()
     if provider is None:
         return None
@@ -53,7 +57,14 @@ def summarize_digest(items: list[NewsItem], topics: list[str], lang: str = "es",
              )
 
     log.info("Resumiendo con %s (%s)…", provider.name, provider.model)
-    text = provider.complete(system, user, max_tokens=max_tokens)
+    resp = provider.complete(system, user, max_tokens=max_tokens)
+    usg = resp.usage or {}
+    calls = [{
+        "purpose": "summarize",
+        "model": f"{provider.name}:{provider.model}",
+        "input": usg.get("input", 0),
+        "output": usg.get("output", 0),
+    }]
 
     header = t(tr, "summarize.header",
                topics=", ".join(topics),
@@ -62,4 +73,4 @@ def summarize_digest(items: list[NewsItem], topics: list[str], lang: str = "es",
                model=provider.model,
                count=len(items),
                )
-    return header + text.strip() + "\n"
+    return header + resp.text.strip() + "\n", calls

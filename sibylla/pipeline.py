@@ -81,7 +81,8 @@ def diversify(items: list[NewsItem], max_per_source: int = MAX_PER_SOURCE_TOPIC)
 
 
 def run_pipeline(topics: list[str], sources_filter: list[str] | None = None,
-                 limit: int = 10) -> tuple[list[NewsItem], dict]:
+                 limit: int = 10) -> tuple[list[NewsItem], dict, int]:
+    """Retorna (items rankeados, meta del registro, conteo crudo antes de deduplicar)."""
     load_env()
     meta, all_sources = load_registry()
     by_id = index_by_id(all_sources)
@@ -98,7 +99,7 @@ def run_pipeline(topics: list[str], sources_filter: list[str] | None = None,
         log.warning("Temas sin configurar (se omiten): %s", unknown)
     if not topic_cfgs:
         log.error("Ningún tema válido. Disponibles: %s", ", ".join(TOPIC_CONFIG))
-        return [], meta
+        return [], meta, 0
 
     log.info("Fuentes: %s | Temas: %s", [s.id for s in selected], [t for t, _ in topic_cfgs])
     raw: list[NewsItem] = []
@@ -108,4 +109,4 @@ def run_pipeline(topics: list[str], sources_filter: list[str] | None = None,
     deduped = dedupe(raw)
     ranked = diversify(rank(deduped))
     log.info("Total: %d crudos -> %d tras deduplicar", len(raw), len(deduped))
-    return ranked, meta
+    return ranked, meta, len(raw)

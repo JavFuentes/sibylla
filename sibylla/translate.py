@@ -124,8 +124,13 @@ def _parse_response(raw: str, valid_ids: set[str]) -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 # Llamada al LLM (una por idioma; batch de todas las cards faltantes)
 # ---------------------------------------------------------------------------
-def _translate_batch(cards: list[dict], lang: str, provider, *, max_tokens: int) -> dict[str, dict]:
-    """Traduce en una sola llamada title+snippet de cada card a `lang`."""
+def _translate_batch(cards: list[dict], lang: str, provider, *,
+                     max_tokens: int, tracker: list[dict] | None = None) -> dict[str, dict]:
+    """Traduce en una sola llamada title+snippet de cada card a `lang`.
+
+    Si se pasa un `tracker` (lista mutable), apendea {purpose, model, input, output}
+    con el consumo de tokens de esta llamada.
+    """
     tr = load_translations(lang)
     lang_name = t(tr, "summarize.lang_name")  # reutiliza el nombre del idioma del locale
     payload = [{"id": c["id"], "title": c["title"], "snippet": c["snippet"]} for c in cards]
@@ -137,12 +142,21 @@ def _translate_batch(cards: list[dict], lang: str, provider, *, max_tokens: int)
 
     log.info("Traduciendo %d tarjetas a %s con %s (%s)…",
              len(cards), lang, provider.name, provider.model)
-    raw = provider.complete(system, user, max_tokens=max_tokens, temperature=0.2)
-    return _parse_response(raw, valid_ids={c["id"] for c in cards})
+    resp = provider.complete(system, user, max_tokens=max_tokens, temperature=0.2)
+    usg = resp.usage or {}
+    if tracker is not None:
+        tracker.append({
+            "purpose": f"translate_{lang}",
+            "model": f"{provider.name}:{provider.model}",
+            "input": usg.get("input", 0),
+            "output": usg.get("output", 0),
+        })
+    return _parse_response(resp.text, valid_ids={c["id"] for c in cards})
 
 
-def translate_cards(cards: list[dict], lang: str, cache: dict,
-                    *, max_tokens: int = 4000) -> dict[str, dict]:
+def translate_cards(cards: list[dict], lang: str, cache: dict, *,
+                    max_tokens: int = 4000,
+                    tracker: list[dict] | None = None) -> dict[str, dict]:
     """Traduce las cards a `lang`. Devuelve {id: {title, snippet}}.
 
     `cards` son dicts {"id", "title", "snippet"} (id = dedup_key del NewsItem).
@@ -151,6 +165,9 @@ def translate_cards(cards: list[dict], lang: str, cache: dict,
 
     Si el modelo omite ítems en el lote, reintenta UNA vez solo los que falten
     (ver `_MAX_ATTEMPTS`); lo que siga faltando cae al original.
+
+    Si se pasa un `tracker` (lista mutable), se apendea el uso de tokens de
+    cada llamada exitosa al LLM.
     """
     if not cards:
         return {}
@@ -173,7 +190,7 @@ def translate_cards(cards: list[dict], lang: str, cache: dict,
     pendientes = misses
     for intento in range(_MAX_ATTEMPTS):
         try:
-            got = _translate_batch(pendientes, lang, provider, max_tokens=max_tokens)
+            got = _translate_batch(pendientes, lang, provider, max_tokens=max_tokens, tracker=tracker)
         except Exception as exc:  # noqa: BLE001
             log.warning("Fallo al traducir a %s (%s). Las restantes quedan en idioma original.", lang, exc)
             break

@@ -17,7 +17,43 @@ import os
 
 import requests
 
+from .models import LLMResponse
+
 log = logging.getLogger("sibylla")
+
+
+def _extract_usage_openai(data: dict) -> dict | None:
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    inp = usage.get("prompt_tokens", 0)
+    out = usage.get("completion_tokens", 0)
+    total = usage.get("total_tokens", inp + out)
+    return _norm(inp, out, total)
+
+
+def _extract_usage_anthropic(data: dict) -> dict | None:
+    usage = data.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    inp = usage.get("input_tokens", 0)
+    out = usage.get("output_tokens", 0)
+    total = inp + out
+    return _norm(inp, out, total)
+
+
+def _extract_usage_ollama(data: dict) -> dict | None:
+    inp = data.get("prompt_eval_count")
+    out = data.get("eval_count")
+    if inp is None and out is None:
+        return None
+    inp = inp or 0
+    out = out or 0
+    return _norm(inp, out, inp + out)
+
+
+def _norm(inp: int, out: int, total: int) -> dict:
+    return {"input": max(0, int(inp)), "output": max(0, int(out)), "total": max(0, int(total))}
 
 
 class LLMError(RuntimeError):
@@ -36,7 +72,7 @@ class LLMProvider:
         self.timeout = timeout
 
     def complete(self, system: str, user: str, *, max_tokens: int = 2000,
-                 temperature: float = 0.3) -> str:
+                 temperature: float = 0.3) -> LLMResponse:
         raise NotImplementedError
 
     @staticmethod
@@ -66,9 +102,10 @@ class AnthropicProvider(LLMProvider):
             "messages": [{"role": "user", "content": user}],
         }
         data = self._post(url, headers, payload, self.timeout)
-        return "".join(
+        text = "".join(
             b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"
         ).strip()
+        return LLMResponse(text=text, usage=_extract_usage_anthropic(data))
 
 
 class OpenAICompatibleProvider(LLMProvider):
@@ -91,7 +128,10 @@ class OpenAICompatibleProvider(LLMProvider):
             ],
         }
         data = self._post(url, headers, payload, self.timeout)
-        return data["choices"][0]["message"]["content"].strip()
+        return LLMResponse(
+            text=data["choices"][0]["message"]["content"].strip(),
+            usage=_extract_usage_openai(data),
+        )
 
 
 class OllamaProvider(LLMProvider):
@@ -110,7 +150,10 @@ class OllamaProvider(LLMProvider):
             ],
         }
         data = self._post(url, {"content-type": "application/json"}, payload, self.timeout)
-        return data.get("message", {}).get("content", "").strip()
+        return LLMResponse(
+            text=data.get("message", {}).get("content", "").strip(),
+            usage=_extract_usage_ollama(data),
+        )
 
 
 _PROVIDERS = {

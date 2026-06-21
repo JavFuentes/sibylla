@@ -95,3 +95,28 @@ class NewsItem:
         if not self.published:
             return 1e9
         return (datetime.now(timezone.utc) - self.published).total_seconds() / 3600.0
+
+
+# --- respuesta del LLM -------------------------------------------------------
+@dataclass
+class LLMResponse:
+    """Respuesta normalizada de un proveedor LLM con uso de tokens."""
+    text: str
+    usage: dict | None = None  # {"input": int, "output": int, "total": int}
+
+
+# --- registro de ejecuciones (dashboard) ------------------------------------
+@dataclass
+class RunRecord:
+    """Métrica de una regeneración completa del pipeline."""
+    run_id: str              # "20260621-0955"
+    timestamp: datetime      # UTC
+    topics: list[str]
+    sources: list[str]
+    items_raw: int
+    items_final: int
+    mode: str                # "ia" | "determinista"
+    translate: bool
+    llm_calls: list[dict]    # [{"purpose":"summarize"|"translate_{lang}", "model":"...", "input":N, "output":N}]
+    tokens_total: int
+    duration_s: float

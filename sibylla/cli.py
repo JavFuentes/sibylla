@@ -11,13 +11,15 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 from .config import OUTPUT_DIR
 from .digest import render_digest
 from .fetchers import TOPIC_CONFIG
 from .i18n import load_translations, resolve_lang, t
 from .llm import LLMError
+from .models import RunRecord
 from .pipeline import DEFAULT_FREE_SOURCES, run_pipeline
 from .summarize import summarize_digest
 
@@ -38,6 +40,8 @@ def main(argv: list[str] | None = None) -> int:
             _stream.reconfigure(encoding="utf-8")
         except Exception:  # noqa: BLE001
             pass
+
+    t0 = time.perf_counter()
 
     parser = argparse.ArgumentParser(prog="sibylla", description="Ingestor de noticias de Sibylla")
     parser.add_argument("--topics", default="ai,medicine",
@@ -72,7 +76,8 @@ def main(argv: list[str] | None = None) -> int:
             base.append("x_twitter")
         sources = base
 
-    items, meta = run_pipeline(topics, sources_filter=sources, limit=args.max_per_source)
+    resolved_sources = sources or list(DEFAULT_FREE_SOURCES)
+    items, meta, raw_count = run_pipeline(topics, sources_filter=sources, limit=args.max_per_source)
     lang = resolve_lang(args.lang, meta)
     tr = load_translations(lang)
 
@@ -80,11 +85,17 @@ def main(argv: list[str] | None = None) -> int:
         print(t(tr, "cli.no_items"))
         return 1
 
+    # --- resumen (IA o determinista) ---
+    llm_calls: list[dict] = []
     markdown = None
+
     if args.summarize != "off":
         try:
-            markdown = summarize_digest(items, topics, lang=lang)
-            if markdown is None:
+            result = summarize_digest(items, topics, lang=lang)
+            if result is not None:
+                markdown, calls = result
+                llm_calls.extend(calls)
+            else:
                 log.info("Sin LLM configurado en .env. Uso el resumen determinista.")
         except LLMError as exc:
             log.warning("LLM no disponible (%s). Uso el resumen determinista.", exc)
@@ -94,7 +105,8 @@ def main(argv: list[str] | None = None) -> int:
         markdown = render_digest(items, topics, meta, lang=lang)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
-    out_path = args.out or (OUTPUT_DIR / f"digest-{datetime.now():%Y%m%d-%H%M}.md")
+    now = datetime.now(timezone.utc)
+    out_path = args.out or (OUTPUT_DIR / f"digest-{now:%Y%m%d-%H%M}.md")
     with open(out_path, "w", encoding="utf-8") as fh:
         fh.write(markdown)
 
@@ -106,12 +118,41 @@ def main(argv: list[str] | None = None) -> int:
     if len(preview) > 30:
         print(f"... (+{len(preview) - 30} líneas en el archivo)")
 
+    do_translate = args.translate != "off"
+
     if args.html:
         from .web import build_all_sites
-        paths = build_all_sites(items, topics, meta, translate=(args.translate != "off"))
+        paths = build_all_sites(items, topics, meta, translate=do_translate,
+                                translate_tracker=llm_calls)
         print(f"\n🌐 Web estática generada:")
         for p in paths:
             print(f"  {p}")
+
+    # --- dashboard de métricas ---
+    duration = time.perf_counter() - t0
+    tokens_total = sum(c.get("input", 0) + c.get("output", 0) for c in llm_calls)
+    run_id = f"{now:%Y%m%d-%H%M}"
+    record = RunRecord(
+        run_id=run_id,
+        timestamp=now,
+        topics=topics,
+        sources=resolved_sources,
+        items_raw=raw_count,
+        items_final=len(items),
+        mode="ia" if used_llm else "determinista",
+        translate=do_translate,
+        llm_calls=llm_calls,
+        tokens_total=tokens_total,
+        duration_s=round(duration, 1),
+    )
+    from .metrics import record_run
+    record_run(record)
+
+    # Generar dashboard siempre que se genere web, o si el usuario pidió html
+    if args.html:
+        from .dashboard import render_dashboard
+        dash_path = render_dashboard()
+        print(f"  {dash_path}")
 
     return 0
 

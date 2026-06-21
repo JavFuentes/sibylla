@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+{#
+  Sibylla — Dashboard de métricas
+  Muestra: historial de regeneraciones, consumo de tokens, costo estimado.
+#}
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sibylla · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#080B14">
+<style>
+  :root{
+    --obsidiana:#080B14; --noche:#0D1322; --panel:rgba(20,27,46,.55);
+    --panel-borde:rgba(217,184,95,.22); --marfil:#ECE4D2; --marfil-2:#C3BCA9;
+    --tenue:#8E8979; --oro:#D9B85F; --oro-claro:#F2DD93; --bronce:#9C7B3E;
+    --cian:#5EE6E0; --cian-claro:#A8F2EE; --tier1:#F2DD93; --tier2:#C7CEDB;
+    --tier3:#86B5A6; --radio:14px;
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; font-family:'Inter',system-ui,sans-serif; color:var(--marfil);
+    background:var(--obsidiana); -webkit-font-smoothing:antialiased; line-height:1.6;
+  }
+  .cielo{ position:fixed; inset:0; z-index:-1;
+    background:
+      radial-gradient(1100px 620px at 50% -8%, rgba(94,230,224,.10), transparent 60%),
+      radial-gradient(820px 520px at 82% 6%, rgba(217,184,95,.08), transparent 55%),
+      linear-gradient(180deg,#080B14, #0B1020 42%, #070A12);
+  }
+  .estrellas{ position:fixed; inset:0; z-index:-1; opacity:.55;
+    background-image:
+      radial-gradient(1.4px 1.4px at 24px 36px, rgba(255,255,255,.55), transparent),
+      radial-gradient(1.2px 1.2px at 130px 90px, rgba(255,255,255,.35), transparent),
+      radial-gradient(1px 1px at 200px 160px, rgba(94,230,224,.45), transparent),
+      radial-gradient(1.3px 1.3px at 300px 40px, rgba(255,255,255,.40), transparent);
+    background-size:420px 320px; background-repeat:repeat;
+  }
+  .lienzo-central{ max-width:1080px; margin:0 auto; padding:0 32px; }
+
+  /* Barra */
+  header.barra{ position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg, rgba(8,11,20,.92), rgba(8,11,20,.55));
+    backdrop-filter:blur(8px); border-bottom:1px solid rgba(217,184,95,.16); }
+  .barra .fila{ display:flex; align-items:center; justify-content:space-between; padding:16px 0; }
+  .marca{ font-family:'Cinzel',serif; font-weight:600; font-size:1.5rem; letter-spacing:.26em;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F 55%,#9C7B3E);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .marca-sub{ display:block; font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:.82rem; letter-spacing:.1em; color:var(--marfil-2); }
+  nav.dash-nav{ display:flex; gap:28px; align-items:center; }
+  nav.dash-nav a{ color:var(--marfil-2); text-decoration:none; font-size:.8rem;
+    letter-spacing:.14em; text-transform:uppercase; transition:color .2s; }
+  nav.dash-nav a:hover{ color:var(--oro-claro); }
+
+  /* Hero */
+  .hero{ padding:48px 0 32px; text-align:center; }
+  .hero h1{ font-family:'Cinzel',serif; font-weight:500; font-size:clamp(1.8rem,3.5vw,2.4rem);
+    margin:0 0 8px; color:var(--marfil); letter-spacing:.16em; }
+  .hero p{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--marfil-2);
+    margin:0 0 6px; font-size:1.05rem; }
+
+  /* Cards de resumen */
+  .resumen-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin:28px 0 42px; }
+  .resumen-card{ background:var(--panel); border:1px solid var(--panel-borde);
+    border-radius:var(--radio); padding:22px 20px; text-align:center;
+    backdrop-filter:blur(6px); transition:.25s; }
+  .resumen-card:hover{ border-color:rgba(242,221,147,.5); transform:translateY(-2px); }
+  .resumen-card .valor{
+    font-family:'Cinzel',serif; font-weight:500; font-size:clamp(1.6rem,3vw,2.2rem);
+    letter-spacing:.06em; margin:0 0 6px;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .resumen-card .label{ font-size:.76rem; letter-spacing:.08em; color:var(--tenue);
+    text-transform:uppercase; }
+
+  /* Barras de tokens */
+  .token-barras{ margin:36px 0; }
+  .token-barras h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.14em;
+    font-size:1.15rem; color:var(--marfil); margin:0 0 20px; }
+  .barra-row{ display:flex; align-items:center; gap:14px; margin-bottom:10px; font-size:.8rem; }
+  .barra-row .run-id{ width:130px; flex:none; color:var(--tenue); font-family:'Inter',sans-serif;
+    letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .barra-row .barra-track{ flex:1; height:22px; background:rgba(20,27,46,.6);
+    border-radius:6px; overflow:hidden; }
+  .barra-row .barra-fill{ height:100%; border-radius:6px;
+    background:linear-gradient(90deg, rgba(94,230,224,.65), rgba(217,184,95,.5)); }
+  .barra-row .barra-val{ width:80px; flex:none; text-align:right; color:var(--marfil-2);
+    font-variant-numeric:tabular-nums; }
+
+  /* Tabla de historial */
+  .historial h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.14em;
+    font-size:1.15rem; color:var(--marfil); margin:44px 0 20px; }
+  table{ width:100%; border-collapse:collapse; font-size:.82rem; }
+  thead th{ text-align:left; font-weight:500; font-size:.72rem; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--tenue); padding:0 14px 12px; border-bottom:1px solid rgba(217,184,95,.16); }
+  tbody td{ padding:12px 14px; border-bottom:1px solid rgba(217,184,95,.08);
+    color:var(--marfil-2); white-space:nowrap; }
+  tbody tr:hover{ background:rgba(217,184,95,.04); }
+  .tokens-cell{ color:var(--cian-claro); font-variant-numeric:tabular-nums; }
+  .cost-cell{ color:var(--oro-claro); font-variant-numeric:tabular-nums; }
+  .mode-badge{ display:inline-block; padding:2px 10px; border-radius:12px; font-size:.68rem;
+    letter-spacing:.08em; text-transform:uppercase; }
+  .mode-ia{ background:rgba(94,230,224,.12); color:var(--cian-claro);
+    border:1px solid rgba(94,230,224,.3); }
+  .mode-det{ background:rgba(142,137,121,.12); color:var(--tenue);
+    border:1px solid rgba(142,137,121,.3); }
+
+  /* Detalle expandible */
+  details.run-detail{ margin:0; }
+  details.run-detail summary{ cursor:pointer; list-style:none; }
+  details.run-detail summary::-webkit-details-marker{ display:none; }
+  tbody tr:has(details) td{ padding:0; }
+  .run-summary-row{ display:contents; }
+  .run-summary-row td{ padding:12px 14px; }
+  .detail-inner{ padding:4px 14px 14px; border-bottom:1px solid rgba(217,184,95,.08); }
+  .detail-inner h4{ font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.1em;
+    color:var(--tenue); margin:0 0 8px; text-transform:uppercase; }
+  .detail-inner table{ font-size:.76rem; margin:0; }
+  .detail-inner thead th{ font-size:.68rem; padding:0 14px 8px; }
+  .detail-inner tbody td{ padding:6px 14px; border:0; }
+
+  /* Vacío */
+  .vacio{ text-align:center; padding:60px 0; color:var(--tenue); }
+  .vacio p{ font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1.1rem; }
+
+  /* Footer */
+  footer{ margin-top:64px; border-top:1px solid rgba(217,184,95,.16);
+    background:linear-gradient(180deg, transparent, rgba(94,230,224,.03)); }
+  .pie{ padding:40px 0 50px; text-align:center; }
+  .pie .marca{ font-size:1.1rem; }
+  .pie .lema{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--tenue);
+    font-size:.95rem; margin:16px 0 0; }
+
+  /* Responsive */
+  @media (max-width:860px){
+    .resumen-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+  @media (max-width:480px){
+    .lienzo-central{ padding:0 16px; }
+    .resumen-grid{ grid-template-columns:1fr 1fr; gap:10px; }
+    .resumen-card{ padding:16px 12px; }
+    .resumen-card .valor{ font-size:1.3rem; }
+    .barra-row .run-id{ width:100px; font-size:.7rem; }
+    .barra-row .barra-val{ width:60px; font-size:.7rem; }
+    table{ font-size:.72rem; }
+    thead th, tbody td{ padding:8px 8px; }
+    .hero{ padding:32px 0 20px; }
+    .hero h1{ font-size:1.4rem; }
+  }
+</style>
+</head>
+<body>
+<div class="cielo" aria-hidden="true"></div>
+<div class="estrellas" aria-hidden="true"></div>
+
+<header class="barra">
+  <div class="lienzo-central fila">
+    <div>
+      <span class="marca">SIBYLLA</span>
+      <span class="marca-sub">dashboard · métricas</span>
+    </div>
+    <nav class="dash-nav">
+      <a href="index.html">← sitio</a>
+    </nav>
+  </div>
+</header>
+
+<main class="lienzo-central">
+
+  <section class="hero">
+    <h1>Dashboard</h1>
+    <p>Historial de regeneraciones y consumo de tokens</p>
+  </section>
+
+  {% if runs %}
+  <!-- ---- Resumen ---- -->
+  <div class="resumen-grid">
+    <div class="resumen-card">
+      <div class="valor">{{ summary.runs_n }}</div>
+      <div class="label">Ejecuciones</div>
+    </div>
+    <div class="resumen-card">
+      <div class="valor">{{ "{:,}".format(summary.tokens_total) }}</div>
+      <div class="label">Tokens totales</div>
+    </div>
+    <div class="resumen-card">
+      <div class="valor">{{ summary.items_total }}</div>
+      <div class="label">Ítems procesados</div>
+    </div>
+    <div class="resumen-card">
+      <div class="valor">${{ "%.2f"|format(summary.cost_total) }}</div>
+      <div class="label">Costo estimado</div>
+    </div>
+  </div>
+
+  <!-- ---- Barras de tokens por ejecución ---- -->
+  <section class="token-barras">
+    <h2>Tokens por ejecución</h2>
+    {% for r in runs %}
+    {% set pct = (r.tokens_total / max_token * 100) if max_token else 0 %}
+    <div class="barra-row">
+      <span class="run-id" title="{{ r.ts }}">{{ r.run_id }}</span>
+      <div class="barra-track">
+        <div class="barra-fill" style="width:{{ "%.1f"|format(pct) }}%"></div>
+      </div>
+      <span class="barra-val">{{ "{:,}".format(r.tokens_total) }}</span>
+    </div>
+    {% endfor %}
+  </section>
+
+  <!-- ---- Tabla de historial ---- -->
+  <section class="historial">
+    <h2>Historial</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Ejecución</th>
+          <th>Fecha</th>
+          <th>Temas</th>
+          <th>Ítems</th>
+          <th>Modo</th>
+          <th>Tokens</th>
+          <th>Costo</th>
+          <th>Dur.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in runs %}
+        <tr id="{{ r.run_id }}">
+          <td>
+          {% if r.calls %}
+          <details class="run-detail">
+            <summary>{{ r.run_id }}</summary>
+            <tr><td colspan="8">
+            <div class="detail-inner">
+              <h4>Desglose de llamadas LLM</h4>
+              <table>
+                <thead><tr><th>Propósito</th><th>Modelo</th><th>Input</th><th>Output</th><th>Total</th><th>Costo</th></tr></thead>
+                <tbody>
+                {% for c in r.calls %}
+                <tr>
+                  <td>{{ c.purpose }}</td>
+                  <td style="font-size:.7rem;">{{ c.model }}</td>
+                  <td class="tokens-cell">{{ "{:,}".format(c.input) }}</td>
+                  <td class="tokens-cell">{{ "{:,}".format(c.output) }}</td>
+                  <td class="tokens-cell">{{ "{:,}".format(c.total) }}</td>
+                  <td class="cost-cell">{% if c.cost is not none %}${{ "%.5f"|format(c.cost) }}{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            </td></tr>
+          </details>
+          {% else %}
+          {{ r.run_id }}
+          {% endif %}
+          </td>
+          <td>{{ r.ts }}</td>
+          <td>{{ r.topics }}</td>
+          <td>{{ r.items_final }}</td>
+          <td><span class="mode-badge {{ 'mode-ia' if r.mode == 'IA' else 'mode-det' }}">{{ r.mode }}</span></td>
+          <td class="tokens-cell">{{ "{:,}".format(r.tokens_total) }}</td>
+          <td class="cost-cell">{% if r.cost > 0 %}${{ "%.4f"|format(r.cost) }}{% else %}—{% endif %}</td>
+          <td>{{ "%.1f"|format(r.duration_s) }}s</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  {% else %}
+  <!-- Sin datos -->
+  <div class="vacio">
+    <p>Sin ejecuciones registradas todavía.</p>
+    <p>Ejecuta el pipeline con <code>--html</code> para empezar a registrar métricas.</p>
+  </div>
+  {% endif %}
+
+</main>
+
+<footer>
+  <div class="lienzo-central pie">
+    <span class="marca">SIBYLLA</span>
+    <p class="lema">Dashboard generado {{ generado }}</p>
+  </div>
+</footer>
+</body>
+</html>

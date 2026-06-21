@@ -205,12 +205,15 @@ def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
 
 
 def _build_translations(items: list[NewsItem], topics: list[str],
-                        max_por_tema: int) -> dict[str, dict]:
+                        max_por_tema: int,
+                        tracker: list[dict] | None = None) -> dict[str, dict]:
     """Traduce las tarjetas RENDERIZADAS a cada idioma (estrategia B+A).
 
     Devuelve {lang: {dedup_key: {title, snippet}}}. Usa y actualiza el cache en
     disco (`data/translations.json`). Sin LLM configurado, los mapas quedan
     vacíos y las tarjetas caen a su idioma original aguas abajo.
+
+    Si se pasa un `tracker`, se apendea el uso de tokens de cada llamada LLM.
     """
     rendered = _rendered_items(items, topics, max_por_tema)
     # Cards únicas por dedup_key (deduplica por si un ítem se contara dos veces).
@@ -223,13 +226,14 @@ def _build_translations(items: list[NewsItem], topics: list[str],
         cards.append({"id": it.dedup_key, "title": it.title, "snippet": _snippet(it.summary)})
 
     cache = load_cache()
-    by_lang = {lang: translate_cards(cards, lang, cache) for lang in ALL_LANGS}
+    by_lang = {lang: translate_cards(cards, lang, cache, tracker=tracker) for lang in ALL_LANGS}
     save_cache(cache)
     return by_lang
 
 
 def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
-                    max_por_tema: int = 6, translate: bool = True) -> list[Path]:
+                    max_por_tema: int = 6, translate: bool = True,
+                    translate_tracker: list[dict] | None = None) -> list[Path]:
     """Genera un HTML por idioma + index.html de aterrizaje con auto-detección.
 
     Estructura generada:
@@ -241,12 +245,14 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
 
     Si `translate` es True y hay LLM configurado, las tarjetas (título + snippet)
     se traducen al idioma de cada página; si no, quedan en su idioma original.
+
+    Si se pasa `translate_tracker`, se apendea el uso de tokens de cada llamada LLM.
     """
     _assert_min_items(items)
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
-    by_lang = _build_translations(items, topics, max_por_tema) if translate else {}
+    by_lang = _build_translations(items, topics, max_por_tema, tracker=translate_tracker) if translate else {}
 
     # Páginas por idioma (sin auto-detección).
     for lang in ALL_LANGS:

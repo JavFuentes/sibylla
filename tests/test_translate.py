@@ -8,6 +8,7 @@ fetchers/LLM del proyecto.
 """
 
 import json
+from sibylla.models import LLMResponse
 
 import pytest
 
@@ -184,7 +185,7 @@ class _FakeProvider:
     def complete(self, system, user, **kwargs):
         resp = self._responses[self.calls]
         self.calls += 1
-        return resp
+        return LLMResponse(text=resp)
 
 
 def test_translate_cards_reintenta_los_faltantes(monkeypatch):
