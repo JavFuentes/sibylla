@@ -15,7 +15,6 @@ archivo de traducción del idioma activo (locales/{lang}.json).
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -106,7 +105,7 @@ def _agrupar(items: list[NewsItem], topics: list[str],
 
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                   lang: str = "es", max_por_tema: int = 6,
-                   is_landing: bool = False) -> dict:
+                  is_landing: bool = False) -> dict:
     """Construye el contexto que recibe la plantilla."""
     tr = load_translations(lang)
     tw = tr["web"]
@@ -163,7 +162,7 @@ def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
     datos de prueba sobrescriban la salida real)."""
     if len(items) < min_n:
         raise ValueError(
-            f"build_site requiere al menos {min_n} ítems para generar "
+            f"Se requieren al menos {min_n} ítems para generar "
             f"(solo hay {len(items)}). ¿Datos de prueba?"
         )
 
@@ -199,14 +198,3 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     return paths
 
 
-def build_site(items: list[NewsItem], topics: list[str], meta: dict,
-               lang: str = "es",
-               out_path: str | Path | None = None,
-               max_por_tema: int = 6) -> Path:
-    """Genera un único archivo HTML (sin auto-detección). Mantenido por retrocompatibilidad."""
-    _assert_min_items(items, min_n=3)
-    html = render_html(items, topics, meta, lang, max_por_tema, is_landing=False)
-    out = Path(out_path) if out_path else (SITE_DIR / "index.html")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding="utf-8")
-    return out
