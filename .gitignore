@@ -1,0 +1,31 @@
+# --- Secretos / entorno -----------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# --- Datos locales / salida / caché de ingesta -----------------------------
+data/
+output/
+*.sqlite
+*.sqlite3
+*.db
+.cache/
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# --- Node -------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# --- OS / editores ----------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

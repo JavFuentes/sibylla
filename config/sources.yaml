@@ -1,0 +1,650 @@
+# =============================================================================
+# Sibylla — Registro de fuentes (source registry) · v1
+# =============================================================================
+# Principio rector: las fuentes se eligen y se PONDERAN por confiabilidad (tier),
+# no por idioma. La ingesta es multilingüe; el resumen final se entrega al
+# usuario en SU idioma. Ver config/README.md para el esquema y el plan de
+# presupuesto de X / señal social.
+#
+# Estado de verificación: lo marcado `verified_2026-06-20` se probó EN VIVO el
+# 2026-06-20 y funcionó. Lo marcado `known` es una fuente estándar y conocida
+# cuyo feed exacto aún hay que confirmar al construir el ingestor.
+# =============================================================================
+
+meta:
+  version: 1
+  updated: 2026-06-20
+  default_user_language: es        # idioma de salida del resumen
+  selection_principle: >
+    Seleccionar y rankear por confiabilidad (tier), no por idioma.
+    Ingesta multilingüe -> resumen localizado al idioma del usuario.
+
+  # --- Diccionarios de referencia (los usan los campos de cada fuente) -------
+  tiers:
+    1: "Primaria / autoridad: revistas peer-review, preprints, instituciones oficiales, agencias de cable."
+    2: "Periodismo de calidad de ciencia/tecnología con estándares editoriales."
+    3: "Agregadores y discusión: señal de DESCUBRIMIENTO; siempre corroborar y enlazar a una fuente Tier 1/2."
+
+  access:
+    open: "Accesible directamente vía RSS/API público."
+    needs_key: "Requiere API key gratuita."
+    blocked_for_claude_fetcher: "Bloquea el fetcher de Claude, PERO tiene feed/API público que un ingestor propio debería poder leer."
+    paywalled: "Texto completo tras pago; usamos solo título + resumen + enlace a la fuente."
+    paid_api: "API de pago / por uso (presupuestar)."
+    out: "Sin vía pública viable; solo alcanzable indirectamente vía agregador (Google News/GDELT)."
+
+  status:
+    verified_2026-06-20: "Probado en vivo el 2026-06-20 y funcionó."
+    known: "Fuente conocida/estándar; confirmar feed exacto al construir el ingestor."
+
+  topics: [general_science, general_tech, ai, computing, space, physics,
+           biotech, medicine, climate, energy, neuroscience]
+
+# =============================================================================
+# TIER 1 — APIs científicas y preprints (la columna vertebral de "avances")
+# =============================================================================
+sources:
+
+  - id: arxiv_api
+    name: "arXiv API"
+    publisher: "Cornell University"
+    tier: 1
+    type: api
+    endpoint: "http://export.arxiv.org/api/query"
+    example: "http://export.arxiv.org/api/query?search_query=cat:cs.AI&sortBy=submittedDate&sortOrder=descending&max_results=20"
+    topics: [ai, computing, physics, space, general_science]
+    lang: en
+    license: "metadata abierta; PDFs según licencia del autor"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Preprints de física, CS/IA, matemáticas, bio cuantitativa. Filtrar por categoría (cs.AI, q-bio, astro-ph...)."
+
+  - id: pubmed_eutils
+    name: "PubMed (NCBI E-utilities)"
+    publisher: "US National Library of Medicine"
+    tier: 1
+    type: api
+    endpoint: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+    example: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=cancer+immunotherapy&sort=date&retmode=json"
+    topics: [medicine, biotech, neuroscience]
+    lang: en
+    license: "metadatos/abstracts públicos; full text según editor"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Recomendado: registrar una API key gratuita de NCBI para subir el rate limit (3->10 req/s). esummary/efetch para detalles."
+
+  - id: europepmc
+    name: "Europe PMC"
+    publisher: "EMBL-EBI"
+    tier: 1
+    type: api
+    endpoint: "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+    example: "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=crispr&format=json&sort=P_PDATE_D%20desc"
+    topics: [medicine, biotech]
+    lang: en
+    license: "metadatos abiertos; subconjunto open access con texto completo"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Complementa/duplica PubMed con texto completo OA y sin key."
+
+  - id: biorxiv_medrxiv
+    name: "bioRxiv / medRxiv API"
+    publisher: "Cold Spring Harbor Laboratory"
+    tier: 1
+    type: api
+    endpoint: "https://api.biorxiv.org/details/biorxiv/"
+    topics: [biotech, medicine, neuroscience]
+    lang: en
+    license: "preprints, mayormente CC-BY / CC-BY-ND"
+    access: open
+    cost: free
+    status: known
+    notes: "Preprints biomédicos. medRxiv = clínico. Útil para detectar avances antes de la revisión por pares (marcar como 'preprint, no revisado')."
+
+  - id: crossref
+    name: "Crossref REST API"
+    publisher: "Crossref"
+    tier: 1
+    type: api
+    endpoint: "https://api.crossref.org/works"
+    topics: [general_science, medicine, physics]
+    lang: en
+    license: "metadatos abiertos"
+    access: open
+    cost: free
+    status: known
+    notes: "Metadatos de DOIs de casi todo lo publicado. Usar el 'polite pool' enviando un email en el User-Agent. Bueno para resolver/enriquecer una referencia."
+
+  - id: semantic_scholar
+    name: "Semantic Scholar Graph API"
+    publisher: "Allen Institute for AI"
+    tier: 1
+    type: api
+    endpoint: "https://api.semanticscholar.org/graph/v1/paper/search"
+    topics: [ai, computing, general_science]
+    lang: en
+    license: "metadatos abiertos"
+    access: needs_key
+    cost: free
+    status: known
+    notes: "Key gratuita recomendada para rate limit. Bueno para influencia/citaciones y descubrir papers relacionados."
+
+# --- Tier 1 — Instituciones oficiales y notas de prensa ----------------------
+
+  - id: nasa
+    name: "NASA"
+    publisher: "NASA"
+    tier: 1
+    type: rss
+    url: "https://www.nasa.gov/feed/"
+    topics: [space, general_science, climate]
+    lang: en
+    license: "dominio público (obras del gobierno de EE. UU.)"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Fuente primaria. Contenido reutilizable (dominio público)."
+
+  - id: esa
+    name: "ESA — European Space Agency"
+    publisher: "ESA"
+    tier: 1
+    type: rss
+    url: "https://www.esa.int/rssfeed/Our_Activities"
+    topics: [space, general_science]
+    lang: en
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: known
+
+  - id: eurekalert
+    name: "EurekAlert!"
+    publisher: "AAAS"
+    tier: 1
+    type: rss
+    url: "https://www.eurekalert.org/rss.php"
+    topics: [general_science, medicine, biotech, physics]
+    lang: en
+    license: "notas de prensa institucionales"
+    access: open
+    cost: free
+    status: known
+    notes: "Agregador de notas de prensa de universidades/instituciones. Excelente para detectar 'avances' temprano; OJO: es PR -> corroborar con el paper (DOI) antes de afirmar."
+
+  - id: nih_news
+    name: "NIH — National Institutes of Health (news)"
+    publisher: "NIH"
+    tier: 1
+    type: rss
+    url: "https://www.nih.gov/news-events/news-releases/feed"
+    topics: [medicine, biotech, neuroscience]
+    lang: en
+    license: "dominio público (gobierno EE. UU.)"
+    access: open
+    cost: free
+    status: known
+
+  - id: who_news
+    name: "WHO — World Health Organization (news)"
+    publisher: "WHO"
+    tier: 1
+    type: rss
+    url: "https://www.who.int/rss-feeds/news-english.xml"
+    topics: [medicine]
+    lang: en
+    license: "propietaria"
+    access: open
+    cost: free
+    status: known
+    notes: "También 'Disease Outbreak News' para alertas. Versiones en varios idiomas."
+
+# =============================================================================
+# TIER 1 — Agencias de cable (acceso problemático: documentado para constancia)
+# =============================================================================
+
+  - id: reuters
+    name: "Reuters"
+    publisher: "Thomson Reuters"
+    tier: 1
+    type: out
+    topics: [general_science, general_tech, medicine]
+    lang: en
+    license: "licencia comercial (Reuters Connect)"
+    access: out
+    cost: paid
+    status: known
+    notes: "Cerró sus RSS públicos en junio 2020. Solo alcanzable indirectamente vía Google News/GDELT (el click va a reuters.com)."
+
+  - id: ap
+    name: "Associated Press"
+    publisher: "AP"
+    tier: 1
+    type: out
+    topics: [general_science, general_tech, medicine]
+    lang: en
+    license: "licencia comercial"
+    access: out
+    cost: paid
+    status: known
+    notes: "Modelo de licenciamiento; sin feed público útil. Alcanzable solo vía agregador."
+
+# =============================================================================
+# TIER 2 — Periodismo de calidad de ciencia y tecnología
+# =============================================================================
+
+  - id: nature_news
+    name: "Nature — últimas investigaciones y noticias"
+    publisher: "Springer Nature"
+    tier: 2
+    type: rss
+    url: "https://www.nature.com/nature.rss"
+    topics: [general_science, biotech, physics, medicine]
+    lang: en
+    license: "propietaria; full text paywalled"
+    access: paywalled
+    cost: free
+    status: verified_2026-06-20
+    notes: "El .rss funciona aunque la página /news exige login. Usar título + abstract + enlace."
+
+  - id: science_aaas_news
+    name: "Science — News (AAAS)"
+    publisher: "AAAS"
+    tier: 2
+    type: rss
+    url: "https://www.science.org/rss/news_current.xml"
+    topics: [general_science, medicine, physics]
+    lang: en
+    license: "propietaria; paywall"
+    access: paywalled
+    cost: free
+    status: known
+    notes: "La web devolvió 403 a mi fetcher. Probable acceso vía RSS para un ingestor propio; full text con paywall."
+
+  - id: bbc_science
+    name: "BBC — Science & Environment"
+    publisher: "BBC"
+    tier: 2
+    type: rss
+    url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"
+    topics: [general_science, climate, space]
+    lang: en
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+
+  - id: guardian_science
+    name: "The Guardian — Science"
+    publisher: "Guardian Media Group"
+    tier: 2
+    type: rss
+    url: "https://www.theguardian.com/science/rss"
+    api_alt: "https://open-platform.theguardian.com/  (Open Platform API, key gratuita)"
+    topics: [general_science, climate, medicine]
+    lang: en
+    license: "propietaria"
+    access: blocked_for_claude_fetcher
+    cost: free
+    status: known
+    notes: "Bloquea mi fetcher. Tiene RSS público + Open Platform API GRATIS (con key, no comercial) que devuelve texto completo. Vía preferida: la API."
+
+  - id: mit_tech_review
+    name: "MIT Technology Review"
+    publisher: "MIT"
+    tier: 2
+    type: rss
+    url: "https://www.technologyreview.com/feed/"
+    topics: [ai, computing, general_tech, biotech]
+    lang: en
+    license: "propietaria; paywall medido"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+
+  - id: ars_technica
+    name: "Ars Technica"
+    publisher: "Condé Nast"
+    tier: 2
+    type: rss
+    url: "https://feeds.arstechnica.com/arstechnica/index"
+    topics: [general_tech, computing, ai, space, general_science]
+    lang: en
+    license: "propietaria"
+    access: blocked_for_claude_fetcher
+    cost: free
+    status: known
+    notes: "Bloquea mi fetcher (host en blocklist). RSS público; un ingestor propio debería poder leerlo."
+
+  - id: the_verge
+    name: "The Verge"
+    publisher: "Vox Media"
+    tier: 2
+    type: rss
+    url: "https://www.theverge.com/rss/index.xml"
+    topics: [general_tech, ai, computing]
+    lang: en
+    license: "propietaria"
+    access: blocked_for_claude_fetcher
+    cost: free
+    status: known
+    notes: "Bloquea mi fetcher. RSS público existe."
+
+  - id: wired
+    name: "WIRED"
+    publisher: "Condé Nast"
+    tier: 2
+    type: rss
+    url: "https://www.wired.com/feed/rss"
+    topics: [general_tech, ai, general_science, biotech]
+    lang: en
+    license: "propietaria; paywall medido"
+    access: blocked_for_claude_fetcher
+    cost: free
+    status: known
+    notes: "Bloquea mi fetcher. RSS público; texto completo con paywall medido -> usar resumen + enlace."
+
+  - id: techcrunch
+    name: "TechCrunch"
+    publisher: "Yahoo/TechCrunch"
+    tier: 2
+    type: rss
+    url: "https://techcrunch.com/feed/"
+    topics: [general_tech, ai, computing]
+    lang: en
+    license: "propietaria"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Industria/startups/financiación. Buen pulso del sector tech."
+
+  - id: ieee_spectrum
+    name: "IEEE Spectrum"
+    publisher: "IEEE"
+    tier: 2
+    type: rss
+    url: "https://spectrum.ieee.org/feeds/feed.rss"
+    topics: [computing, ai, energy, general_tech]
+    lang: en
+    license: "propietaria"
+    access: open
+    cost: free
+    status: known
+
+  - id: quanta
+    name: "Quanta Magazine"
+    publisher: "Simons Foundation"
+    tier: 2
+    type: rss
+    url: "https://api.quantamagazine.org/feed/"
+    topics: [physics, ai, computing, general_science, biotech]
+    lang: en
+    license: "CC-BY-NC-ND (republicación con condiciones)"
+    access: open
+    cost: free
+    status: known
+    notes: "Gratis y de altísima calidad en ciencia fundamental. Sin paywall."
+
+  - id: scientific_american
+    name: "Scientific American"
+    publisher: "Springer Nature"
+    tier: 2
+    type: rss
+    url: "https://www.scientificamerican.com/platform/syndication/rss/"
+    topics: [general_science, medicine, physics, climate]
+    lang: en
+    license: "propietaria; paywall medido"
+    access: open
+    cost: free
+    status: known
+
+  - id: new_scientist
+    name: "New Scientist"
+    publisher: "New Scientist Ltd"
+    tier: 2
+    type: rss
+    url: "https://www.newscientist.com/feed/home/"
+    topics: [general_science, physics, biotech, space]
+    lang: en
+    license: "propietaria; paywall"
+    access: paywalled
+    cost: free
+    status: known
+
+  - id: science_news
+    name: "Science News"
+    publisher: "Society for Science"
+    tier: 2
+    type: rss
+    url: "https://www.sciencenews.org/feed"
+    topics: [general_science, physics, biotech, space]
+    lang: en
+    license: "propietaria"
+    access: open
+    cost: free
+    status: known
+
+  - id: stat_news
+    name: "STAT News"
+    publisher: "Boston Globe Media"
+    tier: 2
+    type: rss
+    url: "https://www.statnews.com/feed/"
+    topics: [medicine, biotech]
+    lang: en
+    license: "propietaria; algo de paywall"
+    access: open
+    cost: free
+    status: known
+    notes: "Referencia en salud/biotecnología/farma."
+
+  - id: the_conversation
+    name: "The Conversation (global)"
+    publisher: "The Conversation"
+    tier: 2
+    type: atom
+    url: "https://theconversation.com/global/articles.atom"
+    url_es: "https://theconversation.com/es/articles.atom"
+    topics: [general_science, medicine, climate, ai]
+    lang: multi
+    license: "Creative Commons BY-ND (republicable con atribución)"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Artículos escritos por académicos. Licencia CC -> se puede citar/republicar con atribución. Tiene edición en español."
+
+  - id: phys_org
+    name: "Phys.org (+ MedicalXpress, TechXplore)"
+    publisher: "Science X"
+    tier: 2
+    type: rss
+    url: "https://phys.org/rss-feed/"
+    topics: [general_science, physics, biotech, medicine, general_tech]
+    lang: en
+    license: "propietaria"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Red amplia. MedicalXpress (medicina) y TechXplore (tecnología) son sitios hermanos con sus propios feeds."
+
+  - id: sciencedaily
+    name: "ScienceDaily"
+    publisher: "ScienceDaily LLC"
+    tier: 2
+    type: rss
+    url: "https://www.sciencedaily.com/rss/all.xml"
+    topics: [general_science, medicine, biotech, physics]
+    lang: en
+    license: "propietaria (resúmenes de notas de prensa)"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Buen volumen de divulgación. Origen suele ser nota de prensa -> corroborar con la fuente primaria."
+
+# --- Tier 2 — Fuentes en español --------------------------------------------
+
+  - id: agencia_sinc
+    name: "Agencia SINC"
+    publisher: "FECYT (España)"
+    tier: 2
+    type: rss
+    url: "https://www.agenciasinc.es/feed/Noticias"
+    topics: [general_science, medicine, biotech, physics, space]
+    lang: es
+    license: "Creative Commons BY (republicable con atribución)"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Agencia pública española de noticias de ciencia. Licencia CC -> ideal para citar/republicar."
+
+  - id: elpais_ciencia
+    name: "El País — Ciencia / Materia"
+    publisher: "PRISA"
+    tier: 2
+    type: rss
+    url: "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/ciencia/portada/"
+    topics: [general_science, medicine, space, climate]
+    lang: es
+    license: "propietaria; paywall medido"
+    access: blocked_for_claude_fetcher
+    cost: free
+    status: known
+    notes: "Bloquea mi fetcher. RSS público; un ingestor propio debería poder leerlo."
+
+  - id: bbc_mundo
+    name: "BBC News Mundo"
+    publisher: "BBC"
+    tier: 2
+    type: rss
+    url: "https://www.bbc.com/mundo/ultimas_noticias/index.xml"
+    topics: [general_science, general_tech, medicine]
+    lang: es
+    license: "propietaria"
+    access: open
+    cost: free
+    status: known
+    notes: "BBC en español; confirmar URL exacta del feed de ciencia/tecnología."
+
+# =============================================================================
+# TIER 3 — Agregadores (descubrimiento amplio y multilingüe)
+# =============================================================================
+
+  - id: google_news_rss
+    name: "Google News (búsqueda por tema)"
+    publisher: "Google"
+    tier: 3
+    type: rss_template
+    url_template: "https://news.google.com/rss/search?q={QUERY}&hl={LANG}&gl={COUNTRY}&ceid={COUNTRY}:{LANG}"
+    example: "https://news.google.com/rss/search?q=gene+therapy&hl=en-US&gl=US&ceid=US:en"
+    topics: [general_science, general_tech, medicine, ai, space, climate]
+    lang: multi
+    license: "solo titulares + enlace a la fuente original"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: >
+      Pieza clave de DESCUBRIMIENTO. Una consulta por tema/idioma. Devuelve titular + fuente + enlace
+      (incluye Reuters/AP indirectamente). Usar operadores: comillas, when:1d, site:, OR. Los enlaces
+      pasan por redirección de Google -> resolver a la URL final al guardar.
+
+  - id: gdelt_doc
+    name: "GDELT 2.0 Doc API"
+    publisher: "The GDELT Project"
+    tier: 3
+    type: api
+    endpoint: "https://api.gdeltproject.org/api/v2/doc/doc"
+    example: "https://api.gdeltproject.org/api/v2/doc/doc?query=%22gene%20therapy%22&mode=artlist&format=json&sort=datedesc"
+    topics: [general_science, general_tech, medicine, climate]
+    lang: multi
+    license: "metadatos abiertos"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Monitor global multilingüe de noticias (probado: devolvió artículos en 4 idiomas). Bueno para volumen/tono y cobertura por país."
+
+# =============================================================================
+# TIER 3 — Señal social / discusión (presupuestar X; el resto es gratis)
+# =============================================================================
+
+  - id: hacker_news
+    name: "Hacker News (Algolia Search API)"
+    publisher: "Y Combinator / Algolia"
+    tier: 3
+    type: api
+    endpoint: "https://hn.algolia.com/api/v1/search_by_date"
+    example: "https://hn.algolia.com/api/v1/search_by_date?tags=story&query=medicine&numericFilters=points%3E20"
+    topics: [ai, computing, general_tech, general_science]
+    lang: en
+    license: "metadatos abiertos"
+    access: open
+    cost: free
+    status: verified_2026-06-20
+    notes: "Mejor alternativa gratis a X para tech/IA/ciencia dura. Sin auth. Filtrar por puntos/comentarios para quedarse con lo relevante."
+
+  - id: reddit
+    name: "Reddit (Data API)"
+    publisher: "Reddit"
+    tier: 3
+    type: api
+    endpoint: "https://oauth.reddit.com/r/{subreddit}/new"
+    public_json: "https://www.reddit.com/r/{subreddit}/new.json"
+    suggested_subs: [science, medicine, technology, Futurology, askscience, EverythingScience, artificial, MachineLearning, space]
+    topics: [general_science, medicine, general_tech, ai, space]
+    lang: en
+    license: "uso no comercial en tier gratuito"
+    access: needs_key
+    cost: free
+    status: known
+    notes: "Gratis con OAuth (100 req/min); tier gratuito es SOLO no comercial. Bueno para 'qué se discute' y para detectar artículos que se vuelven virales."
+
+  - id: mastodon
+    name: "Mastodon (Fediverso)"
+    publisher: "Mastodon gGmbH (descentralizado)"
+    tier: 3
+    type: api
+    endpoint: "https://{instance}/api/v1/timelines/tag/{hashtag}"
+    suggested_instances: [fediscience.org, mastodon.social, mas.to, scholar.social]
+    suggested_tags: [science, medicine, AI, astronomy, physics, climate]
+    topics: [general_science, medicine, ai, space, physics]
+    lang: multi
+    license: "abierto (ActivityPub)"
+    access: open
+    cost: free
+    status: known
+    notes: "API gratuita por instancia. Muchos científicos migraron aquí (fediscience.org, scholar.social). Sin coste; ideal para sustituir buena parte de X."
+
+  - id: bluesky
+    name: "Bluesky (AT Protocol)"
+    publisher: "Bluesky"
+    tier: 3
+    type: api
+    endpoint: "https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts"
+    topics: [general_science, general_tech, ai]
+    lang: multi
+    license: "abierto"
+    access: needs_key
+    cost: free
+    status: known
+    notes: "Gratis. La búsqueda de posts requiere auth (app password). Comunidad científica creciente. Alternativa abierta a X sin coste."
+
+  - id: x_twitter
+    name: "X (Twitter) API v2"
+    publisher: "X Corp"
+    tier: 3
+    type: paid_api
+    endpoint: "https://api.twitter.com/2/tweets/search/recent"
+    topics: [general_science, general_tech, ai, medicine]
+    lang: multi
+    license: "comercial"
+    access: paid_api
+    cost: "pay-per-use (~$0.005/lectura de post; tope 2M/mes). Publicar: $0.015, o $0.20 si lleva enlace"
+    budget_usd_loaded: 5.00
+    monthly_read_budget: 300        # ~$1.50/mes -> ver plan en README
+    status: known
+    notes: >
+      Tier gratuito eliminado (feb-2026); cuenta nueva = pay-per-use. USAR CON CUIDADO y de forma quirúrgica:
+      solo para CONFIRMAR/enriquecer las top-N historias ya detectadas por fuentes gratis. Cap mensual duro en
+      código. NO publicar posts con enlaces ($0.20 c/u). Ver "Plan de presupuesto" en config/README.md.
