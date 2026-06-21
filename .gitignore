@@ -6,6 +6,7 @@
 # --- Datos locales / salida / caché de ingesta -----------------------------
 data/
 output/
+web/
 *.sqlite
 *.sqlite3
 *.db
