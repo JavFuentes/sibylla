@@ -24,7 +24,7 @@
                     seal_roman,seal_class,seal_color,snippet}]}]
 #}
 {% macro busto() -%}
-<span class="busto" aria-hidden="true"><svg viewBox="0 0 240 250"><path fill="#ECE4D2" d="M92,72 C84,90 78,96 78,104 C78,110 82,110 84,112 C76,118 62,124 58,128 C66,134 76,134 80,136 C76,138 73,140 72,146 C74,150 76,150 78,150 C84,156 92,158 98,162 C103,167 104,170 104,172 L100,196 L44,238 L214,238 L150,196 C151,170 152,160 152,150 C170,138 184,134 186,120 C190,104 188,92 180,80 C172,66 160,58 150,56 C132,55 118,56 110,58 C100,62 95,66 92,72 Z"/></svg></span>
+<span class="busto" aria-hidden="true"></span>
 {%- endmacro %}
 {% macro apunte(quien, texto, clase='') -%}
 <div class="apunte{% if clase %} {{ clase }}{% endif %}">
@@ -261,7 +261,7 @@
   .apunte.anticipa{ border-left-color:var(--cian);
     background:linear-gradient(90deg, rgba(94,230,224,.12), rgba(217,184,95,.03) 60%, transparent); }
   .apunte .busto{ flex:none; width:58px; height:58px; border-radius:50%;
-    background:radial-gradient(circle at 50% 35%, #18243f, #0A0E1A 75%);
+    background:#000;
     border:1px solid rgba(217,184,95,.4); display:grid; place-items:end center; overflow:hidden;
     box-shadow:0 0 22px -6px rgba(94,230,224,.5); }
   .apunte.anticipa .busto{ border-color:rgba(94,230,224,.5); }
@@ -400,8 +400,6 @@
           </div>
         </div>
       </div>
-      <div class="nombre-portal">SIBYLLA
-        <small>{{ t.portal_subtitle }}</small>
       </div>
     </div>
   </section>
@@ -410,10 +408,6 @@
 
   <!-- ===================== PRESENTE ===================== -->
   <section id="presente">
-    <div class="seccion-titulo">
-      <h2>{{ t.section_heading }}</h2>
-      <p>{{ t.section_subtitle }}</p>
-    </div>
 
     {{ apunte(t.observes, observa) }}
 
