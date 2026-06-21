@@ -34,6 +34,7 @@ def render_digest(items: list[NewsItem], topics: list[str], meta: dict,
         by_topic.setdefault(key, []).append(it)
 
     no_date = t(tr, "digest.no_date")
+    also_in = t(tr, "digest.also_in")
     for topic in topics:
         group = by_topic.get(topic, [])[:max_per_topic]
         if not group:
@@ -42,6 +43,9 @@ def render_digest(items: list[NewsItem], topics: list[str], meta: dict,
         for it in group:
             out.append(f"- **[{it.title}]({it.url})**  ")
             out.append(f"  <sub>{_meta_line(it, no_date)}</sub>")
+            if it.related:
+                medios = ", ".join(r["source_name"] for r in it.related)
+                out.append(f"  <sub>{also_in}: {medios}</sub>")
             if it.summary:
                 snippet = it.summary[:240] + ("…" if len(it.summary) > 240 else "")
                 out.append(f"  {snippet}")

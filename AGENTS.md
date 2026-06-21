@@ -10,7 +10,8 @@ sibylla/
   models.py      # NewsItem (modelo normalizado) + utilidades de texto/URL
   config.py      # carga config/sources.yaml y .env; rutas ROOT/OUTPUT_DIR
   fetchers.py    # un fetcher por fuente -> List[NewsItem]; relevancia y clasificación
-  pipeline.py    # orquesta: seleccionar fuentes -> fetch -> dedupe -> rank -> diversify
+  pipeline.py    # orquesta: seleccionar fuentes -> fetch -> dedupe -> cluster -> rank -> diversify
+  cluster.py     # agrupa la MISMA historia entre medios distintos (near-dedup por similitud de título)
   digest.py      # render Markdown determinista (sin IA)
   summarize.py   # resumen con IA (usa llm.py); None si no hay LLM configurado
   llm.py         # capa LLM agnóstica de proveedor (requests puro, sin SDKs)
@@ -65,7 +66,21 @@ web/             # sitio estático generado — ignorado por git
 
 ## Pipeline (flujo)
 
-`run_pipeline(topics, sources, limit)` → por cada fuente `fetch_source` → `dedupe` (URL canónica / título) → `rank` (`tier × frescura` + bonus HN) → `diversify` (máx. 3 por fuente y tema). El CLer decide si resumir con IA (`summarize_digest`, si hay LLM) o con el render determinista (`render_digest`).
+`run_pipeline(topics, sources, limit)` → por cada fuente `fetch_source` → `dedupe` (URL canónica / título) → `cluster_stories` (agrupa la misma historia entre medios distintos) → `rank` (`tier × frescura` + bonus HN) → `diversify` (máx. 3 por fuente y tema). El CLer decide si resumir con IA (`summarize_digest`, si hay LLM) o con el render determinista (`render_digest`).
+
+### Agrupación de misma historia (`cluster.py`)
+
+Tras el `dedupe` exacto (misma URL), `cluster_stories` detecta la **misma noticia cubierta por
+medios distintos** (URLs distintas, títulos parecidos): conserva un representante (menor tier =
+más fiable) y cuelga el resto en `NewsItem.related`, que la web muestra como "**También en: …**"
+y el digest como una sub-línea. Es una etapa **pura** (sin red), conservadora a propósito:
+similitud de Jaccard de tokens de título (umbral `SIM_THRESHOLD`, mínimo `MIN_SHARED` tokens),
+y **solo agrupa fuentes distintas** (mismo medio = historia distinta). No toca `dedup_key`, así
+que el cache de traducción sigue válido. **Limitación conocida:** la señal título-Jaccard es
+débil para noticias (los titulares de la misma historia se reescriben mucho; los de historias
+distintas comparten el vocabulario del tema), por lo que en muchas corridas no agrupa nada. Es
+correcto: preferimos no fusionar a fusionar de más. Subir de nivel requiere una señal más fuerte
+(entidades / embeddings / el LLM, que ya agrupa en el modo resumen).
 
 ## Web (ver `web.py`)
 

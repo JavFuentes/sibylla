@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from .cluster import cluster_stories
 from .config import load_env, load_registry, index_by_id
 from .fetchers import TOPIC_CONFIG, fetch_source
 from .models import NewsItem
@@ -107,6 +108,8 @@ def run_pipeline(topics: list[str], sources_filter: list[str] | None = None,
         raw.extend(fetch_source(s, topic_cfgs, limit))
 
     deduped = dedupe(raw)
-    ranked = diversify(rank(deduped))
-    log.info("Total: %d crudos -> %d tras deduplicar", len(raw), len(deduped))
+    clustered = cluster_stories(deduped)
+    ranked = diversify(rank(clustered))
+    log.info("Total: %d crudos -> %d tras deduplicar -> %d tras agrupar historias",
+             len(raw), len(deduped), len(clustered))
     return ranked, meta, len(raw)

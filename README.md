@@ -13,6 +13,7 @@ Sibylla revisa cada cierto tiempo temas que te interesan (empezando por **cienci
 - **Fuentes por confiabilidad (tiers), no por idioma.** Ingesta multilingüe; el resumen se entrega en tu idioma.
 - **15 fuentes por defecto:** APIs científicas (arXiv, PubMed), agregadores (Google News, Hacker News) y 11 medios por RSS directo (Nature, BBC, MIT Tech Review, Phys.org, ScienceDaily, The Conversation, TechCrunch, Scientific American, Quanta, IEEE Spectrum, Agencia SINC en español).
 - **Filtro de relevancia bilingüe** (ES/EN, sin tildes) y **deduplicación** por URL canónica / título.
+- **Agrupación de misma historia entre medios** (near-dedup conservador por similitud de título): una noticia cubierta por varios medios se muestra una vez, con "También en: …" enlazando a los demás. Señal débil a propósito; prefiere no fusionar a fusionar de más.
 - **Ranking** por `tier × frescura` y **diversidad** (una sola fuente no tapa al resto).
 - **Resumen con IA opcional y multi-proveedor:** Anthropic (Claude), OpenAI, OpenRouter, cualquier endpoint compatible o **Ollama** (local). Sin LLM, genera una lista determinista.
 - **Web estática multilingüe con contenido localizado:** una página por idioma (es/en/it/pt); los títulos y snippets de las tarjetas se traducen con IA al idioma de cada página (estrategia B+A: solo lo visible, con cache en `data/`). Sin LLM, las tarjetas quedan en el idioma original de la fuente.
@@ -92,6 +93,8 @@ Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro
 - [x] Ingestor (fetchers + normalización + dedupe + ranking)
 - [x] Resumen con IA multi-proveedor (con fallback determinista)
 - [x] Calidad: relevancia bilingüe, diversidad, URLs limpias de medios
+- [x] Agrupación de misma historia entre medios (near-dedup por título; "También en")
+- [ ] Mejorar el near-dedup con una señal más fuerte (entidades / embeddings / LLM)
 - [x] Más fuentes (medios RSS + español + X con presupuesto)
 - [x] Web estática multilingüe (4 idiomas: es, en, it, pt) generada desde el pipeline
 - [ ] Automatización periódica + entrega por email

@@ -48,6 +48,7 @@ jobs:
           LLM_MODEL: ${{ vars.LLM_MODEL }}
           LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SIBYLLA_SITE_URL: ${{ vars.SIBYLLA_SITE_URL || 'https://sibylla.cl' }}
           DASHBOARD_KEY: ${{ secrets.DASHBOARD_KEY }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python -m sibylla.cli --topics ai,medicine --with-x --html --translate auto
@@ -78,5 +79,5 @@ jobs:
             exit 1
           }
           echo "→ Subiendo web/ con scp..."
-          scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html "$USER@$HOST:$PATH_REMOTO/"
+          scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html web/robots.txt web/sitemap.xml "$USER@$HOST:$PATH_REMOTO/"
           echo "✅ Deploy completado a $PATH_REMOTO"

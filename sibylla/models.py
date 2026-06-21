@@ -74,6 +74,7 @@ class NewsItem:
     summary: str = ""
     authors: list[str] = field(default_factory=list)
     extra: dict = field(default_factory=dict)  # datos propios de la fuente (puntos HN, journal, pmid...)
+    related: list[dict] = field(default_factory=list)  # otros medios con la misma historia: [{"source_name","url","tier"}]
 
     def __post_init__(self) -> None:
         self.title = clean_text(self.title)
