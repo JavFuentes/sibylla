@@ -14,13 +14,21 @@ sibylla/
   digest.py      # render Markdown determinista (sin IA)
   summarize.py   # resumen con IA (usa llm.py); None si no hay LLM configurado
   llm.py         # capa LLM agnóstica de proveedor (requests puro, sin SDKs)
+  i18n.py        # internacionalización simple (JSON sin dependencias)
+  web.py         # genera web estática a partir de los ítems del pipeline
   cli.py         # punto de entrada: python -m sibylla.cli
+  templates/     # plantillas Jinja2 de la web (index.html.j2)
 config/
   sources.yaml   # registro curado de fuentes (tiers, acceso, costo)
   README.md      # documentación del registro y plan de presupuesto de X
+locales/         # traducciones JSON (es, en, it, pt)
+tests/           # tests unitarios (pytest, sin red)
+  test_models.py    # canonicalize_url, clean_text, NewsItem
+  test_relevance.py # _strip_accents, is_relevant, classify_topics
 .env(.example)   # claves (NO se sube .env); plantilla en .env.example
 data/            # estado local (p. ej. x_usage.json) — ignorado por git
 output/          # resúmenes generados — ignorado por git
+web/             # sitio estático generado — ignorado por git
 ```
 
 ## Convenciones
@@ -61,12 +69,27 @@ output/          # resúmenes generados — ignorado por git
 - `X` es **de pago por uso**. `fetch_x` aplica un **tope mensual duro** (`x_twitter.monthly_read_budget` en `sources.yaml`, uso en `data/x_usage.json`). No lo quites.
 - No publiques en X con enlaces ($0.20/post). No subas `output/` ni `data/`.
 
+## Tests (ver [TEST.md](TEST.md))
+
+- **Framework:** pytest (sin dependencias extra, sin red).
+- **Qué se testea:** lógica de dominio pura — `canonicalize_url`, `clean_text`, `is_relevant`, `NewsItem`, `dedup_key`.
+- **Qué NO se testea (aún):** fetchers HTTP, LLM, CLI (fases posteriores con VCR/mocks).
+- **Convenciones:** `@pytest.mark.parametrize` con 3er campo `_desc` para documentar cada caso; un assert por test; sin fixtures ni mocks.
+- Si añades keywords a `TOPIC_KEYWORDS`, añade los casos correspondientes en `tests/test_relevance.py`.
+- Si modificas `canonicalize_url` o `dedup_key`, añade los casos en `tests/test_models.py`.
+
 ## Comandos útiles
 
 ```bash
 python -m sibylla.cli --help
 python -m sibylla.cli --topics ai,medicine --max-per-source 8 --summarize off
+
+# tests
+python -m pytest tests/ -v
+python -m pytest tests/ -v --cov=sibylla --cov-report=term-missing  # requiere pytest-cov
 ```
+
+**Antes de commitear:** ejecuta siempre `python -m pytest tests/ -v`. Los tests cubren la lógica de dominio pura (canonicalización de URLs, limpieza de texto, relevancia bilingüe) y deben pasar en < 1s. Si añades keywords, temas o modificas `canonicalize_url`/`dedup_key`, añade los casos correspondientes.
 
 ## Gotchas conocidos
 
