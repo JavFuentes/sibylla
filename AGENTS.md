@@ -91,7 +91,34 @@ La web se renderiza desde `sibylla/templates/index.html.j2` (fuente de verdad). 
 
 ### Selector de tarjetas por tema
 
-Cada `.tema` tiene un control `− N +` (valores 0, 2, 4, 6) que el usuario ajusta en el navegador. Persiste en `localStorage` como JSON `{"topic_id": n}`. El JS (`querySelector('.carta')` por rejilla adyacente) oculta/muestra tarjetas sin recargar.
+Cada `.tema` tiene un control `− N +` que el usuario ajusta en el navegador. Persiste en `localStorage` como JSON `{"topic_id": n}`. El JS (`querySelector('.carta')` por rejilla adyacente) oculta/muestra tarjetas sin recargar.
+
+Los valores por defecto son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
+La sección social usa `data-steps="0,1,2"` (máx. 2 tarjetas). El valor inicial se lee de `data-default`.
+
+### Sección "Voces de la red" (redes sociales)
+
+Tras los temas principales, al pie de la página (`#voces`), se muestran posts de redes sociales
+(X, en el futuro Reddit, Mastodon…). La lógica está en `web.py` y funciona así:
+
+1. **Separación** (`build_all_sites`): `_is_social(item)` filtra por `source_id` — los ítems de fuentes
+   en `SOCIAL_SOURCE_IDS` se extraen de la lista normal y van a su propia sección.
+2. **Selección** (`_select_social`): rankea los ítems sociales por `_score` (de `pipeline.py`),
+   aplica `SOCIAL_MAX_PER_SOURCE = 1` (máx. 1 post por red) y toma los `SOCIAL_MAX_TOTAL = 2` mejores.
+3. **Renderizado**: el template recibe `social_cards` y genera una sección independiente con su
+   propio selector de tarjetas (0–2), apunte neutro de advertencia y sellos T3 (verde).
+4. **Traducción**: las tarjetas sociales se incluyen en `_rendered_items` y se traducen junto
+   con las normales (estrategia B+A). Sin posts sociales, la sección entera desaparece
+   (`{% if social_cards %}`).
+
+**Para añadir una red social nueva:**
+1. Implementa su fetcher en `fetchers.py`.
+2. Añade su `source_id` a `SOCIAL_SOURCE_IDS` en `web.py`.
+3. Marca la fuente con `category: social` en `config/sources.yaml`.
+4. El resto (selección, renderizado, traducción) funciona automáticamente.
+
+**Filtro anti-spam en X:** la query de `fetch_x` excluye `-job -hiring -"job alert"` para
+evitar que ofertas de empleo coladas por el filtro de relevancia contaminen la sección social.
 
 ### Localización de contenido (estrategia B+A — implementada)
 
@@ -153,3 +180,4 @@ python -m pytest tests/ -v --cov=sibylla --cov-report=term-missing  # requiere p
 - **URLs de Google News:** el formato actual usa tokens opacos no decodificables solo con base64; `resolve_google_news_url` es best-effort (no-op en ese formato). Preferir medios por RSS directo, que dan URL limpia.
 - **Relevancia bilingüe:** `is_relevant` quita tildes y compara stems ES/EN; las keywords cortas (≤3) usan límite de palabra (p. ej. `ai` no casa con `airport`).
 - **X recent search** exige `max_results ≥ 10`: si el presupuesto restante es < 10, se omite.
+- **Cache de `x_usage.json` en CI:** el workflow solo cachea `translations.json` y `runs.json`, pero no `x_usage.json`. Cada ejecución de CI parte con `reads=0`, así que el tope mensual no frena en CI — solo funciona en local.

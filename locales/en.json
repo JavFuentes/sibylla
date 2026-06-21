@@ -60,6 +60,11 @@
     "voice": "I have read {count} signals across {sources} sources and sorted them by reliability; these are the ones that deserve your attention.",
     "no_date": "n/d",
     "also_in": "Also in",
+    "social_heading": "Voices from the web",
+    "social_subtitle": "What's being discussed in real time",
+    "social_voice": "Sibylla explores",
+    "social_voice_text": "These conversations echo across social networks. They are weak signal, unconfirmed: treat them as rumor, not fact.",
+    "social_topic_label": "Social media",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "topics": {
       "ai": "Artificial Intelligence",

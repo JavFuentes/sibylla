@@ -60,6 +60,11 @@
     "voice": "He leído {count} señales en {sources} fuentes y las he ordenado por confiabilidad; estas son las que merecen tu atención.",
     "no_date": "s/f",
     "also_in": "También en",
+    "social_heading": "Voces de la red",
+    "social_subtitle": "Lo que se discute en tiempo real",
+    "social_voice": "Sibylla explora",
+    "social_voice_text": "Estas conversaciones resuenan en las redes. Son señal débil, sin confirmar: trátalas como rumor, no como hecho.",
+    "social_topic_label": "Redes sociales",
     "months": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
     "topics": {
       "ai": "Inteligencia artificial",

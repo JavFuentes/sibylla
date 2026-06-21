@@ -23,6 +23,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .config import ROOT, get_site_url
 from .i18n import load_translations, t
 from .models import NewsItem
+from .pipeline import _score
 from .translate import load_cache, save_cache, translate_cards
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -37,6 +38,38 @@ OG_LOCALE: dict[str, str] = {"es": "es_CL", "en": "en_US", "it": "it_IT", "pt": 
 
 # Máximo de medios "También en" que se listan en una tarjeta; el resto se resume como "+N".
 _RELATED_CAP = 3
+
+# Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
+SOCIAL_SOURCE_IDS: set[str] = {"x_twitter"}
+
+# Máximo de tarjetas sociales visibles y máximo por red.
+SOCIAL_MAX_TOTAL = 2
+SOCIAL_MAX_PER_SOURCE = 1
+
+
+def _is_social(item: NewsItem) -> bool:
+    """Indica si un ítem proviene de una red social (X, Reddit, Mastodon…)."""
+    return item.source_id in SOCIAL_SOURCE_IDS
+
+
+def _select_social(items: list[NewsItem], max_total: int = SOCIAL_MAX_TOTAL,
+                   max_per_source: int = SOCIAL_MAX_PER_SOURCE) -> list[NewsItem]:
+    """De entre todos los ítems sociales, elige los más relevantes (por _score),
+    con un máximo de `max_per_source` por red y `max_total` en total."""
+    if not items:
+        return []
+    ranked = sorted(items, key=_score, reverse=True)
+    seen: dict[str, int] = {}
+    selected: list[NewsItem] = []
+    for it in ranked:
+        if it.source_id not in seen:
+            seen[it.source_id] = 0
+        if seen[it.source_id] < max_per_source:
+            selected.append(it)
+            seen[it.source_id] += 1
+        if len(selected) >= max_total:
+            break
+    return selected
 
 # Tier -> (numeral romano, clase CSS del sello, color del acento de la tarjeta).
 _SEAL = {
@@ -117,15 +150,19 @@ def _orden_temas(items: list[NewsItem], topics: list[str]) -> list[str]:
 
 
 def _rendered_items(items: list[NewsItem], topics: list[str],
-                    max_por_tema: int) -> list[NewsItem]:
+                    max_por_tema: int,
+                    social_items: list[NewsItem] | None = None) -> list[NewsItem]:
     """Los NewsItem que se renderizarán como tarjetas (≤ max_por_tema por tema).
 
     Misma regla de selección que `_agrupar`, pero devuelve los ítems en vez de
     las tarjetas: lo usa la traducción para tocar solo lo visible (estrategia B+A).
-    """
+
+    Si se pasan `social_items`, también se incluyen (siempre se renderizan)."""
     salida: list[NewsItem] = []
     for t in _orden_temas(items, topics):
         salida.extend([it for it in items if _primario(it) == t][:max_por_tema])
+    if social_items:
+        salida.extend(social_items)
     return salida
 
 
@@ -193,8 +230,12 @@ def _render_jsonld(site_url: str, description: str,
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    lang: str = "es", max_por_tema: int = 6,
                    is_landing: bool = False,
-                   translations: dict | None = None) -> dict:
-    """Construye el contexto que recibe la plantilla."""
+                   translations: dict | None = None,
+                   social_items: list[NewsItem] | None = None) -> dict:
+    """Construye el contexto que recibe la plantilla.
+
+    `items` son los ítems normales (temáticos). `social_items` son los ítems
+    de redes sociales que van en su propia sección al pie de la página."""
     tr = load_translations(lang)
     tw = tr["web"]
     months: list[str] = tw["months"]
@@ -202,11 +243,22 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     topic_labels: dict[str, str] = tw["topics"]
 
     ahora = datetime.now(timezone.utc)
-    n_fuentes = len({it.source_id for it in items})
+    # Contar fuentes contando también las sociales.
+    all_source_ids = {it.source_id for it in items}
+    if social_items:
+        all_source_ids |= {it.source_id for it in social_items}
+    n_fuentes = len(all_source_ids)
+    total_all = len(items) + len(social_items) if social_items else len(items)
+
     grupos = _agrupar(items, topics, max_por_tema, topic_labels, months, no_date, translations)
-    observa = t(tr, "web.voice", count=len(items), sources=n_fuentes)
+    observa = t(tr, "web.voice", count=total_all, sources=n_fuentes)
     ts = _instante(ahora, months)
-    hero_ts = t(tr, "web.hero_timestamp", date=ts, count=len(items), sources=n_fuentes)
+    hero_ts = t(tr, "web.hero_timestamp", date=ts, count=total_all, sources=n_fuentes)
+
+    # Tarjetas sociales.
+    social_cards: list[dict] = []
+    if social_items:
+        social_cards = [_tarjeta(it, months, no_date, translations) for it in social_items]
 
     # Datos para el selector de idioma.
     lang_label = LANG_LABELS.get(lang, lang.upper())
@@ -237,9 +289,10 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "lang_files": lang_files,
         "generado": ts,
         "hero_timestamp": hero_ts,
-        "total": len(items),
+        "total": total_all,
         "n_fuentes": n_fuentes,
         "grupos": grupos,
+        "social_cards": social_cards,
         "observa": observa,
         "t": tw,
         "site_url": site_url,
@@ -253,7 +306,8 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
 def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 lang: str = "es", max_por_tema: int = 6,
                 is_landing: bool = False,
-                translations: dict | None = None) -> str:
+                translations: dict | None = None,
+                social_items: list[NewsItem] | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -262,7 +316,7 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     )
     tmpl = env.get_template("index.html.j2")
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
-                                       is_landing, translations))
+                                       is_landing, translations, social_items))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -277,7 +331,8 @@ def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
 
 def _build_translations(items: list[NewsItem], topics: list[str],
                         max_por_tema: int,
-                        tracker: list[dict] | None = None) -> dict[str, dict]:
+                        tracker: list[dict] | None = None,
+                        social_items: list[NewsItem] | None = None) -> dict[str, dict]:
     """Traduce las tarjetas RENDERIZADAS a cada idioma (estrategia B+A).
 
     Devuelve {lang: {dedup_key: {title, snippet}}}. Usa y actualiza el cache en
@@ -285,8 +340,9 @@ def _build_translations(items: list[NewsItem], topics: list[str],
     vacíos y las tarjetas caen a su idioma original aguas abajo.
 
     Si se pasa un `tracker`, se apendea el uso de tokens de cada llamada LLM.
-    """
-    rendered = _rendered_items(items, topics, max_por_tema)
+    `social_items` se incluyen siempre en el lote de traducción (se renderizan
+    todos, máximo 2)."""
+    rendered = _rendered_items(items, topics, max_por_tema, social_items)
     # Cards únicas por dedup_key (deduplica por si un ítem se contara dos veces).
     cards: list[dict] = []
     vistos: set[str] = set()
@@ -380,24 +436,37 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     se traducen al idioma de cada página; si no, quedan en su idioma original.
 
     Si se pasa `translate_tracker`, se apendea el uso de tokens de cada llamada LLM.
-    """
+
+    Los ítems de redes sociales (X, Reddit…) se extraen de la lista principal
+    y se muestran en su propia sección al pie de la página ("Voces de la red")."""
     _assert_min_items(items)
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
-    by_lang = _build_translations(items, topics, max_por_tema, tracker=translate_tracker) if translate else {}
+    # Separar ítems normales de los de redes sociales.
+    normal_items = [it for it in items if not _is_social(it)]
+    social_raw = [it for it in items if _is_social(it)]
+    social_top = _select_social(social_raw)
+
+    by_lang = {}
+    if translate:
+        by_lang = _build_translations(normal_items, topics, max_por_tema,
+                                      tracker=translate_tracker,
+                                      social_items=social_top)
 
     # Páginas por idioma (sin auto-detección).
     for lang in ALL_LANGS:
-        html = render_html(items, topics, meta, lang=lang, max_por_tema=max_por_tema,
-                           is_landing=False, translations=by_lang.get(lang))
+        html = render_html(normal_items, topics, meta, lang=lang, max_por_tema=max_por_tema,
+                           is_landing=False, translations=by_lang.get(lang),
+                           social_items=social_top)
         out = SITE_DIR / f"{lang}.html"
         out.write_text(html, encoding="utf-8")
         paths.append(out)
 
     # Página de aterrizaje (español + JS de auto-detección).
-    html_landing = render_html(items, topics, meta, lang="es", max_por_tema=max_por_tema,
-                               is_landing=True, translations=by_lang.get("es"))
+    html_landing = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
+                                is_landing=True, translations=by_lang.get("es"),
+                                social_items=social_top)
     out_landing = SITE_DIR / "index.html"
     out_landing.write_text(html_landing, encoding="utf-8")
     paths.append(out_landing)

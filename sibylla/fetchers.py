@@ -344,7 +344,7 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int) -> list
         return []
     max_results = max(10, min(limit, remaining, 25))
     params = {
-        "query": f"({query}) -is:retweet -is:reply lang:en",
+        "query": f"({query}) -is:retweet -is:reply -job -hiring -\"job alert\" lang:en",
         "max_results": max_results,
         "tweet.fields": "created_at,public_metrics,lang",
     }
