@@ -14,7 +14,7 @@ name: Regenerar sitio Sibylla
 
 on:
   schedule:
-    - cron: "0 14 * * *"   # diario a las 11:00 UTC (ajusta a tu gusto)
+    - cron: "0 14 * * *"   # diario a las 14:00 UTC (ajusta a tu gusto)
   workflow_dispatch: {}     # permite disparo manual desde la pestaña Actions
 
 # Evita corridas solapadas: garantiza que el read-modify-write de runs.json en

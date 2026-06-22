@@ -44,6 +44,7 @@ web/             # sitio estático generado — ignorado por git
 - **Tiers de confiabilidad:** 1 = primaria/peer-review, 2 = periodismo, 3 = agregador/discusión. El ranking pondera por tier.
 - **Sin SDKs de proveedor:** la capa LLM usa `requests` directo para no atarse a ninguno.
 - **Nada de secretos en el código:** las claves se leen de `.env` vía `os.getenv`.
+- **No commit ni push sin instrucción explícita:** editar archivos no implica commit ni push. Solo se commitea/pushea cuando el usuario lo pide con palabras como "commitea", "haz push", "sube" o equivalentes. Si un cambio requiere commit para surtir efecto (ej. CI/CD), preguntar primero.
 
 ## Cómo extender
 
