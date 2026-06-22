@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.perf_counter()
 
     parser = argparse.ArgumentParser(prog="sibylla", description="Ingestor de noticias de Sibylla")
-    parser.add_argument("--topics", default="ai,medicine",
+    parser.add_argument("--topics", default="nacional,ai,medicine",
                         help=f"temas separados por coma. Disponibles: {', '.join(TOPIC_CONFIG)}")
     parser.add_argument("--max-per-source", type=int, default=10,
                         help="máximo de ítems por fuente y tema (def. 10)")
@@ -91,6 +91,12 @@ def main(argv: list[str] | None = None) -> int:
     x_reads = x_after - x_before
     x_cost = round(x_reads * 0.005, 6)  # ~$0.005/post
 
+    # Sección Nacional: embudo heurístico + juez LLM elige los 6 (con cuota
+    # regional). Reordena `items` dejando los elegidos al frente; degrada a
+    # heurística pura si no hay LLM. Las llamadas LLM se contabilizan abajo.
+    from .nacional import select_nacional, is_nacional
+    items, nacional_calls = select_nacional(items)
+
     lang = resolve_lang(args.lang, meta)
     tr = load_translations(lang)
 
@@ -100,16 +106,21 @@ def main(argv: list[str] | None = None) -> int:
 
     # X (y demás redes sociales) van SOLO a "Voces de la red" en la web; nunca a
     # las tarjetas de tema. El digest temático también las excluye, por coherencia.
+    # Lo nacional también se excluye del resumen: ese digest es de ciencia y
+    # tecnología, y mezclar noticia nacional chilena lo volvería incoherente.
+    # (La sección Nacional vive solo en la web, ya seleccionada por select_nacional.)
     from .web import _is_social
-    items_topic = [it for it in items if not _is_social(it)]
+    items_topic = [it for it in items if not _is_social(it) and not is_nacional(it)]
+    # El digest es de ciencia/tecnología: su lista de temas excluye 'nacional'.
+    topics_sci = [tp for tp in topics if tp != "nacional"]
 
     # --- resumen (IA o determinista) ---
-    llm_calls: list[dict] = []
+    llm_calls: list[dict] = list(nacional_calls)
     markdown = None
 
     if args.summarize != "off":
         try:
-            result = summarize_digest(items_topic, topics, lang=lang)
+            result = summarize_digest(items_topic, topics_sci, lang=lang)
             if result is not None:
                 markdown, calls = result
                 llm_calls.extend(calls)
@@ -120,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
 
     used_llm = markdown is not None
     if markdown is None:
-        markdown = render_digest(items_topic, topics, meta, lang=lang)
+        markdown = render_digest(items_topic, topics_sci, meta, lang=lang)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     now = datetime.now(timezone.utc)

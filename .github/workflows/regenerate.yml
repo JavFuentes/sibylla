@@ -129,7 +129,7 @@ jobs:
           SIBYLLA_SITE_URL: ${{ vars.SIBYLLA_SITE_URL || 'https://sibylla.cl' }}
           SIBYLLA_GOOGLE_VERIFICATION: ${{ vars.SIBYLLA_GOOGLE_VERIFICATION }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
-        run: python -m sibylla.cli --topics ai,medicine --with-x --html --translate auto
+        run: python -m sibylla.cli --topics nacional,ai,medicine --with-x --html --translate auto
 
       - name: Subir web/ y persistir historial en el host (scp)
         env:

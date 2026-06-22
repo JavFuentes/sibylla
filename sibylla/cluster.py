@@ -13,14 +13,21 @@ se agrupan ítems de FUENTES distintas.
 """
 from __future__ import annotations
 
+import re
+
 from .fetchers import _strip_accents
-from .models import NewsItem, normalize_title
+from .models import NewsItem, clean_text, normalize_title
 
 # --- parámetros (tunables) ---------------------------------------------------
 # Similitud de Jaccard mínima entre los conjuntos de tokens significativos.
 SIM_THRESHOLD = 0.5
 # Tokens compartidos mínimos: evita que una sola palabra en común dispare un match.
 MIN_SHARED = 2
+# Entidades (nombres propios/acrónimos) compartidas mínimas para considerar la
+# MISMA historia aunque el Jaccard de título no llegue al umbral. Es la señal de
+# "corroboración" que importa en la sección Nacional: dos medios que reescriben
+# el titular pero coinciden en 2+ nombres propios cubren la misma noticia.
+MIN_SHARED_ENTITIES = 2
 # Ventana de fechas: dos coberturas de la misma historia salen con pocos días de
 # diferencia. Solo se aplica si AMBOS ítems tienen fecha.
 DATE_WINDOW_DAYS = 14
@@ -49,6 +56,37 @@ def _tokens(title: str) -> frozenset[str]:
     return frozenset(w for w in norm.split() if len(w) > 2 and w not in _STOPWORDS)
 
 
+_WORD_RE = re.compile(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]+")
+
+
+def _entities(title: str) -> frozenset[str]:
+    """Pseudo-entidades del título: nombres propios y acrónimos (sin NLP).
+
+    Heurística dependency-free sobre el título ORIGINAL (con mayúsculas):
+      - acrónimos en MAYÚSCULAS de 2+ letras (SQM, TVN, CIPER);
+      - palabras Capitalizadas de 4+ letras que no sean stopwords (nombres,
+        lugares: 'Boric', 'Contraloria', 'Antofagasta').
+    Se conserva la primera palabra (en titulares en español suele ser el sujeto:
+    'Boric anuncia…'); las comunes que la inician suelen ser stopwords/cortas y
+    se filtran igual. Si el título está en Title Case (casi todo capitalizado),
+    se descarta la señal de entidades (devolvería ruido) y solo cuenta el Jaccard."""
+    words = _WORD_RE.findall(clean_text(title))
+    if len(words) < 3:
+        return frozenset()  # títulos muy cortos: la señal de entidades es ruidosa
+    caps = [w for w in words if w[:1].isupper()]
+    # Title Case: si la mayoría va capitalizada, no son entidades distintivas.
+    if len(caps) / len(words) > 0.6:
+        return frozenset()
+    ents: set[str] = set()
+    for w in words:
+        low = _strip_accents(w.lower())
+        if w.isupper() and len(w) >= 2:
+            ents.add(low)
+        elif w[:1].isupper() and len(w) >= 4 and low not in _STOPWORDS:
+            ents.add(low)
+    return frozenset(ents)
+
+
 def _similar(a: frozenset[str], b: frozenset[str],
              threshold: float, min_shared: int) -> bool:
     """True si dos conjuntos de tokens describen la misma historia.
@@ -61,6 +99,17 @@ def _similar(a: frozenset[str], b: frozenset[str],
         return False
     union = len(a | b)
     return union > 0 and inter / union >= threshold
+
+
+def _same_story(a_toks: frozenset[str], a_ents: frozenset[str],
+                b_toks: frozenset[str], b_ents: frozenset[str],
+                threshold: float, min_shared: int, min_shared_entities: int) -> bool:
+    """True si dos ítems cuentan la misma historia, por CUALQUIERA de dos vías:
+    similitud de Jaccard de tokens (reescrituras del mismo titular) o coincidencia
+    de ≥`min_shared_entities` nombres propios/acrónimos (corroboración)."""
+    if _similar(a_toks, b_toks, threshold, min_shared):
+        return True
+    return len(a_ents & b_ents) >= min_shared_entities
 
 
 def _better_rep(a: NewsItem, b: NewsItem) -> bool:
@@ -101,34 +150,39 @@ def _attach(rep: NewsItem, others: list[NewsItem]) -> None:
 def cluster_stories(items: list[NewsItem], *,
                     threshold: float = SIM_THRESHOLD,
                     min_shared: int = MIN_SHARED,
+                    min_shared_entities: int = MIN_SHARED_ENTITIES,
                     date_window_days: int = DATE_WINDOW_DAYS) -> list[NewsItem]:
     """Agrupa la misma historia entre medios distintos. Devuelve los
     representantes (uno por historia) con sus satélites en `related`.
 
     Greedy single-link: cada ítem se compara contra el TÍTULO del representante
-    de cada cluster ya abierto; si supera el umbral y aporta una fuente nueva,
-    se une; si no, abre su propio cluster. Conserva el orden de entrada (luego
-    `rank` reordena)."""
-    clusters: list[dict] = []  # {"rep", "rep_tokens", "members", "sources"}
+    de cada cluster ya abierto; si supera el umbral de similitud O comparte
+    suficientes entidades (nombres propios) y aporta una fuente nueva, se une;
+    si no, abre su propio cluster. Conserva el orden de entrada (luego `rank`
+    reordena)."""
+    clusters: list[dict] = []  # {"rep", "rep_tokens", "rep_ents", "members", "sources"}
     for it in items:
         toks = _tokens(it.title)
+        ents = _entities(it.title)
         placed = False
         for cl in clusters:
             if it.source_id in cl["sources"]:
                 continue  # mismo medio = historia distinta (los dups ya los quitó dedupe)
             if not _within_window(it, cl["rep"], date_window_days):
                 continue
-            if _similar(toks, cl["rep_tokens"], threshold, min_shared):
+            if _same_story(toks, ents, cl["rep_tokens"], cl["rep_ents"],
+                           threshold, min_shared, min_shared_entities):
                 cl["members"].append(it)
                 cl["sources"].add(it.source_id)
                 if _better_rep(it, cl["rep"]):
                     cl["rep"] = it
                     cl["rep_tokens"] = toks
+                    cl["rep_ents"] = ents
                 placed = True
                 break
         if not placed:
             clusters.append({
-                "rep": it, "rep_tokens": toks,
+                "rep": it, "rep_tokens": toks, "rep_ents": ents,
                 "members": [it], "sources": {it.source_id},
             })
 

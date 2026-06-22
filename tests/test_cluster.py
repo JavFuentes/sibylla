@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from sibylla.cluster import _similar, _tokens, cluster_stories
+from sibylla.cluster import _entities, _similar, _tokens, cluster_stories
 from sibylla.models import NewsItem
 
 NOW = datetime(2026, 6, 21, 12, 0, tzinfo=timezone.utc)
@@ -194,3 +194,46 @@ def test_cluster_spanish_titles_merge():
         _it(title="Telescopio observa galaxia lejana según científicos", source_id="agencia", tier=2),
     ]
     assert len(cluster_stories(items)) == 1
+
+
+# --- _entities (señal de corroboración para Nacional) -----------------------
+
+ENTITY_CASES = [
+    ("Boric anuncia reforma a Codelco", {"boric", "codelco"},
+     "nombre propio inicial + entidad capitalizada"),
+    ("SQM y Codelco firman acuerdo de litio", {"sqm", "codelco"},
+     "acrónimo en mayúsculas + entidad"),
+    ("Gobierno Anuncia Nueva Reforma Tributaria Total", set(),
+     "Title Case (casi todo capitalizado) -> sin entidades"),
+    ("la crisis del agua en el norte", set(),
+     "sin mayúsculas -> sin entidades"),
+    ("Renunció Jackson", set(),
+     "título muy corto (<3 palabras) -> sin señal"),
+]
+
+
+@pytest.mark.parametrize("title,expected,_desc", ENTITY_CASES)
+def test_entities(title, expected, _desc):
+    assert _entities(title) == frozenset(expected)
+
+
+# --- cluster_stories: fusión por entidades compartidas ----------------------
+
+def test_cluster_merges_by_shared_entities():
+    """Dos medios distintos con el titular reescrito pero que comparten 2 nombres
+    propios (Contraloría, Codelco) -> una sola historia, aunque el Jaccard de
+    tokens no alcance el umbral. Es la señal de corroboración de Nacional."""
+    items = [
+        _it(title="Contraloría investiga a Codelco por contratos", source_id="ciper"),
+        _it(title="Codelco responde a la Contraloría tras denuncia", source_id="interferencia"),
+    ]
+    assert len(cluster_stories(items)) == 1
+
+
+def test_cluster_no_merge_with_single_shared_entity():
+    """Una sola entidad en común y Jaccard bajo -> NO fusiona (conservador)."""
+    items = [
+        _it(title="Codelco anuncia plan de inversión minera", source_id="ciper"),
+        _it(title="El litio domina la agenda según expertos", source_id="interferencia"),
+    ]
+    assert len(cluster_stories(items)) == 2

@@ -32,6 +32,11 @@
     "user_prompt": "Translate into {lang}. Return a JSON array with one element per item; each with the id (same as the input), title and snippet translated.\n\nItems (JSON):\n{items_json}"
   },
 
+  "nacional": {
+    "system_prompt": "Eres Sibylla, editora de la sección nacional de Chile. Recibes titulares recientes de medios chilenos independientes (elegidos por su modelo de financiación, no por su línea editorial) y debes elegir los {n} MÁS RELEVANTES para el país hoy.\nCriterios, en orden:\n- Impacto y alcance nacional e interés público: lo que afecta a más personas o al funcionamiento del país (poder, dinero público, derechos, seguridad, medio ambiente).\n- VALORA especialmente la investigación o denuncia exclusiva de interés público, aunque la cubra un solo medio: no la castigues por no estar replicada en otros.\n- Descarta lo trivial, lo promocional, el clickbait y la nota de color.\n- Busca variedad: evita 3 titulares de la misma historia o del mismo medio.\nDevuelve ÚNICAMENTE un array JSON con los id (números enteros) de los {n} elegidos, ordenados de más a menos relevante, sin texto adicional ni markdown. Formato de ejemplo: [3, 0, 7].",
+    "user_prompt": "Elige los {n} titulares más relevantes para Chile hoy y devuélvelos como un array JSON de id (números enteros), ordenado de más a menos relevante.\n\nÍtems disponibles (JSON):\n{items_json}"
+  },
+
   "web": {
     "page_title": "Sibylla — What is happening. What will happen.",
     "meta_description": "Sibylla gathers the most reliable science and technology sources, separates signal from noise, and shows you what is happening today in AI, medicine, space, physics, and more. Always linking to the original source.",
@@ -67,6 +72,7 @@
     "social_topic_label": "Social media",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "topics": {
+      "nacional": "Chile",
       "ai": "Artificial Intelligence",
       "computing": "Computing",
       "space": "Space",

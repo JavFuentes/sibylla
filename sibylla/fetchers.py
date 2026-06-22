@@ -48,6 +48,11 @@ TOPIC_CONFIG: dict[str, dict] = {
     "energy":         {"news": 'nuclear fusion OR "grid battery" OR "renewable energy" OR "solar power"', "hn": "fusion battery energy"},
     "general_science":{"news": 'science discovery research breakthrough', "hn": "science"},
     "general_tech":   {"news": 'technology OR software OR startup', "hn": "technology"},
+    # Nacional (Chile): NO se filtra por palabras clave (todo lo que publican
+    # estos medios ya es noticia nacional). Config vacía a propósito: las fuentes
+    # nacionales son RSS pass-through + google_news_nacional (consulta `site:`),
+    # ambas atadas al tema vía `topics: [nacional]` en sources.yaml.
+    "nacional":       {},
 }
 
 # Palabras clave por tema (bilingüe ES/EN, sin tildes) para filtrar el ruido de
@@ -281,7 +286,7 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
         return []
     feed = feedparser.parse(_get(source.url).content)
     items = []
-    for e in feed.entries[:limit]:
+    for pos, e in enumerate(feed.entries[:limit]):
         items.append(NewsItem(
             title=e.get("title", ""),
             url=e.get("link", ""),
@@ -290,7 +295,9 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
             tier=source.tier,
             published=_from_struct(e.get("published_parsed") or e.get("updated_parsed")),
             summary=e.get("summary", ""),
-            extra={},
+            # `feed_pos` = orden en el feed (0 = titular del medio): señal de
+            # prominencia editorial que aprovecha el score de la sección Nacional.
+            extra={"feed_pos": pos},
         ))
     return items
 
@@ -420,6 +427,18 @@ def _build_x_social_query(source: Source, handles: list[str],
     return " OR ".join(parts) if parts else keywords
 
 
+def _build_nacional_gnews_query(source: Source) -> str:
+    """Consulta única de Google News para los medios CL sin RSS nativo.
+
+    Une los dominios de `sites` con `site:a OR site:b …` y acota la ventana con
+    `when:Nd` (N = `freshness_days`). Devuelve "" si no hay dominios."""
+    sites = [s.strip() for s in (source.raw.get("sites") or []) if s.strip()]
+    if not sites:
+        return ""
+    days = int(source.raw.get("freshness_days", 1) or 1)
+    return "(" + " OR ".join(f"site:{s}" for s in sites) + f") when:{days}d"
+
+
 QUERY_SOURCES = {"arxiv_api", "pubmed_eutils", "hacker_news", "google_news_rss"}
 
 
@@ -450,20 +469,39 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
             log.warning("  x_twitter FALLÓ: %s", ex)
         return items
 
+    if source.id == "google_news_nacional":
+        # Una sola consulta `site:` combinada para los regionales CL sin RSS.
+        # Independiente de las keywords de tema: van todos al tema 'nacional'.
+        try:
+            query = _build_nacional_gnews_query(source)
+            if query:
+                lang = source.raw.get("lang") or "es-419"
+                country = source.raw.get("country") or "CL"
+                got = fetch_googlenews(source, query, max(limit, 20), lang=lang, country=country)
+                scope = source.raw.get("scope", "")
+                for it in got:
+                    it.topics = ["nacional"]
+                    it.extra["scope"] = scope
+                items.extend(got)
+                log.info("  %-16s [nacional] -> %d ítems (site: GN)", source.id, len(got))
+        except Exception as ex:  # noqa: BLE001
+            log.warning("  %-16s [nacional] FALLÓ: %s", source.id, ex)
+        return items
+
     if source.id in QUERY_SOURCES:
         for topic, cfg in topic_cfgs:
             try:
                 if source.id == "arxiv_api" and cfg.get("arxiv"):
                     got = fetch_arxiv(source, cfg["arxiv"], limit)
-                elif source.id == "pubmed_eutils" and cfg.get("pubmed"):
+                elif source.id == "pubmed_eutils" and cfg.get("pubmed") and cfg.get("news"):
                     got = fetch_pubmed(source, cfg["news"], limit)
-                elif source.id == "hacker_news":
+                elif source.id == "hacker_news" and cfg.get("hn"):
                     got = fetch_hackernews(source, cfg["hn"], limit)
-                elif source.id == "google_news_rss":
+                elif source.id == "google_news_rss" and cfg.get("news"):
                     got = [it for it in fetch_googlenews(source, cfg["news"], limit)
                            if is_relevant(it.title, topic)]
                 else:
-                    continue
+                    continue  # esta fuente no sirve este tema (p. ej. 'nacional')
                 for it in got:
                     it.topics = [topic]
                 items.extend(got)
@@ -473,11 +511,20 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
 
     elif source.type in ("rss", "atom") and source.url:
         try:
+            # Acota a los temas que la fuente declara servir (`topics:` en
+            # sources.yaml); si no declara ninguno, sirve todos los pedidos. Evita
+            # que un medio nacional se cuele en temas de ciencia y viceversa
+            # (clave porque 'nacional' no tiene keywords → casaría con todo).
+            allowed = source.topics or topics
+            topics_for_source = [t for t in topics if t in allowed]
+            scope = source.raw.get("scope", "")
             raw = fetch_generic_rss(source, max(limit, 25))
             for it in raw:
-                matched = classify_topics(it.title, it.summary, topics)
+                matched = classify_topics(it.title, it.summary, topics_for_source)
                 if matched:
                     it.topics = matched[:1]
+                    if scope:
+                        it.extra["scope"] = scope
                     items.append(it)
             log.info("  %-16s [rss] -> %d/%d relevantes", source.id, len(items), len(raw))
         except Exception as ex:  # noqa: BLE001

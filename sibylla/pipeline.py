@@ -19,6 +19,10 @@ DEFAULT_FREE_SOURCES = [
     "nature_news", "bbc_science", "mit_tech_review", "phys_org", "sciencedaily",
     "the_conversation", "techcrunch", "scientific_american", "quanta",
     "ieee_spectrum", "agencia_sinc",
+    # Sección Nacional (Chile): 8 medios por RSS nativo + 1 agregador `site:` GN.
+    "ciper", "interferencia", "diario_uchile", "fast_check_cl",
+    "lavoz_pucon", "diario_aysen", "puranoticia", "mapuexpress",
+    "google_news_nacional",
 ]
 
 # Peso por confiabilidad. Tier 1 (peer-review/oficial) pesa más que un agregador.
@@ -55,6 +59,16 @@ def _score(it: NewsItem) -> float:
     points = it.extra.get("points")
     if points:
         bonus = min(0.15, points / 1500.0)  # pequeño empujón por tracción en HN
+    # Corroboración cruzada: cuántos medios DISTINTOS cubren la misma historia
+    # (poblado por cluster_stories en `related`). Es la señal de importancia de la
+    # sección Nacional; en ciencia `related` casi siempre va vacío -> no afecta.
+    n_related = len(it.related)
+    if n_related:
+        bonus += min(0.30, 0.15 * math.log1p(n_related))
+    # Prominencia editorial: posición en el feed del medio (0 = su titular).
+    feed_pos = it.extra.get("feed_pos")
+    if feed_pos is not None:
+        bonus += max(0.0, 0.10 * (1.0 - feed_pos / 10.0))
     return 0.6 * weight + 0.4 * recency + bonus
 
 

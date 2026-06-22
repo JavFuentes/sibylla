@@ -35,9 +35,10 @@ meta:
 
   status:
     verified_2026-06-20: "Probado en vivo el 2026-06-20 y funcionó."
+    verified_2026-06-22: "Probado en vivo el 2026-06-22 (feeds de la sección Nacional)."
     known: "Fuente conocida/estándar; confirmar feed exacto al construir el ingestor."
 
-  topics: [general_science, general_tech, ai, computing, space, physics,
+  topics: [nacional, general_science, general_tech, ai, computing, space, physics,
            biotech, medicine, climate, energy, neuroscience]
 
 # =============================================================================
@@ -672,3 +673,158 @@ sources:
       Tier gratuito eliminado (feb-2026); cuenta nueva = pay-per-use. USAR CON CUIDADO y de forma quirúrgica:
       solo para CONFIRMAR/enriquecer las top-N historias ya detectadas por fuentes gratis. Cap mensual duro en
       código. NO publicar posts con enlaces ($0.20 c/u). Ver "Plan de presupuesto" en config/README.md.
+
+# =============================================================================
+# NACIONAL (Chile) — medios elegidos por MODELO DE FINANCIACIÓN, no por línea
+# editorial: fundación/donaciones, cooperativa/suscripción, universitario y
+# locales independientes, todos poco susceptibles a sesgo/captura. Se EVITAN el
+# duopolio (El Mercurio/Edwards y Copesa/Saieh) y sus satélites (red "Soy", etc.).
+#
+# `scope: national|regional` alimenta la cuota regional de la sección (la
+# selección garantiza ≥2 de 6 tarjetas regionales). Feeds verificados en vivo el
+# 2026-06-22. Los 6 medios sin RSS nativo entran por `google_news_nacional`
+# (consulta `site:` a Google News): El Nortero, El Observatodo, El Tipógrafo,
+# El Martutino, El Vacanudo, El Divisadero.
+# =============================================================================
+
+  - id: ciper
+    name: "CIPER"
+    publisher: "Fundación CIPER"
+    tier: 2
+    type: rss
+    url: "https://www.ciperchile.cl/feed/"
+    topics: [nacional]
+    scope: national
+    lang: es
+    license: "propietaria (uso editorial: título + resumen + enlace)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Investigación periodística. Fundación + donaciones/socios: poco susceptible a captura."
+
+  - id: interferencia
+    name: "INTERFERENCIA"
+    publisher: "Interferencia (cooperativa)"
+    tier: 2
+    type: rss
+    url: "https://interferencia.cl/rss.xml"
+    topics: [nacional]
+    scope: national
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Investigación. Cooperativa financiada por suscriptores."
+
+  - id: diario_uchile
+    name: "Diario y Radio Universidad de Chile"
+    publisher: "Universidad de Chile"
+    tier: 2
+    type: rss
+    url: "https://radio.uchile.cl/feed/"
+    topics: [nacional]
+    scope: national
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Medio público universitario; editorial independiente."
+
+  - id: fast_check_cl
+    name: "Fast Check CL"
+    publisher: "Fast Check CL"
+    tier: 2
+    type: rss
+    url: "https://www.fastcheck.cl/feed/"
+    topics: [nacional]
+    scope: national
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Verificación de datos independiente."
+
+  - id: lavoz_pucon
+    name: "La Voz de Pucón"
+    publisher: "La Voz de Pucón"
+    tier: 3
+    type: rss
+    url: "https://www.lavozdepucon.cl/feed/"
+    topics: [nacional]
+    scope: regional
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Hiperlocal Araucanía/Pucón."
+
+  - id: diario_aysen
+    name: "Diario de Aysén"
+    publisher: "Diario de Aysén"
+    tier: 3
+    type: rss
+    url: "https://diariodeaysen.cl/feed/"
+    topics: [nacional]
+    scope: regional
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Local de la región de Aysén."
+
+  - id: puranoticia
+    name: "Puranoticia"
+    publisher: "Puranoticia"
+    tier: 3
+    type: rss
+    url: "https://puranoticia.pnt.cl/cms/site/list/port/feed.rss"
+    topics: [nacional]
+    scope: regional
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Local de Valparaíso (CMS PNT; feed en /cms/site/list/port/feed.rss)."
+
+  - id: mapuexpress
+    name: "Mapuexpress"
+    publisher: "Colectivo Mapuexpress"
+    tier: 3
+    type: rss
+    url: "https://www.mapuexpress.org/feed/"
+    topics: [nacional]
+    scope: regional
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: "Colectivo de comunicación mapuche (Araucanía). Línea militante; valioso por cobertura única."
+
+  - id: google_news_nacional
+    name: "Google News (medios CL sin RSS)"
+    publisher: "Google"
+    tier: 3
+    type: query
+    topics: [nacional]
+    scope: regional
+    lang: es-419
+    country: CL
+    # Medios regionales independientes sin RSS nativo (verificado 2026-06-22). Se
+    # consultan en UNA sola llamada con `(site:a OR site:b ...) when:Nd`. El
+    # publisher real de cada ítem lo rescata fetch_googlenews en el source_name.
+    sites: [elnortero.cl, elobservatodo.cl, eltipografo.cl, elmartutino.cl, elvacanudo.cl, eldivisadero.cl]
+    freshness_days: 1
+    license: "solo titular + enlace a la fuente original"
+    access: open
+    cost: free
+    status: verified_2026-06-22
+    notes: >
+      Respaldo para los 6 regionales sin feed nativo. Caveat: los enlaces de Google News llevan token
+      opaco (ver resolve_google_news_url) y solo dan titular + fuente, sin snippet propio.
