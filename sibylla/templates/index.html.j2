@@ -307,8 +307,8 @@
   .apunte.neutro{ border-left-color:var(--tenue);
     background:linear-gradient(90deg, rgba(142,137,121,.08), transparent 70%); }
   .apunte .busto{ flex:none; width:58px; height:58px; border-radius:50%;
-    background:#000;
-    border:1px solid rgba(217,184,95,.4); display:grid; place-items:end center; overflow:hidden;
+    background:url("sibylla_logo_256.png") center/cover;
+    border:1px solid rgba(217,184,95,.4);
     box-shadow:0 0 22px -6px rgba(94,230,224,.5); }
   .apunte.anticipa .busto{ border-color:rgba(94,230,224,.5); }
   .apunte.neutro .busto{ border-color:rgba(142,137,121,.4); box-shadow:0 0 22px -6px rgba(142,137,121,.3); }
@@ -470,13 +470,7 @@
     <div class="rejilla">
       {% for c in g.cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
     </div>
-    {% if loop.first and grupos|length > 1 %}
-    {{ apunte(t.warns, t.warn_text) }}
-    {% endif %}
     {% endfor %}
-    {% if grupos|length == 1 %}
-    {{ apunte(t.warns, t.warn_text) }}
-    {% endif %}
   </section>
 
   {% if social_cards %}
@@ -486,7 +480,6 @@
       <h2>{{ t.social_heading }}</h2>
       <p>{{ t.social_subtitle }}</p>
     </div>
-    {{ apunte(t.social_voice, t.social_voice_text, 'neutro') }}
     <div class="tema" data-topic="social">
       <h3>{{ t.social_topic_label }}</h3>
       <span class="raya"></span>
