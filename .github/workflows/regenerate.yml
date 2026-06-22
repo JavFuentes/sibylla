@@ -14,7 +14,7 @@ name: Regenerar sitio Sibylla
 
 on:
   schedule:
-    - cron: "0 11 * * *"   # diario a las 11:00 UTC (ajusta a tu gusto)
+    - cron: "0 14 * * *"   # diario a las 11:00 UTC (ajusta a tu gusto)
   workflow_dispatch: {}     # permite disparo manual desde la pestaña Actions
 
 # Evita corridas solapadas: garantiza que el read-modify-write de runs.json en
@@ -117,6 +117,7 @@ jobs:
           LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           SIBYLLA_SITE_URL: ${{ vars.SIBYLLA_SITE_URL || 'https://sibylla.cl' }}
+          SIBYLLA_GOOGLE_VERIFICATION: ${{ vars.SIBYLLA_GOOGLE_VERIFICATION }}
           DASHBOARD_KEY: ${{ secrets.DASHBOARD_KEY }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python -m sibylla.cli --topics ai,medicine --with-x --html --translate auto
@@ -135,8 +136,19 @@ jobs:
           echo "→ Verificando que web/ existe y tiene contenido..."
           ls -la web/
 
+          # dashboard.html NO se publica: es una herramienta de monitoreo
+          # personal, no le interesa al visitante. Subimos todos los .html
+          # MENOS dashboard.html (se ve en local con `--dashboard`).
+          PUBLICOS=()
+          for f in web/*.html; do
+            [ "$(basename "$f")" = "dashboard.html" ] && continue
+            PUBLICOS+=("$f")
+          done
+          echo "→ Páginas públicas a subir: ${PUBLICOS[*]}"
+
           probar_ssh()     { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo 'SSH OK'"; }
-          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/*.html web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
+          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
+          borrar_dash()    { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "rm -f '$DEPLOY_PATH/dashboard.html'"; }
           crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
           subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }
 
@@ -151,6 +163,13 @@ jobs:
             echo "ERROR: No se pudo subir web/ a $DEPLOY_PATH tras varios intentos."
             exit 1
           }
+
+          # Limpia un dashboard.html que hubiera quedado público de versiones
+          # anteriores (idempotente: rm -f no falla si ya no existe). Best-effort:
+          # no aborta el deploy si falla, solo avisa.
+          echo "→ Eliminando dashboard.html público (si quedaba de antes)..."
+          reintentar "borrado de dashboard.html público" borrar_dash \
+            || echo "  (aviso) no se pudo borrar dashboard.html del host; bórralo manualmente."
 
           # Persistir el historial ya con la corrida nueva añadida.
           if [ -f data/runs.json ]; then
