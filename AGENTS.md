@@ -103,11 +103,14 @@ Tras los temas principales, al pie de la página (`#voces`), se muestran posts d
 (X, en el futuro Reddit, Mastodon…). La lógica está en `web.py` y funciona así:
 
 1. **Separación** (`build_all_sites`): `_is_social(item)` filtra por `source_id` — los ítems de fuentes
-   en `SOCIAL_SOURCE_IDS` se extraen de la lista normal y van a su propia sección.
-2. **Selección** (`_select_social`): rankea los ítems sociales por `_score` (de `pipeline.py`),
-   aplica `SOCIAL_MAX_PER_SOURCE = 1` (máx. 1 post por red) y toma los `SOCIAL_MAX_TOTAL = 2` mejores.
+   en `SOCIAL_SOURCE_IDS` se extraen de la lista normal y van a su propia sección. X **nunca**
+   enriquece las tarjetas de tema (ni en la web ni en el digest: `cli.py` también lo excluye).
+2. **Selección** (`_select_social`): rankea por `_social_score` (de `pipeline.py`) = "buzz"
+   (engagement `likes + 2·reposts`, escala log, con decaimiento por frescura y bonus a cuentas
+   curadas). Dos pasadas: 1ª preferir diversidad (`SOCIAL_MAX_PER_SOURCE = 1` por red), 2ª rellenar
+   huecos hasta `SOCIAL_MAX_TOTAL = 2` aunque repita red. Hoy, con solo X, salen **2 tarjetas de X**.
 3. **Renderizado**: el template recibe `social_cards` y genera una sección independiente con su
-   propio selector de tarjetas (0–2), apunte neutro de advertencia y sellos T3 (verde).
+   propio selector de tarjetas (0–2, `data-default="2"`), apunte neutro de advertencia y sellos T3 (verde).
 4. **Traducción**: las tarjetas sociales se incluyen en `_rendered_items` y se traducen junto
    con las normales (estrategia B+A). Sin posts sociales, la sección entera desaparece
    (`{% if social_cards %}`).
@@ -117,6 +120,13 @@ Tras los temas principales, al pie de la página (`#voces`), se muestran posts d
 2. Añade su `source_id` a `SOCIAL_SOURCE_IDS` en `web.py`.
 3. Marca la fuente con `category: social` en `config/sources.yaml`.
 4. El resto (selección, renderizado, traducción) funciona automáticamente.
+
+**Consulta de X (híbrida, 1 sola/día):** `fetch_source` arma con `_build_x_social_query` una única
+consulta combinada IA+medicina (no una por tema) → ~10 lecturas/día. Combina con OR una base de
+**cuentas curadas** (`curated_accounts` en `sources.yaml`, vía `from:`) y un relleno por
+**palabras clave** (`social_query`). La preferencia por lo curado se resuelve en `_social_score`
+(las cuentas curadas llevan `extra["curated"]=True`, marcado por las expansiones `author_id`). La
+ventana de frescura sale de `social_freshness_hours`.
 
 **Filtro anti-spam en X:** la query de `fetch_x` excluye `-job -hiring -"job alert"` para
 evitar que ofertas de empleo coladas por el filtro de relevancia contaminen la sección social.
@@ -181,4 +191,4 @@ python -m pytest tests/ -v --cov=sibylla --cov-report=term-missing  # requiere p
 - **URLs de Google News:** el formato actual usa tokens opacos no decodificables solo con base64; `resolve_google_news_url` es best-effort (no-op en ese formato). Preferir medios por RSS directo, que dan URL limpia.
 - **Relevancia bilingüe:** `is_relevant` quita tildes y compara stems ES/EN; las keywords cortas (≤3) usan límite de palabra (p. ej. `ai` no casa con `airport`).
 - **X recent search** exige `max_results ≥ 10`: si el presupuesto restante es < 10, se omite.
-- **Cache de `x_usage.json` en CI:** el workflow solo cachea `translations.json` y `runs.json`, pero no `x_usage.json`. Cada ejecución de CI parte con `reads=0`, así que el tope mensual no frena en CI — solo funciona en local.
+- **Tope mensual de X en CI:** `x_usage.json` se **persiste en el host** (igual que `runs.json`): el workflow lo descarga antes de generar y lo sube después (best-effort, no aborta el deploy). Así el `monthly_read_budget` sí frena en CI. Es un contador de gasto, no historial: si se pierde, el mes solo reinicia a `reads=0` (no corrompe nada).

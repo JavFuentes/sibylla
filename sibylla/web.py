@@ -23,7 +23,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .config import ROOT, get_google_verification, get_site_url
 from .i18n import load_translations, t
 from .models import NewsItem
-from .pipeline import _score
+from .pipeline import _social_score
 from .translate import load_cache, save_cache, translate_cards
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -43,7 +43,10 @@ _RELATED_CAP = 3
 # Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
 SOCIAL_SOURCE_IDS: set[str] = {"x_twitter"}
 
-# Máximo de tarjetas sociales visibles y máximo por red.
+# Máximo de tarjetas sociales visibles y máximo por red en la 1ª pasada.
+# `SOCIAL_MAX_PER_SOURCE` solo expresa una PREFERENCIA de diversidad (1 por red);
+# si no hay suficientes redes para llenar `SOCIAL_MAX_TOTAL`, los huecos se
+# rellenan con los mejores posts restantes aunque repitan red (ver _select_social).
 SOCIAL_MAX_TOTAL = 2
 SOCIAL_MAX_PER_SOURCE = 1
 
@@ -55,21 +58,37 @@ def _is_social(item: NewsItem) -> bool:
 
 def _select_social(items: list[NewsItem], max_total: int = SOCIAL_MAX_TOTAL,
                    max_per_source: int = SOCIAL_MAX_PER_SOURCE) -> list[NewsItem]:
-    """De entre todos los ítems sociales, elige los más relevantes (por _score),
-    con un máximo de `max_per_source` por red y `max_total` en total."""
+    """Elige los posts sociales a mostrar, rankeados por 'buzz' (`_social_score`).
+
+    Dos pasadas:
+      1) Diversidad: hasta `max_per_source` por red, para repartir entre fuentes
+         cuando hay varias (X, Mastodon, Bluesky…).
+      2) Relleno: si quedan huecos hasta `max_total`, se completan con los mejores
+         posts restantes AUNQUE sean de la misma red. Hoy, con solo X, esto hace
+         que se muestren 2 tarjetas de X en vez de 1.
+    """
     if not items:
         return []
-    ranked = sorted(items, key=_score, reverse=True)
-    seen: dict[str, int] = {}
+    ranked = sorted(items, key=_social_score, reverse=True)
     selected: list[NewsItem] = []
+    chosen: set[int] = set()
+    counts: dict[str, int] = {}
+    # 1ª pasada: preferir diversidad de redes.
     for it in ranked:
-        if it.source_id not in seen:
-            seen[it.source_id] = 0
-        if seen[it.source_id] < max_per_source:
-            selected.append(it)
-            seen[it.source_id] += 1
         if len(selected) >= max_total:
             break
+        if counts.get(it.source_id, 0) < max_per_source:
+            selected.append(it)
+            chosen.add(id(it))
+            counts[it.source_id] = counts.get(it.source_id, 0) + 1
+    # 2ª pasada: rellenar huecos con los mejores restantes (puede repetir red).
+    if len(selected) < max_total:
+        for it in ranked:
+            if len(selected) >= max_total:
+                break
+            if id(it) not in chosen:
+                selected.append(it)
+                chosen.add(id(it))
     return selected
 
 # Tier -> (numeral romano, clase CSS del sello, color del acento de la tarjeta).

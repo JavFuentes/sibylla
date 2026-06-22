@@ -644,6 +644,29 @@ sources:
     cost: "pay-per-use (~$0.005/lectura de post; tope 2M/mes). Publicar: $0.015, o $0.20 si lleva enlace"
     budget_usd_loaded: 5.00
     monthly_read_budget: 300        # ~$1.50/mes -> ver plan en README
+    social_freshness_hours: 48      # solo posts de las últimas 48 h ('buzz' actual)
+    # Consulta híbrida para "Voces de la red" (NO enriquece los temas):
+    #   1) base curada: posts de estas cuentas de alta señal (IA + medicina).
+    #   2) relleno: si las cuentas curadas no llenan las 2 tarjetas, se completa
+    #      con búsqueda abierta por estas palabras clave. Todo en UNA sola
+    #      consulta/día (~10 lecturas). Edita libremente la lista y las keywords.
+    curated_accounts:               # IA
+      - OpenAI
+      - GoogleDeepMind
+      - AnthropicAI
+      - ylecun
+      - demishassabis
+      - MITTechReview
+      # Medicina
+      - NEJM
+      - TheLancet
+      - NIH
+      - WHO
+      - EricTopol
+      - statnews
+    social_query: >-
+      "artificial intelligence" OR "machine learning" OR "large language model"
+      OR "clinical trial" OR "gene therapy" OR "drug approval" OR "medical breakthrough"
     status: known
     notes: >
       Tier gratuito eliminado (feb-2026); cuenta nueva = pay-per-use. USAR CON CUIDADO y de forma quirúrgica:

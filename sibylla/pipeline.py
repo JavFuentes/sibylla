@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 
 from .cluster import cluster_stories
 from .config import load_env, load_registry, index_by_id
@@ -59,6 +60,33 @@ def _score(it: NewsItem) -> float:
 
 def rank(items: list[NewsItem]) -> list[NewsItem]:
     return sorted(items, key=_score, reverse=True)
+
+
+# Bonus que garantiza que un post de una cuenta curada (alta señal) se ordene
+# SIEMPRE por encima de uno traído por palabras clave (búsqueda abierta). Así la
+# sección social prefiere lo curado y solo cae a la búsqueda abierta para
+# rellenar huecos (estrategia híbrida).
+_CURATED_BONUS = 1000.0
+
+
+def _social_score(it: NewsItem) -> float:
+    """Puntúa un post social por 'buzz' (engagement) con decaimiento por frescura.
+
+    A diferencia de `_score` (pensado para noticias: tier × frescura), aquí lo que
+    manda es cuánto se está discutiendo el post: likes + 2×reposts, en escala
+    logarítmica para que un único viral no aplaste al resto. Los posts de cuentas
+    curadas reciben un bonus fijo (`_CURATED_BONUS`) para anteponerlos a los de
+    búsqueda abierta. Sirve para elegir y ordenar las tarjetas de 'Voces de la red'.
+    """
+    likes = it.extra.get("likes") or 0
+    reposts = it.extra.get("reposts") or 0
+    engagement = math.log1p(likes + 2 * reposts)
+    if it.published is not None:
+        recency = 0.5 ** (it.age_hours / RECENCY_HALFLIFE_H)
+    else:
+        recency = 0.25  # penaliza posts sin fecha
+    curated = _CURATED_BONUS if it.extra.get("curated") else 0.0
+    return curated + engagement * recency
 
 
 # Máximo de ítems por (fuente, tema) en la zona alta, para que una sola fuente

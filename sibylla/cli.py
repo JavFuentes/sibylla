@@ -98,13 +98,18 @@ def main(argv: list[str] | None = None) -> int:
         print(t(tr, "cli.no_items"))
         return 1
 
+    # X (y demás redes sociales) van SOLO a "Voces de la red" en la web; nunca a
+    # las tarjetas de tema. El digest temático también las excluye, por coherencia.
+    from .web import _is_social
+    items_topic = [it for it in items if not _is_social(it)]
+
     # --- resumen (IA o determinista) ---
     llm_calls: list[dict] = []
     markdown = None
 
     if args.summarize != "off":
         try:
-            result = summarize_digest(items, topics, lang=lang)
+            result = summarize_digest(items_topic, topics, lang=lang)
             if result is not None:
                 markdown, calls = result
                 llm_calls.extend(calls)
@@ -115,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
 
     used_llm = markdown is not None
     if markdown is None:
-        markdown = render_digest(items, topics, meta, lang=lang)
+        markdown = render_digest(items_topic, topics, meta, lang=lang)
 
     OUTPUT_DIR.mkdir(exist_ok=True)
     now = datetime.now(timezone.utc)

@@ -76,8 +76,9 @@ jobs:
           PORT="${DEPLOY_PORT:-22}"
           mkdir -p data
 
-          probar_ssh() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
-          descargar()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json" data/runs.json; }
+          probar_ssh()       { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
+          descargar()        { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json" data/runs.json; }
+          descargar_xusage() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json" data/x_usage.json; }
 
           # Si el host es inalcanzable ABORTAMOS: generar con historial vacío y
           # luego subirlo machacaría el runs.json bueno que vive en el servidor.
@@ -109,6 +110,15 @@ jobs:
               exit 1
               ;;
           esac
+
+          # Contador de lecturas de X (x_usage.json): best-effort. Es solo el tope
+          # mensual de gasto, no historial; si no existe o falla, se sigue (el mes
+          # arranca en 0). Persistirlo hace que el cap mensual SÍ frene en CI.
+          if descargar_xusage 2>/dev/null; then
+            echo "✓ x_usage.json descargado ($(wc -c < data/x_usage.json) bytes)."
+          else
+            echo "ⓘ Sin x_usage.json en el host (o inalcanzable); el contador del mes arranca en 0."
+          fi
 
       - name: Generar sitio (con traducción de tarjetas)
         env:
@@ -154,6 +164,7 @@ jobs:
           subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" "${ASSETS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
           crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
           subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }
+          subir_xusage()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_usage.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json"; }
 
           echo "→ Probando conectividad SSH (con reintentos)..."
           reintentar "test de conectividad SSH" probar_ssh || {
@@ -181,6 +192,14 @@ jobs:
             echo "✓ Historial persistido en $REMOTE_DATA/runs.json"
           else
             echo "ⓘ No hay data/runs.json que persistir (¿generación sin métricas?)."
+          fi
+
+          # Persistir el contador de gasto de X (best-effort, no aborta el deploy).
+          if [ -f data/x_usage.json ]; then
+            echo "→ Persistiendo x_usage.json en el host ($REMOTE_DATA)..."
+            reintentar "subida de x_usage.json" subir_xusage \
+              && echo "✓ Contador de X persistido en $REMOTE_DATA/x_usage.json" \
+              || echo "⚠ No se pudo persistir x_usage.json; el cap del mes podría reiniciarse."
           fi
 
           echo "✅ Deploy completado a $DEPLOY_PATH"

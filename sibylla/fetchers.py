@@ -14,7 +14,7 @@ import calendar
 import logging
 import re
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import feedparser
@@ -326,10 +326,15 @@ def x_usage_reads() -> int:
     return reads
 
 
-def fetch_x(source: Source, query: str, limit: int, monthly_budget: int) -> list[NewsItem]:
+def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
+            curated_handles: frozenset[str] = frozenset(),
+            freshness_hours: int = 48) -> list[NewsItem]:
     """Recent search de X. DE PAGO (~$0.005/post leído). Tope mensual DURO.
 
     Solo lee si queda presupuesto del mes (persistido en data/x_usage.json).
+    `curated_handles` (en minúsculas, sin @) marca los posts de cuentas de alta
+    señal con `extra["curated"]=True` para que el ranking social los anteponga.
+    `freshness_hours` acota la ventana (recent search llega hasta 7 días).
     """
     import os
     bearer = os.getenv("X_BEARER_TOKEN")
@@ -346,8 +351,14 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int) -> list
     params = {
         "query": f"({query}) -is:retweet -is:reply -job -hiring -\"job alert\" lang:en",
         "max_results": max_results,
-        "tweet.fields": "created_at,public_metrics,lang",
+        "tweet.fields": "created_at,public_metrics,lang,author_id",
+        "expansions": "author_id",
+        "user.fields": "username",
     }
+    # Ventana de frescura: solo posts recientes (más "buzz" actual, mismo costo).
+    if freshness_hours and freshness_hours > 0:
+        start = datetime.now(timezone.utc) - timedelta(hours=freshness_hours)
+        params["start_time"] = start.strftime("%Y-%m-%dT%H:%M:%SZ")
     r = requests.get(
         "https://api.twitter.com/2/tweets/search/recent",
         params=params, headers={"Authorization": f"Bearer {bearer}"}, timeout=25,
@@ -355,27 +366,58 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int) -> list
     if r.status_code >= 400:
         log.warning("  x_twitter: HTTP %s %s", r.status_code, r.text[:200])
         return []
-    tweets = r.json().get("data", []) or []
+    payload = r.json()
+    tweets = payload.get("data", []) or []
+    # author_id -> username (las expansiones no cuestan lecturas extra).
+    users = {u.get("id"): (u.get("username") or "")
+             for u in payload.get("includes", {}).get("users", []) or []}
     _x_save_usage(month, used + len(tweets))  # se cobra por post leído
     items = []
     for tw in tweets:
         text = tw.get("text", "")
         tid = tw.get("id")
         m = tw.get("public_metrics", {}) or {}
+        username = users.get(tw.get("author_id"), "")
+        curated = username.lower() in curated_handles
+        post_url = (f"https://x.com/{username}/status/{tid}" if username
+                    else f"https://x.com/i/web/status/{tid}")
         items.append(NewsItem(
             title=(text[:90] + ("…" if len(text) > 90 else "")) or f"post {tid}",
-            url=f"https://x.com/i/web/status/{tid}",
+            url=post_url,
             source_id=source.id,
-            source_name=source.name,
+            source_name=(f"{source.name} › @{username}" if username else source.name),
             tier=source.tier,
             published=_parse_date(tw.get("created_at")),
             summary=text,
             extra={"kind": "post", "likes": m.get("like_count"),
-                   "reposts": m.get("retweet_count")},
+                   "reposts": m.get("retweet_count"),
+                   "author": username, "curated": curated},
         ))
-    log.info("  %-16s -> %d posts (lecturas del mes: %d/%d)",
-             source.id, len(tweets), used + len(tweets), monthly_budget)
+    n_cur = sum(1 for it in items if it.extra.get("curated"))
+    log.info("  %-16s -> %d posts (%d curados; lecturas del mes: %d/%d)",
+             source.id, len(tweets), n_cur, used + len(tweets), monthly_budget)
     return items
+
+
+def _build_x_social_query(source: Source, handles: list[str],
+                          topic_cfgs: list[tuple[str, dict]]) -> str:
+    """Arma la consulta híbrida de X para 'Voces de la red' en UNA sola llamada.
+
+    Combina dos señales con OR (la preferencia por lo curado se resuelve después,
+    en `_social_score`):
+      - cuentas curadas: `(from:a OR from:b OR …)`  → base de alta señal.
+      - palabras clave:  `social_query` de sources.yaml, o si falta, la unión de
+        las consultas `news` de los temas pedidos → relleno (búsqueda abierta).
+    """
+    parts: list[str] = []
+    if handles:
+        parts.append("(" + " OR ".join(f"from:{h}" for h in handles) + ")")
+    keywords = (source.raw.get("social_query") or "").strip()
+    if not keywords:
+        keywords = " OR ".join(cfg["news"] for _, cfg in topic_cfgs if cfg.get("news"))
+    if keywords:
+        parts.append(f"({keywords})")
+    return " OR ".join(parts) if parts else keywords
 
 
 QUERY_SOURCES = {"arxiv_api", "pubmed_eutils", "hacker_news", "google_news_rss"}
@@ -392,15 +434,20 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
     items: list[NewsItem] = []
 
     if source.id == "x_twitter":
+        # X NO enriquece los temas: va solo a "Voces de la red". Una SOLA consulta
+        # híbrida combinada (cuentas curadas + palabras clave) para no duplicar
+        # lecturas (~10/día). Los ítems quedan SIN topic (no son tarjetas de tema).
         budget = int(source.raw.get("monthly_read_budget", 300) or 300)
-        for topic, cfg in topic_cfgs:
-            try:
-                got = fetch_x(source, cfg["news"], limit, budget)
-                for it in got:
-                    it.topics = [topic]
-                items.extend(got)
-            except Exception as ex:  # noqa: BLE001
-                log.warning("  x_twitter [%s] FALLÓ: %s", topic, ex)
+        freshness = int(source.raw.get("social_freshness_hours", 48) or 48)
+        handles = [h.strip().lstrip("@")
+                   for h in (source.raw.get("curated_accounts") or []) if h.strip()]
+        curated_set = frozenset(h.lower() for h in handles)
+        query = _build_x_social_query(source, handles, topic_cfgs)
+        try:
+            items.extend(fetch_x(source, query, limit, budget,
+                                 curated_handles=curated_set, freshness_hours=freshness))
+        except Exception as ex:  # noqa: BLE001
+            log.warning("  x_twitter FALLÓ: %s", ex)
         return items
 
     if source.id in QUERY_SOURCES:
