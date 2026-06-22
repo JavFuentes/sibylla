@@ -146,8 +146,18 @@ jobs:
           done
           echo "→ Páginas públicas a subir: ${PUBLICOS[*]}"
 
+          # Assets estáticos (favicons, iconos, manifest): se derivan de static/
+          # para que añadir un archivo allí lo despliegue sin tocar este workflow.
+          ASSETS=()
+          if [ -d static ]; then
+            for f in static/*; do
+              [ -f "$f" ] && [ -f "web/$(basename "$f")" ] && ASSETS+=("web/$(basename "$f")")
+            done
+          fi
+          echo "→ Assets estáticos a subir: ${ASSETS[*]:-(ninguno)}"
+
           probar_ssh()     { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo 'SSH OK'"; }
-          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
+          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" "${ASSETS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
           borrar_dash()    { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "rm -f '$DEPLOY_PATH/dashboard.html'"; }
           crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
           subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }

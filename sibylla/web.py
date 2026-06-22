@@ -20,7 +20,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .config import ROOT, get_site_url
+from .config import ROOT, get_google_verification, get_site_url
 from .i18n import load_translations, t
 from .models import NewsItem
 from .pipeline import _score
@@ -28,6 +28,7 @@ from .translate import load_cache, save_cache, translate_cards
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 SITE_DIR = ROOT / "web"  # salida: web/{index,es,en,it,pt}.html
+STATIC_DIR = ROOT / "static"  # assets a publicar tal cual (favicons, manifest, iconos)
 
 # Etiqueta del idioma en su propia lengua (mayúsculas, para el selector).
 LANG_LABELS = {"es": "ESPAÑOL", "en": "ENGLISH", "it": "ITALIANO", "pt": "PORTUGUÊS"}
@@ -272,6 +273,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     page_file = "index.html" if is_landing else f"{lang}.html"
     meta_description = tw.get("meta_description", "")
     og_locale = OG_LOCALE.get(lang, f"{lang}_{lang.upper()}")
+    google_verification = get_google_verification()
 
     # JSON-LD WebSite + ItemList con todas las tarjetas visibles.
     all_cards: list[dict] = []
@@ -299,6 +301,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "page_file": page_file,
         "meta_description": meta_description,
         "og_locale": og_locale,
+        "google_verification": google_verification,
         "jsonld": jsonld,
     }
 
@@ -356,6 +359,24 @@ def _build_translations(items: list[NewsItem], topics: list[str],
     by_lang = {lang: translate_cards(cards, lang, cache, tracker=tracker) for lang in ALL_LANGS}
     save_cache(cache)
     return by_lang
+
+
+def _copy_static_assets() -> list[Path]:
+    """Copia los assets estáticos (favicons, iconos, manifest) de static/ a web/.
+
+    Todo lo que viva en `static/` se publica tal cual en la raíz del sitio. Para
+    añadir o quitar un asset, basta con tocar la carpeta `static/` (sin código).
+    Si `static/` no existe, no hace nada (la web se genera igual)."""
+    if not STATIC_DIR.is_dir():
+        return []
+    copiados: list[Path] = []
+    for src in sorted(STATIC_DIR.iterdir()):
+        if not src.is_file():
+            continue
+        dst = SITE_DIR / src.name
+        dst.write_bytes(src.read_bytes())
+        copiados.append(dst)
+    return copiados
 
 
 def _write_robots(site_url: str) -> Path:
@@ -470,6 +491,9 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     out_landing = SITE_DIR / "index.html"
     out_landing.write_text(html_landing, encoding="utf-8")
     paths.append(out_landing)
+
+    # Assets estáticos (favicons, iconos, manifest) → se publican en la raíz.
+    paths.extend(_copy_static_assets())
 
     # Archivos SEO auxiliares.
     ahora = datetime.now(timezone.utc)

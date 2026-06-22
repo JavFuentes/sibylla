@@ -18,29 +18,36 @@ web/
   en.html      ← inglés
   it.html      ← italiano
   pt.html      ← portugués
-  dashboard.html ← métricas del proyecto (privado, ver §1.1)
 ```
+(`dashboard.html` también se genera, pero **no se publica** — es una herramienta
+de monitoreo personal, ver §1.1.)
 
 > **`web/` está en `.gitignore`**: es un *artefacto generado*, no se versiona.
 > Desplegar = **regenerar** `web/` y **subir su contenido** a la raíz pública del
 > hosting. No hay nada que "compilar" en el servidor.
 
-### 1.1 Dashboard de métricas (privado)
+### 1.1 Dashboard de métricas (personal, no se publica)
 
-El pipeline genera `web/dashboard.html` con métricas de cada ejecución:
+El dashboard muestra métricas de cada ejecución:
 - Historial de regeneraciones (fecha, temas, fuentes, ítems procesados)
 - Consumo de tokens por llamada LLM (summarize + traducciones por idioma)
 - Costo estimado en USD según precios actualizados de DeepSeek, OpenAI y Anthropic
 
-El dashboard es **privado**: requiere una clave de acceso configurada en
-`DASHBOARD_KEY`. Sin la key, la página muestra "Acceso restringido". Para
-ver los datos se accede con `?key=TU_CLAVE` en la URL.
+Es una **herramienta de monitoreo personal**: no le interesa al visitante, así
+que **no se publica** en el sitio. El deploy sube todo `web/` *menos*
+`dashboard.html`, y el footer del sitio no lo enlaza.
 
-- La clave **nunca** aparece en texto claro en el HTML: solo se hornea su hash
-  SHA-256.
-- En local, si `DASHBOARD_KEY` no está definida, el dashboard se muestra sin
-  restricción (modo desarrollo).
-- En CI, la key se configura como *secret* de GitHub (`DASHBOARD_KEY`).
+**Para verlo en local** (descarga el historial del host, lo renderiza y lo abre
+en tu navegador):
+
+```bash
+python -m sibylla.cli --dashboard
+```
+
+Necesita en tu `.env` las credenciales SSH del host (`DEPLOY_HOST`,
+`DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_DATA_PATH` y, opcional, `DEPLOY_KEY_FILE`).
+El visor local **ignora** `DASHBOARD_KEY`: siempre muestra los datos. (La key
+solo gatearía el HTML con `?key=` si algún día decidieras publicarlo.)
 
 Los datos de cada ejecución se persisten en `data/runs.json` (ignorado por git).
 En CI el historial vive en el **host**, no en el cache de Actions: cada corrida

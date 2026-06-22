@@ -47,6 +47,7 @@
 <html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
+{% if google_verification %}<meta name="google-site-verification" content="{{ google_verification }}">{% endif %}
 {% if is_landing %}<script>
 /* Sibylla — auto-detección de idioma (solo en index.html de aterrizaje).
    Si el usuario ya eligió, respeta su preferencia (localStorage).
@@ -63,6 +64,12 @@
 })();
 </script>{% endif %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#080B14">
 <title>{{ t.page_title }}</title>
 {% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
 <meta name="robots" content="index, follow">
@@ -77,9 +84,14 @@
 <meta property="og:type" content="website">
 <meta property="og:locale" content="{{ og_locale }}">
 <meta property="og:site_name" content="Sibylla">
+<meta property="og:image" content="{{ site_url }}/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="Sibylla">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{{ t.page_title }}">
 {% if meta_description %}<meta name="twitter:description" content="{{ meta_description }}">{% endif %}
+<meta name="twitter:image" content="{{ site_url }}/icon-512.png">
 <script type="application/ld+json">
 [
 {{ jsonld }}
@@ -504,7 +516,6 @@
       <span><span class="punto t3"></span> III · {{ t.tier3_label }}</span>
     </div>
     <p class="lema">{{ t.footer_motto }}</p>
-    <p style="margin-top:10px;"><a href="dashboard.html" style="color:var(--tenue);font-size:.72rem;letter-spacing:.08em;text-decoration:none;text-transform:uppercase;transition:color .2s;" onmouseover="this.style.color='var(--oro-claro)'" onmouseout="this.style.color='var(--tenue)'">Dashboard</a></p>
   </div>
 </footer>
 <script>

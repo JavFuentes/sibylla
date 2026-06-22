@@ -68,3 +68,13 @@ def index_by_id(sources: list[Source]) -> dict[str, Source]:
 def get_site_url() -> str:
     """URL base del sitio público, sin barra final. Lee SIBYLLA_SITE_URL del .env; si no, usa el fallback."""
     return os.getenv("SIBYLLA_SITE_URL", "https://sibylla.cl").rstrip("/")
+
+
+def get_google_verification() -> str:
+    """Token de verificación de Google Search Console (método 'etiqueta HTML').
+
+    Se hornea como <meta name="google-site-verification"> en cada página, así
+    sobrevive a la regeneración del sitio. Es solo el valor del atributo content
+    (NO la etiqueta completa). Vacío si no se configura → no se emite la meta.
+    """
+    return os.getenv("SIBYLLA_GOOGLE_VERIFICATION", "").strip()

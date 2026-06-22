@@ -63,10 +63,17 @@ def main(argv: list[str] | None = None) -> int:
                         help="ruta de salida de la web (def. web/index.html)")
     parser.add_argument("--lang", default=None,
                         help="idioma del resumen y la web: es, en, it, pt (def. según config, SIBYLLA_LANG, o 'es')")
+    parser.add_argument("--dashboard", action="store_true",
+                        help="abre el dashboard de métricas en local: descarga runs.json del host y lo muestra (no toca el sitio público)")
     parser.add_argument("-q", "--quiet", action="store_true", help="menos logs")
     args = parser.parse_args(argv)
 
     _setup_logging(verbose=not args.quiet)
+
+    # Visor local del dashboard: no corre el pipeline, solo baja y abre métricas.
+    if args.dashboard:
+        from .dashboard import open_local_dashboard
+        return open_local_dashboard()
 
     topics = [t.strip() for t in args.topics.split(",") if t.strip()]
     sources = [s.strip() for s in args.sources.split(",")] if args.sources else None
