@@ -173,17 +173,6 @@
   .pie .lema{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--tenue);
     font-size:.95rem; margin:16px 0 0; }
 
-  /* Acceso restringido */
-  #dash-locked{ display:flex; flex-direction:column; align-items:center; justify-content:center;
-    min-height:60vh; text-align:center; padding:40px 20px; }
-  #dash-locked .lock-icon{ font-size:3rem; margin-bottom:20px; color:var(--oro); }
-  #dash-locked h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.16em;
-    font-size:1.3rem; color:var(--marfil); margin:0 0 12px; }
-  #dash-locked p{ font-family:'Cormorant Garamond',serif; font-style:italic;
-    color:var(--marfil-2); font-size:1rem; max-width:40ch; }
-  #dash-data{ display:none; }
-  #dash-data.visible{ display:block; }
-
   /* Responsive */
   @media (max-width:860px){
     .resumen-grid{ grid-template-columns:repeat(2,1fr); }
@@ -222,18 +211,7 @@
   </div>
 </header>
 
-{% if dash_key_hash %}
-<!-- ---- Acceso restringido (sin key correcta) ---- -->
-<div id="dash-locked">
-  <div class="lock-icon" aria-hidden="true">&#x1f512;</div>
-  <h2>Acceso restringido</h2>
-  <p>Este dashboard es privado. Usa la clave de acceso para ver las métricas.</p>
-</div>
-{% endif %}
-
 <!-- ---- Contenido del dashboard ---- -->
-<div id="dash-data"{% if not dash_key_hash %} class="visible"{% endif %}>
-
 <main class="lienzo-central">
 
   <section class="hero">
@@ -420,43 +398,6 @@
     <p class="lema">Dashboard generado {{ generado }}</p>
   </div>
 </footer>
-
-</div>{# /dash-data #}
-
-{% if dash_key_hash %}
-<script>
-/* Control de acceso al dashboard: compara SHA-256 de ?key= contra el hash
-   horneado en el HTML. Sin key correcta, solo se ve "Acceso restringido". */
-(function(){
-  var expected="{{ dash_key_hash }}";
-  var data=document.getElementById('dash-data');
-  var locked=document.getElementById('dash-locked');
-  var params=new URLSearchParams(location.search);
-  var key=params.get('key')||'';
-  if(!key){ return; }
-
-  if(window.crypto&&crypto.subtle){
-    var enc=new TextEncoder().encode(key);
-    crypto.subtle.digest('SHA-256',enc).then(function(hash){
-      var hex=Array.from(new Uint8Array(hash)).map(function(b){
-        return ('00'+b.toString(16)).slice(-2);
-      }).join('');
-      if(hex===expected){
-        locked.style.display='none';
-        data.className='visible';
-      }
-    }).catch(function(){});
-  }else{
-    if(key.length>=8 && djb2(key)===djb2_expected()){
-      locked.style.display='none';
-      data.className='visible';
-    }
-  }
-  function djb2(s){ var h=5381; for(var i=0;i<s.length;i++){ h=((h<<5)+h+s.charCodeAt(i))|0; } return h>>>0; }
-  function djb2_expected(){ return {{ djb2_fallback }}; }
-})();
-</script>
-{% endif %}
 
 <script>
 /* Toggle de fila de detalle: click en cualquier fila principal expande/colapsa su detalle. */

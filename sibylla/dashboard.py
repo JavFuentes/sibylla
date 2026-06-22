@@ -1,10 +1,6 @@
 """Genera dashboard.html con métricas del proyecto: historial de ejecuciones y consumo de tokens."""
 from __future__ import annotations
 
-import hashlib
-import os
-import subprocess
-import tempfile
 import webbrowser
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -194,24 +190,15 @@ def _summary(runs: list[RunRecord], prep: list[dict[str, Any]]) -> dict[str, Any
     }
 
 
-def _djb2(s: str) -> int:
-    """Hash djb2 no criptográfico (fallback si crypto.subtle no está disponible)."""
-    h = 5381
-    for ch in s:
-        h = ((h << 5) + h + ord(ch)) & 0xFFFFFFFF
-    return h
-
-
 def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None) -> Path:
     """Genera dashboard.html y devuelve la ruta.
 
-    Siempre genera aunque no haya ejecuciones registradas (muestra "sin datos").
-    Si DASHBOARD_KEY está configurada en el entorno, el HTML incluye control de
-    acceso: sin ?key=<valor> en la URL solo se ve "Acceso restringido".
-    Sin DASHBOARD_KEY el contenido es público (modo desarrollo / visor local).
+    Es una herramienta de monitoreo personal: el HTML se muestra sin reja de
+    acceso. Siempre genera aunque no haya ejecuciones registradas (muestra
+    "sin datos").
 
-    `runs_path` permite renderizar desde un runs.json arbitrario (p. ej. el que
-    se descarga del host); por defecto usa data/runs.json.
+    `runs_path` permite renderizar desde un runs.json arbitrario; por defecto
+    usa data/runs.json (el historial local).
     """
     out_dir = out_dir or SITE_DIR
     raw_runs = load_runs(runs_path) if runs_path is not None else load_runs()
@@ -222,9 +209,6 @@ def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None)
     max_token = summary["max_tokens_run"] or 1
 
     ahora = _format_dt(datetime.now(timezone.utc))
-
-    dash_key = (os.getenv("DASHBOARD_KEY") or "").strip()
-    dash_key_hash = hashlib.sha256(dash_key.encode()).hexdigest() if dash_key else ""
 
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -238,8 +222,6 @@ def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None)
         days=days,
         summary=summary,
         max_token=max_token,
-        dash_key_hash=dash_key_hash,
-        djb2_fallback=_djb2(dash_key) if dash_key else 0,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "dashboard.html"
@@ -249,60 +231,17 @@ def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None)
 
 # --- Visor local del dashboard (herramienta de monitoreo personal) ----------
 # El dashboard NO se publica en el sitio: las métricas no le interesan al
-# visitante. El historial vive en el host (runs.json en DEPLOY_DATA_PATH); este
-# comando lo descarga por SSH, lo renderiza en local y lo abre en el navegador.
-
-def fetch_runs_from_host(dest: Path) -> None:
-    """Descarga runs.json del host por scp usando las credenciales del .env.
-
-    Lee DEPLOY_HOST, DEPLOY_USER, DEPLOY_PORT (def. 22), DEPLOY_DATA_PATH
-    (def. '.sibylla') y, opcionalmente, DEPLOY_KEY_FILE (ruta a la clave
-    privada; si se omite, usa tu config SSH por defecto / el agente).
-    """
-    host = os.getenv("DEPLOY_HOST")
-    user = os.getenv("DEPLOY_USER")
-    if not host or not user:
-        raise SystemExit(
-            "Faltan DEPLOY_HOST y/o DEPLOY_USER en .env. Añádelos (las mismas "
-            "credenciales del deploy) para ver el dashboard en local."
-        )
-    port = os.getenv("DEPLOY_PORT") or "22"
-    remote_data = os.getenv("DEPLOY_DATA_PATH") or ".sibylla"
-    key_file = os.getenv("DEPLOY_KEY_FILE")
-
-    cmd = ["scp", "-P", str(port),
-           "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15"]
-    if key_file:
-        cmd += ["-i", os.path.expanduser(key_file)]
-    cmd += [f"{user}@{host}:{remote_data}/runs.json", str(dest)]
-    subprocess.run(cmd, check=True)
-
+# visitante. Es un instrumento de medición local que se renderiza desde el
+# historial local (data/runs.json) y se abre en el navegador.
 
 def open_local_dashboard() -> int:
-    """Descarga el historial del host, renderiza el dashboard y lo abre.
+    """Renderiza el dashboard desde data/runs.json local y lo abre en el navegador.
 
     Pensado para correr en tu máquina (`python -m sibylla.cli --dashboard`).
-    Se renderiza SIN control de acceso: es local y privado, queremos ver los
-    datos directamente, no la pantalla de "Acceso restringido".
+    Sin reja de acceso ni red: es un instrumento de medición privado.
     """
     load_env()
-    # En local nunca gateamos: ignoramos DASHBOARD_KEY aunque esté en el .env.
-    os.environ.pop("DASHBOARD_KEY", None)
-
-    with tempfile.TemporaryDirectory() as td:
-        runs_tmp = Path(td) / "runs.json"
-        print("→ Descargando historial (runs.json) del host…")
-        try:
-            fetch_runs_from_host(runs_tmp)
-        except FileNotFoundError:
-            raise SystemExit("No encuentro el comando 'scp'. Instala el cliente OpenSSH.")
-        except subprocess.CalledProcessError:
-            raise SystemExit(
-                "No se pudo descargar runs.json del host. ¿Ya corrió el workflow al "
-                "menos una vez y existe DEPLOY_DATA_PATH/runs.json en el servidor?"
-            )
-        out = render_dashboard(runs_path=runs_tmp)
-
+    out = render_dashboard()
     print(f"✓ Dashboard generado en {out}")
     webbrowser.open(out.as_uri())
     return 0

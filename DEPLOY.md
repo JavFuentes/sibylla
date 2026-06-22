@@ -19,8 +19,8 @@ web/
   it.html      ← italiano
   pt.html      ← portugués
 ```
-(`dashboard.html` también se genera, pero **no se publica** — es una herramienta
-de monitoreo personal, ver §1.1.)
+(El `dashboard.html` de métricas **no** se genera aquí ni se publica — es una
+herramienta de monitoreo local, ver §1.1.)
 
 > **`web/` está en `.gitignore`**: es un *artefacto generado*, no se versiona.
 > Desplegar = **regenerar** `web/` y **subir su contenido** a la raíz pública del
@@ -34,20 +34,17 @@ El dashboard muestra métricas de cada ejecución:
 - Costo estimado en USD según precios actualizados de DeepSeek, OpenAI y Anthropic
 
 Es una **herramienta de monitoreo personal**: no le interesa al visitante, así
-que **no se publica** en el sitio. El deploy sube todo `web/` *menos*
-`dashboard.html`, y el footer del sitio no lo enlaza.
+que **no se publica** en el sitio. El build del sitio (`--html`) **no** genera
+`dashboard.html`, y el deploy nunca lo sube.
 
-**Para verlo en local** (descarga el historial del host, lo renderiza y lo abre
-en tu navegador):
+**Para verlo en local** (renderiza el historial local y lo abre en tu navegador):
 
 ```bash
 python -m sibylla.cli --dashboard
 ```
 
-Necesita en tu `.env` las credenciales SSH del host (`DEPLOY_HOST`,
-`DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_DATA_PATH` y, opcional, `DEPLOY_KEY_FILE`).
-El visor local **ignora** `DASHBOARD_KEY`: siempre muestra los datos. (La key
-solo gatearía el HTML con `?key=` si algún día decidieras publicarlo.)
+Lee `data/runs.json` (tu historial local), genera `web/dashboard.html` **sin
+reja de acceso** y lo abre. No necesita credenciales ni red.
 
 Los datos de cada ejecución se persisten en `data/runs.json` (ignorado por git).
 En CI el historial vive en el **host**, no en el cache de Actions: cada corrida
@@ -137,7 +134,6 @@ Configura en *Settings → Secrets and variables → Actions* del repo:
 | --- | --- |
 | `LLM_PROVIDER`, `LLM_MODEL` | Proveedor y modelo de IA (pueden ir como *Variables* en vez de *Secrets*). |
 | `LLM_API_KEY` | Clave del proveedor de IA. **Secret.** |
-| `DASHBOARD_KEY` | Clave de acceso al dashboard de métricas. **Secret.** |
 | `DEPLOY_HOST`, `DEPLOY_USER` | Host y usuario SSH/SFTP del hosting. |
 | `DEPLOY_KEY` | Clave **privada** SSH autorizada en el host. **Secret.** |
 | `DEPLOY_PATH` | Ruta de la raíz pública en el host (p. ej. `/home/usuario/public_html`). |

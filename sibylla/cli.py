@@ -163,12 +163,8 @@ def main(argv: list[str] | None = None) -> int:
     from .metrics import record_run
     record_run(record)
 
-    # Generar dashboard siempre que se genere web, o si el usuario pidió html
-    if args.html:
-        from .dashboard import render_dashboard
-        dash_path = render_dashboard()
-        print(f"  {dash_path}")
-
+    # El dashboard de métricas NO se genera aquí: es una herramienta de monitoreo
+    # local que se ve con `python -m sibylla.cli --dashboard` (lee data/runs.json).
     return 0
 
 
