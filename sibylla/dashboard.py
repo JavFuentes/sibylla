@@ -1,6 +1,9 @@
 """Genera dashboard.html con métricas del proyecto: historial de ejecuciones y consumo de tokens."""
 from __future__ import annotations
 
+import os
+import subprocess
+import tempfile
 import webbrowser
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -231,17 +234,58 @@ def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None)
 
 # --- Visor local del dashboard (herramienta de monitoreo personal) ----------
 # El dashboard NO se publica en el sitio: las métricas no le interesan al
-# visitante. Es un instrumento de medición local que se renderiza desde el
-# historial local (data/runs.json) y se abre en el navegador.
+# visitante. El historial de PRODUCCIÓN vive en el host (runs.json en
+# DEPLOY_DATA_PATH); este comando lo descarga por SSH, lo renderiza en local
+# (sin reja de acceso) y lo abre en el navegador.
+
+def fetch_runs_from_host(dest: Path) -> None:
+    """Descarga runs.json del host por scp usando las credenciales del .env.
+
+    Lee DEPLOY_HOST, DEPLOY_USER, DEPLOY_PORT (def. 22), DEPLOY_DATA_PATH
+    (def. '.sibylla') y, opcionalmente, DEPLOY_KEY_FILE (ruta a la clave
+    privada; si se omite, usa tu config SSH por defecto / el agente).
+    """
+    host = os.getenv("DEPLOY_HOST")
+    user = os.getenv("DEPLOY_USER")
+    if not host or not user:
+        raise SystemExit(
+            "Faltan DEPLOY_HOST y/o DEPLOY_USER en .env. Añádelos (las mismas "
+            "credenciales del deploy) para ver el historial de producción."
+        )
+    port = os.getenv("DEPLOY_PORT") or "22"
+    remote_data = os.getenv("DEPLOY_DATA_PATH") or ".sibylla"
+    key_file = os.getenv("DEPLOY_KEY_FILE")
+
+    cmd = ["scp", "-P", str(port),
+           "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15"]
+    if key_file:
+        cmd += ["-i", os.path.expanduser(key_file)]
+    cmd += [f"{user}@{host}:{remote_data}/runs.json", str(dest)]
+    subprocess.run(cmd, check=True)
+
 
 def open_local_dashboard() -> int:
-    """Renderiza el dashboard desde data/runs.json local y lo abre en el navegador.
+    """Descarga el historial de producción del host, lo renderiza y lo abre.
 
     Pensado para correr en tu máquina (`python -m sibylla.cli --dashboard`).
-    Sin reja de acceso ni red: es un instrumento de medición privado.
+    Se renderiza SIN reja de acceso: es un instrumento de medición privado.
     """
     load_env()
-    out = render_dashboard()
+
+    with tempfile.TemporaryDirectory() as td:
+        runs_tmp = Path(td) / "runs.json"
+        print("→ Descargando historial de producción (runs.json) del host…")
+        try:
+            fetch_runs_from_host(runs_tmp)
+        except FileNotFoundError:
+            raise SystemExit("No encuentro el comando 'scp'. Instala el cliente OpenSSH.")
+        except subprocess.CalledProcessError:
+            raise SystemExit(
+                "No se pudo descargar runs.json del host. ¿Ya corrió el workflow al "
+                "menos una vez y existe DEPLOY_DATA_PATH/runs.json en el servidor?"
+            )
+        out = render_dashboard(runs_path=runs_tmp)
+
     print(f"✓ Dashboard generado en {out}")
     webbrowser.open(out.as_uri())
     return 0

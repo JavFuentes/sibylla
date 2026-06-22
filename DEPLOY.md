@@ -37,14 +37,17 @@ Es una **herramienta de monitoreo personal**: no le interesa al visitante, así
 que **no se publica** en el sitio. El build del sitio (`--html`) **no** genera
 `dashboard.html`, y el deploy nunca lo sube.
 
-**Para verlo en local** (renderiza el historial local y lo abre en tu navegador):
+**Para verlo en local** (descarga el historial de producción del host, lo
+renderiza y lo abre en tu navegador):
 
 ```bash
 python -m sibylla.cli --dashboard
 ```
 
-Lee `data/runs.json` (tu historial local), genera `web/dashboard.html` **sin
-reja de acceso** y lo abre. No necesita credenciales ni red.
+Necesita en tu `.env` las credenciales SSH del host (`DEPLOY_HOST`,
+`DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_DATA_PATH` y, opcional, `DEPLOY_KEY_FILE`)
+— las mismas del deploy. Genera `web/dashboard.html` **sin reja de acceso** y lo
+abre.
 
 Los datos de cada ejecución se persisten en `data/runs.json` (ignorado por git).
 En CI el historial vive en el **host**, no en el cache de Actions: cada corrida
