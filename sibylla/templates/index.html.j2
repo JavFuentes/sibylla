@@ -238,10 +238,10 @@
     background:conic-gradient(from 0deg, transparent, #F2DD93, transparent 26%, #5EE6E0, transparent 54%, #D9B85F, transparent 84%);
     animation:girar 18s linear infinite; }
   .portal .disco{ position:absolute; inset:7px; border-radius:50%; overflow:hidden;
-    background:#000;
+    background:transparent;
     border:1px solid rgba(217,184,95,.30);
     box-shadow:inset 0 0 60px rgba(94,230,224,.16), inset 0 0 22px rgba(217,184,95,.10); }
-  .portal .lienzo{ position:absolute; inset:0; display:grid; place-items:end center; }
+  .portal .lienzo{ position:absolute; inset:0; display:grid; place-items:center; }
   .portal .lienzo svg, .portal .lienzo img{ width:84%; height:auto; }
   @keyframes girar{ to{ transform:rotate(360deg);} }
   .laurel{ position:absolute; top:-18px; left:50%; transform:translateX(-50%); width:200px; opacity:.85; }
@@ -445,7 +445,7 @@
         <div class="aro" aria-hidden="true"></div>
         <div class="disco">
           <div class="lienzo">
-            <!-- Avatar de Sibylla: reemplaza este comentario por <img src="assets/sibylla.png" alt="Sibylla"> -->
+            <img src="sibylla.png" alt="Sibylla">
           </div>
         </div>
       </div>
