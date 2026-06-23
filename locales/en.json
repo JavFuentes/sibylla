@@ -70,6 +70,11 @@
     "social_voice": "Sibylla explores",
     "social_voice_text": "These conversations echo across social networks. They are weak signal, unconfirmed: treat them as rumor, not fact.",
     "social_topic_label": "Social media",
+    "net_mastodon": "Mastodon",
+    "net_bluesky": "Bluesky",
+    "net_reddit": "Reddit",
+    "net_x": "X",
+    "social_house_badge": "Sibylla",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "topics": {
       "nacional": "Chile",

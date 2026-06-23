@@ -70,6 +70,11 @@
     "social_voice": "Sibylla esplora",
     "social_voice_text": "Queste conversazioni risuonano nei social network. Sono segnale debole, non confermato: considerale come voci, non come fatti.",
     "social_topic_label": "Social media",
+    "net_mastodon": "Mastodon",
+    "net_bluesky": "Bluesky",
+    "net_reddit": "Reddit",
+    "net_x": "X",
+    "social_house_badge": "Sibylla",
     "months": ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"],
     "topics": {
       "nacional": "Cile",

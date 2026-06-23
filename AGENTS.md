@@ -97,39 +97,108 @@ Cada `.tema` tiene un control `− N +` que el usuario ajusta en el navegador. P
 Los valores por defecto son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
 La sección social usa `data-steps="0,1,2"` (máx. 2 tarjetas). El valor inicial se lee de `data-default`.
 
-### Sección "Voces de la red" (redes sociales)
+### Sección "Voces de la red" (redes sociales) · v2.0
 
-Tras los temas principales, al pie de la página (`#voces`), se muestran posts de redes sociales
-(X, en el futuro Reddit, Mastodon…). La lógica está en `web.py` y funciona así:
+Tras los temas principales, al pie de la página (`#voces`), se muestran **6 tarjetas
+con reglas de producto**: 4 plazas de red (Mastodon, Bluesky, Reddit, X) + 2 tarjetas
+de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.py`,
+`fetchers.py` y `pipeline.py`.
 
-1. **Separación** (`build_all_sites`): `_is_social(item)` filtra por `source_id` — los ítems de fuentes
-   en `SOCIAL_SOURCE_IDS` se extraen de la lista normal y van a su propia sección. X **nunca**
-   enriquece las tarjetas de tema (ni en la web ni en el digest: `cli.py` también lo excluye).
-2. **Selección** (`_select_social`): rankea por `_social_score` (de `pipeline.py`) = "buzz"
-   (engagement `likes + 2·reposts`, escala log, con decaimiento por frescura y bonus a cuentas
-   curadas). Dos pasadas: 1ª preferir diversidad (`SOCIAL_MAX_PER_SOURCE = 1` por red), 2ª rellenar
-   huecos hasta `SOCIAL_MAX_TOTAL = 2` aunque repita red. Hoy, con solo X, salen **2 tarjetas de X**.
-3. **Renderizado**: el template recibe `social_cards` y genera una sección independiente con su
-   propio selector de tarjetas (0–2, `data-default="2"`), apunte neutro de advertencia y sellos T3 (verde).
-4. **Traducción**: las tarjetas sociales se incluyen en `_rendered_items` y se traducen junto
-   con las normales (estrategia B+A). Sin posts sociales, la sección entera desaparece
-   (`{% if social_cards %}`).
+#### Arquitectura de la sección
 
-**Para añadir una red social nueva:**
-1. Implementa su fetcher en `fetchers.py`.
-2. Añade su `source_id` a `SOCIAL_SOURCE_IDS` en `web.py`.
-3. Marca la fuente con `category: social` en `config/sources.yaml`.
-4. El resto (selección, renderizado, traducción) funciona automáticamente.
+1. **Separación e ingesta** (`build_all_sites` → `fetch_source`):
+   - Las fuentes en `SOCIAL_SOURCE_IDS` (`web.py`) se fetchean en el pipeline normal
+     (`run_pipeline` recorre `DEFAULT_FREE_SOURCES`, que ya incluye `mastodon`, `bluesky`,
+     `reddit`; X solo con `--with-x`). Cada una hace UNA llamada API, sin desglosar
+     por tema, y devuelve ítems sin `topics` (no son tarjetas de tema).
+   - `_is_social(item)` filtra por `source_id` para separar los ítems sociales de
+     los temáticos antes de renderizar.
 
-**Consulta de X (híbrida, 1 sola/día):** `fetch_source` arma con `_build_x_social_query` una única
-consulta combinada IA+medicina (no una por tema) → ~10 lecturas/día. Combina con OR una base de
-**cuentas curadas** (`curated_accounts` en `sources.yaml`, vía `from:`) y un relleno por
-**palabras clave** (`social_query`). La preferencia por lo curado se resuelve en `_social_score`
-(las cuentas curadas llevan `extra["curated"]=True`, marcado por las expansiones `author_id`). La
-ventana de frescura sale de `social_freshness_hours`.
+2. **Lentes** (`fetchers.py` `pick_lens` + bloque `social:` en `sources.yaml`):
+   - Cada red elige una lente al azar por corrida (semilla por día → estable en el
+     día). Las lentes se definen en `config/sources.yaml` → `social.lenses` con peso
+     (`weight`). Añadir una sección = añadir una entrada a `lenses`; las
+     probabilidades se reparten parejo según el peso.
+   - Cada lente tiene campos específicos por red: `mastodon_tag`, `bluesky_query`,
+     `reddit_subs`, `x_topic`. Las búsquedas temáticas (no-`trend`) usan estos campos;
+     la lente `trend` consulta el feed "caliente" de cada API.
 
-**Filtro anti-spam en X:** la query de `fetch_x` excluye `-job -hiring -"job alert"` para
-evitar que ofertas de empleo coladas por el filtro de relevancia contaminen la sección social.
+3. **Selección** (`_select_social` en `web.py`): algoritmo de slots con reglas fijas:
+   - **Fase 1** → top‑1 por red orgánica (por `_social_score`) → hasta 4 slots.
+   - **Fase 2** → 2 house cards de `fetch_house_posts` (cuentas propias en
+     `social.house_accounts`); si hay <2, rellena con pool orgánico restante.
+   - **Fase 3** → rellena huecos de redes que no aportaron nada con el mejor pool
+     orgánico hasta `SOCIAL_MAX_TOTAL = 6`.
+   - **Fase 4** → baraja las 6 con `random.Random(seed_dia)` si `social.shuffle`.
+   - `_social_score` se reutiliza tal cual (engagement `likes + 2·reposts`, escala
+     log, con decaimiento por frescura y bonus a cuentas curadas).
+
+4. **Renderizado**: el template recibe `social_cards` y genera:
+   - Apunte neutro de Sibylla (`social_voice` / `social_voice_text` del locale).
+   - 6 tarjetas con badge de red (`.pill`): nombre de la red (`net_*` del locale)
+     o "Sibylla" (`social_house_badge`) para las house.
+   - Selector de tarjetas (`data-steps="0,2,4,6"`, `data-default="6"`).
+   - Sin posts sociales, la sección entera desaparece (`{% if social_cards %}`).
+
+5. **Traducción**: las tarjetas sociales se incluyen en `_rendered_items` y se
+   traducen junto con las normales (estrategia B+A). Sin cambios en `translate.py`.
+
+6. **Degradación elegante**: cada red sin credenciales (falta `.env`) o cuyo fetcher
+   falle devuelve `[]` con `log.warning`. Los fallbacks (Fase 3) mantienen las 6
+   tarjetas mientras haya al menos 1 red con resultados. Sin `--with-x`, la plaza de
+   X y los house de X se omiten y el hueco lo cubre el pool orgánico.
+
+#### Fetchers sociales (ver `fetchers.py`)
+
+Cada uno devuelve `list[NewsItem]` con `extra` uniforme:
+`{"kind":"post", "network":<id>, "likes":N, "reposts":N, "author":h, "is_repost":bool}`.
+
+| Red | Fetcher | Auth | Endpoints |
+|-----|---------|------|-----------|
+| Mastodon | `fetch_mastodon(source, lens, limit)` | Ninguno (instancia pública) | `trends/statuses` o `timelines/tag/{tag}`. Instancia configurable vía `MASTODON_INSTANCE` (def. `mastodon.social`). |
+| Bluesky | `fetch_bluesky(source, lens, limit)` | `BLUESKY_IDENTIFIER` + `BLUESKY_APP_PASSWORD` → `createSession` → `accessJwt` cacheado | `getFeed` (What's Hot) o `searchPosts` |
+| Reddit | `fetch_reddit(source, lens, limit)` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` → OAuth `client_credentials` → Bearer cacheado | `/r/all/hot` o `/r/{subs}/search` |
+| X | `fetch_x` (existente) | `X_BEARER_TOKEN` → Bearer, con tope mensual | `tweets/search/recent`. Su lente se mapea vía `x_topic` a keywords de `TOPIC_CONFIG`; fallback a `social_query` de `sources.yaml`. |
+
+**House posts** (`fetch_house_posts`): consulta el feed de las cuentas en
+`social.house_accounts` (incluyendo reposts): Mastodon vía `accounts/lookup` +
+`/statuses`, Bluesky vía `getAuthorFeed`, Reddit vía `/user/{name}/submitted`.
+Marca `extra["house"]=True`.
+
+#### Configuración (`config/sources.yaml` · bloque `social:`)
+
+```yaml
+social:
+  shuffle: true
+  lenses:                       # 25 % c/u con esta config; escalable
+    - { name: trend,    weight: 1, trend: true }
+    - { name: ia,       weight: 1, mastodon_tag: ai,  bluesky_query: …,   reddit_subs: […], x_topic: ai }
+    - { name: medicina, weight: 1, mastodon_tag: medicine, bluesky_query: …, reddit_subs: […], x_topic: medicine }
+    - { name: chile,    weight: 1, mastodon_tag: chile, bluesky_query: …, reddit_subs: […], x_topic: nacional }
+  house_accounts:
+    - { network: bluesky,  handle: sibylla.cl }
+    - { network: mastodon, handle: "@sibylla@mastodon.social" }
+```
+
+#### Cómo añadir una red social nueva
+
+1. Define la fuente en `config/sources.yaml` (con `type: api`, `tier: 3`).
+2. Escribe su fetcher `fetch_xxx(source, lens, limit)` → `list[NewsItem]` con el
+   `extra` uniforme (`network`, `likes`, `reposts`, `author`, `is_repost`).
+3. Añade su `source_id` a `SOCIAL_API_SOURCES` y la rama dispatch en `fetch_source`.
+4. Añade su `source_id` a `SOCIAL_SOURCE_IDS` en `web.py` y a `DEFAULT_FREE_SOURCES`
+   en `pipeline.py`.
+5. Añade las claves de locale: `net_xxx` en los 4 archivos de `locales/`.
+6. El resto (selección, renderizado, traducción, badges) funciona automáticamente:
+   `_select_social` garantiza 1 slot por red, `_tarjeta` renderiza el pill, y si la
+   red falla el fallback llena el hueco.
+
+#### Cómo añadir una lente (sección temática nueva)
+
+1. Añade una entrada a `social.lenses` en `sources.yaml` con los campos por red
+   (`mastodon_tag`, `bluesky_query`, `reddit_subs`, `x_topic`).
+2. Las probabilidades se reparten automáticamente según `weight`. Si el `x_topic`
+   no está en `TOPIC_CONFIG`, X cae a `social_query`.
 
 ### Localización de contenido (estrategia B+A — implementada)
 

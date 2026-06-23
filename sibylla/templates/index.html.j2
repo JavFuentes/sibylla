@@ -37,7 +37,10 @@
 {%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
 <article class="carta" style="--sello:{{ c.seal_color }};">
-  <h4><a href="{{ c.url }}">{{ c.title }}</a></h4>
+  <h4>
+    {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
+    <a href="{{ c.url }}">{{ c.title }}</a>
+  </h4>
   <div class="fuente"><span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span> {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
   {% if c.snippet %}<p class="resumen">{{ c.snippet }}</p>{% endif %}
   {% if c.related %}<p class="tambien">{{ also_in }}: {% for r in c.related %}<a href="{{ r.url }}">{{ r.source_name }}</a>{% if not loop.last %} <span class="sep">·</span> {% endif %}{% endfor %}{% if c.related_extra %} <span class="sep">·</span> +{{ c.related_extra }}{% endif %}</p>{% endif %}
@@ -478,6 +481,7 @@
   {% if social_cards %}
   <div class="meandro" aria-hidden="true" style="margin:20px 0;"></div>
   <section id="voces">
+    {{ apunte(t.social_voice, t.social_voice_text, 'neutro') }}
     <div class="tema" data-topic="social">
       <h3>{{ t.social_topic_label }}</h3>
       <span class="raya"></span>

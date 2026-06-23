@@ -137,6 +137,13 @@ Configura en *Settings → Secrets and variables → Actions* del repo:
 | --- | --- |
 | `LLM_PROVIDER`, `LLM_MODEL` | Proveedor y modelo de IA (pueden ir como *Variables* en vez de *Secrets*). |
 | `LLM_API_KEY` | Clave del proveedor de IA. **Secret.** |
+| `X_BEARER_TOKEN` | Token Bearer de X para "Voces de la red" (solo si usas `--with-x`). **Secret.** |
+| `BLUESKY_IDENTIFIER` | Identificador de Bluesky (ej. `sibylla.bsky.social`) para la API de AT Protocol. |
+| `BLUESKY_APP_PASSWORD` | App password de Bluesky (desde Settings → App Passwords). **Secret.** |
+| `REDDIT_CLIENT_ID` | Client ID de Reddit (script app en https://www.reddit.com/prefs/apps). |
+| `REDDIT_CLIENT_SECRET` | Client secret de Reddit. **Secret.** |
+| `REDDIT_USER_AGENT` | User-Agent para Reddit (formato `sibylla/0.1 by u/tu_usuario`). |
+| `MASTODON_INSTANCE` | Instancia de Mastodon (opcional; por defecto `mastodon.social`). |
 | `DEPLOY_HOST`, `DEPLOY_USER` | Host y usuario SSH/SFTP del hosting. |
 | `DEPLOY_KEY` | Clave **privada** SSH autorizada en el host. **Secret.** |
 | `DEPLOY_PATH` | Ruta de la raíz pública en el host (p. ej. `/home/usuario/public_html`). |
@@ -175,4 +182,7 @@ Si tienes una máquina encendida (o un VPS), programa el build + subida con `cro
   el YAML.
 - La automatización por defecto **no** usa `--with-x` (X es de pago por uso, con
   tope mensual en `config/sources.yaml`). Inclúyelo solo a conciencia.
+- Mastodon es **gratis y sin auth** en instancias públicas (`mastodon.social` por defecto).
+  Bluesky y Reddit requieren credenciales gratuitas (app password / OAuth) — sin ellas
+  simplemente se omiten con `log.warning` y los fallbacks mantienen las 6 tarjetas.
 - No subas `output/` ni `data/` al hosting: no son parte del sitio.

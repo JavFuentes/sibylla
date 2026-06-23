@@ -15,12 +15,13 @@ archivo de traducción del idioma activo (locales/{lang}.json).
 """
 from __future__ import annotations
 
+import random as _random
 from datetime import datetime, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .config import ROOT, get_google_verification, get_site_url
+from .config import ROOT, get_google_verification, get_site_url, load_social_config
 from .i18n import load_translations, t
 from .models import NewsItem
 from .pipeline import _social_score
@@ -41,14 +42,10 @@ OG_LOCALE: dict[str, str] = {"es": "es_CL", "en": "en_US", "it": "it_IT", "pt": 
 _RELATED_CAP = 3
 
 # Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
-SOCIAL_SOURCE_IDS: set[str] = {"x_twitter"}
+SOCIAL_SOURCE_IDS: set[str] = {"x_twitter", "mastodon", "bluesky", "reddit"}
 
-# Máximo de tarjetas sociales visibles y máximo por red en la 1ª pasada.
-# `SOCIAL_MAX_PER_SOURCE` solo expresa una PREFERENCIA de diversidad (1 por red);
-# si no hay suficientes redes para llenar `SOCIAL_MAX_TOTAL`, los huecos se
-# rellenan con los mejores posts restantes aunque repitan red (ver _select_social).
+# Máximo de tarjetas sociales visibles.
 SOCIAL_MAX_TOTAL = 6
-SOCIAL_MAX_PER_SOURCE = 1
 
 
 def _is_social(item: NewsItem) -> bool:
@@ -56,38 +53,69 @@ def _is_social(item: NewsItem) -> bool:
     return item.source_id in SOCIAL_SOURCE_IDS
 
 
-def _select_social(items: list[NewsItem], max_total: int = SOCIAL_MAX_TOTAL,
-                   max_per_source: int = SOCIAL_MAX_PER_SOURCE) -> list[NewsItem]:
-    """Elige los posts sociales a mostrar, rankeados por 'buzz' (`_social_score`).
+def _select_social(organic: list[NewsItem],
+                   house_items: list[NewsItem],
+                   social_cfg: dict,
+                   seed_str: str) -> list[NewsItem]:
+    """Produce exactamente SOCIAL_MAX_TOTAL tarjetas para 'Voces de la red'.
 
-    Dos pasadas:
-      1) Diversidad: hasta `max_per_source` por red, para repartir entre fuentes
-         cuando hay varias (X, Mastodon, Bluesky…).
-      2) Relleno: si quedan huecos hasta `max_total`, se completan con los mejores
-         posts restantes AUNQUE sean de la misma red.
+    1. top‑1 por red (mastodon, bluesky, reddit, x_twitter) → hasta 4 slots.
+    2. house cards (mejores 2 de `fetch_house_posts`); si <2, rellena con pool orgánico.
+    3. Rellena huecos de redes que no aportaron nada con pool orgánico restante.
+    4. Baraja si `social.shuffle` (semilla por día → estable dentro del día).
     """
-    if not items:
-        return []
-    ranked = sorted(items, key=_social_score, reverse=True)
+    TOTAL = SOCIAL_MAX_TOTAL
+    NETWORKS = ["mastodon", "bluesky", "reddit", "x_twitter"]
+
+    # Agrupar orgánico por source_id y rankear por _social_score
+    by_net: dict[str, list[NewsItem]] = {n: [] for n in NETWORKS}
+    for it in organic:
+        if it.source_id in by_net:
+            by_net[it.source_id].append(it)
+    for posts in by_net.values():
+        posts.sort(key=_social_score, reverse=True)
+
+    used: set[int] = set()
     selected: list[NewsItem] = []
-    chosen: set[int] = set()
-    counts: dict[str, int] = {}
-    # 1ª pasada: preferir diversidad de redes.
-    for it in ranked:
-        if len(selected) >= max_total:
-            break
-        if counts.get(it.source_id, 0) < max_per_source:
-            selected.append(it)
-            chosen.add(id(it))
-            counts[it.source_id] = counts.get(it.source_id, 0) + 1
-    # 2ª pasada: rellenar huecos con los mejores restantes (puede repetir red).
-    if len(selected) < max_total:
-        for it in ranked:
-            if len(selected) >= max_total:
-                break
-            if id(it) not in chosen:
+
+    # --- Fase 1: top‑1 por red ---
+    for net in NETWORKS:
+        for it in by_net.get(net, []):
+            if id(it) not in used:
                 selected.append(it)
-                chosen.add(id(it))
+                used.add(id(it))
+                break  # solo 1 por red
+
+    # --- Fase 2: house cards (hasta 2) ---
+    house_ranked = sorted(house_items, key=_social_score, reverse=True)
+    for it in house_ranked:
+        if sum(1 for s in selected if s.extra.get("house")) >= 2:
+            break
+        if id(it) not in used:
+            selected.append(it)
+            used.add(id(it))
+
+    # Si tras las fases 1+2 no llegamos a TOTAL, rellenar con orgánico restante
+    if len(selected) < TOTAL:
+        remaining_org = sorted(
+            [it for it in organic if id(it) not in used],
+            key=_social_score, reverse=True,
+        )
+        for it in remaining_org:
+            if len(selected) >= TOTAL:
+                break
+            if id(it) not in used:
+                selected.append(it)
+                used.add(id(it))
+
+    # Truncar a TOTAL por si acaso
+    selected = selected[:TOTAL]
+
+    # --- Fase 4: barajar ---
+    if social_cfg.get("shuffle", True):
+        rng = _random.Random(seed_str)
+        rng.shuffle(selected)
+
     return selected
 
 # Tier -> (numeral romano, clase CSS del sello, color del acento de la tarjeta).
@@ -136,6 +164,10 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     snippet = tr["snippet"] if tr else _snippet(it.summary)
     # Otros medios con la misma historia (capados a 3; el resto, "+N").
     rel = it.related or []
+    network = it.extra.get("network", "")
+    if network == "x_twitter":
+        network = "x"  # el locale usa la clave net_x (no net_x_twitter)
+    is_house = bool(it.extra.get("house"))
     return {
         "url": it.url,
         "title": title,
@@ -147,6 +179,8 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         "snippet": snippet,
         "related": [{"source_name": r["source_name"], "url": r["url"]} for r in rel[:_RELATED_CAP]],
         "related_extra": max(0, len(rel) - _RELATED_CAP),
+        "network": network,
+        "is_house": is_house,
     }
 
 
@@ -485,7 +519,14 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # Separar ítems normales de los de redes sociales.
     normal_items = [it for it in items if not _is_social(it)]
     social_raw = [it for it in items if _is_social(it)]
-    social_top = _select_social(social_raw)
+
+    # Fetch house posts (cuentas propias de Sibylla) y seleccionar 6 tarjetas.
+    from .fetchers import fetch_house_posts
+    sc = load_social_config()
+    house_accounts = sc.get("house_accounts", [])
+    house_items = fetch_house_posts(house_accounts)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    social_top = _select_social(social_raw, house_items, sc, today)
 
     by_lang = {}
     if translate:

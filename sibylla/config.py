@@ -70,6 +70,12 @@ def get_site_url() -> str:
     return os.getenv("SIBYLLA_SITE_URL", "https://sibylla.cl").rstrip("/")
 
 
+def load_social_config(path: Path = CONFIG_PATH) -> dict:
+    """Carga el bloque `social:` de sources.yaml (lentes, cuentas propias...)."""
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data.get("social", {}) or {}
+
+
 def get_google_verification() -> str:
     """Token de verificación de Google Search Console (método 'etiqueta HTML').
 

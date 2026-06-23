@@ -828,3 +828,17 @@ sources:
     notes: >
       Respaldo para los 6 regionales sin feed nativo. Caveat: los enlaces de Google News llevan token
       opaco (ver resolve_google_news_url) y solo dan titular + fuente, sin snippet propio.
+
+# =============================================================================
+# Voces de la red — Configuración de lentes y cuentas propias
+# =============================================================================
+social:
+  shuffle: true
+  lenses:
+    - { name: trend,    weight: 1, trend: true }
+    - { name: ia,       weight: 1, mastodon_tag: ai,       bluesky_query: '"artificial intelligence" OR "machine learning"', reddit_subs: [artificial, MachineLearning], x_topic: ai }
+    - { name: medicina, weight: 1, mastodon_tag: medicine, bluesky_query: '"clinical trial" OR "gene therapy"',             reddit_subs: [medicine, science],           x_topic: medicine }
+    - { name: chile,    weight: 1, mastodon_tag: chile,    bluesky_query: 'Chile',                                          reddit_subs: [chile],                        x_topic: nacional }
+  house_accounts:
+    - { network: bluesky,  handle: sibylla.cl }
+    - { network: mastodon, handle: "@sibylla@mastodon.social" }

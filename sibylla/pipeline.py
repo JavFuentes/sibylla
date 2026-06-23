@@ -23,6 +23,8 @@ DEFAULT_FREE_SOURCES = [
     "ciper", "interferencia", "diario_uchile", "fast_check_cl",
     "lavoz_pucon", "diario_aysen", "puranoticia", "mapuexpress",
     "google_news_nacional",
+    # Social (gratis): una tarjeta por red en "Voces de la red"
+    "mastodon", "bluesky", "reddit",
 ]
 
 # Peso por confiabilidad. Tier 1 (peer-review/oficial) pesa más que un agregador.

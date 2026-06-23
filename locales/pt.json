@@ -70,6 +70,11 @@
     "social_voice": "Sibylla explora",
     "social_voice_text": "Estas conversas ecoam nas redes sociais. São sinal fraco, não confirmado: trate-as como rumor, não como fato.",
     "social_topic_label": "Redes sociais",
+    "net_mastodon": "Mastodon",
+    "net_bluesky": "Bluesky",
+    "net_reddit": "Reddit",
+    "net_x": "X",
+    "social_house_badge": "Sibylla",
     "months": ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"],
     "topics": {
       "nacional": "Chile",

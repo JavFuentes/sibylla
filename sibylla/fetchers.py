@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import calendar
 import logging
+import random as _random
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -21,8 +22,8 @@ import feedparser
 import requests
 from dateutil import parser as dateparser
 
-from .config import Source
-from .models import NewsItem
+from .config import Source, load_social_config
+from .models import NewsItem, clean_text as _clean_text
 
 log = logging.getLogger("sibylla")
 
@@ -99,6 +100,24 @@ def _strip_accents(s: str) -> str:
                    if unicodedata.category(c) != "Mn")
 
 
+def pick_lens(network: str, lenses: list[dict], seed_str: str) -> dict:
+    """Elige una lente por azar ponderado, sembrado por (fecha, network).
+
+    Devuelve el dict de la lente elegida. Si `lenses` está vacío, devuelve {}.
+    """
+    if not lenses:
+        return {}
+    rng = _random.Random(seed_str + "|" + network)
+    total = sum(l.get("weight", 1) for l in lenses)
+    target = rng.uniform(0, total)
+    acc = 0.0
+    for l in lenses:
+        acc += l.get("weight", 1)
+        if target <= acc:
+            return l
+    return lenses[-1]
+
+
 def is_relevant(title: str, topic: str) -> bool:
     """True si el texto contiene alguna palabra clave del tema (ES/EN, sin tildes)."""
     kws = TOPIC_KEYWORDS.get(topic)
@@ -137,8 +156,13 @@ def _parse_date(s: str) -> Optional[datetime]:
         return None
 
 
-def _get(url: str, params: dict | None = None, timeout: int = 25) -> requests.Response:
-    r = _session.get(url, params=params, timeout=timeout)
+def _get(url: str, params: dict | None = None, timeout: int = 25,
+         headers: dict | None = None) -> requests.Response:
+    if headers:
+        r = requests.get(url, params=params, timeout=timeout,
+                         headers={**dict(_session.headers), **headers})
+    else:
+        r = _session.get(url, params=params, timeout=timeout)
     r.raise_for_status()
     return r
 
@@ -302,6 +326,409 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
     return items
 
 
+# --- Mastodon / Fediverso (gratis, sin auth en instancias públicas) ---------
+def fetch_mastodon(source: Source, lens: dict, limit: int) -> list[NewsItem]:
+    """Mastodon: trends o hashtag según la lente. Sin auth en instancias públicas."""
+    import os
+    instance = os.getenv("MASTODON_INSTANCE", "mastodon.social")
+    base = f"https://{instance}/api/v1"
+    try:
+        if lens.get("trend"):
+            url = f"{base}/trends/statuses"
+            params = {"limit": limit}
+        else:
+            tag = str(lens.get("mastodon_tag", "")).strip().lower().lstrip("#")
+            if not tag:
+                log.warning("  mastodon: lente sin mastodon_tag y sin trend; se omite")
+                return []
+            url = f"{base}/timelines/tag/{tag}"
+            params = {"limit": limit}
+        r = _get(url, params=params)
+        data = r.json()
+        posts = data if isinstance(data, list) else data.get("data", [])
+    except Exception as ex:
+        log.warning("  mastodon: fallo al consultar %s: %s", instance, ex)
+        return []
+    items = []
+    for p in posts[:limit]:
+        acc = p.get("account", {}) or {}
+        username = acc.get("acct") or acc.get("username", "")
+        author_url = acc.get("url", "")
+        pid = p.get("id", "")
+        post_url = p.get("url") or p.get("uri") or (f"{author_url}/{pid}" if author_url else "")
+        text = _clean_text(p.get("content") or "")
+        title = text[:90] + ("…" if len(text) > 90 else "") or f"post {pid}"
+        created = p.get("created_at", "")
+        is_repost = bool(p.get("reblog"))
+        items.append(NewsItem(
+            title=title,
+            url=post_url,
+            source_id=source.id,
+            source_name=f"{source.name} › @{username}" if username else source.name,
+            tier=source.tier,
+            published=_parse_date(created),
+            summary=text,
+            extra={"kind": "post", "network": "mastodon",
+                   "likes": p.get("favourites_count", 0),
+                   "reposts": p.get("reblogs_count", 0),
+                   "author": username, "is_repost": is_repost},
+        ))
+    log.info("  %-16s [lente:%s] -> %d posts", source.id,
+             lens.get("name", "?"), len(items))
+    return items
+
+
+# --- Bluesky / AT Protocol (gratis, requiere app password) ------------------
+_bluesky_jwt: str | None = None
+
+
+def _bluesky_auth() -> str | None:
+    """Autentica en Bluesky y devuelve el accessJwt. Cacheado por corrida."""
+    global _bluesky_jwt
+    if _bluesky_jwt:
+        return _bluesky_jwt
+    import os
+    identifier = os.getenv("BLUESKY_IDENTIFIER")
+    password = os.getenv("BLUESKY_APP_PASSWORD")
+    if not (identifier and password):
+        log.warning("  bluesky: falta BLUESKY_IDENTIFIER o BLUESKY_APP_PASSWORD en .env")
+        return None
+    try:
+        r = requests.post(
+            "https://bsky.social/xrpc/com.atproto.server.createSession",
+            json={"identifier": identifier, "password": password},
+            timeout=25,
+        )
+        r.raise_for_status()
+        _bluesky_jwt = r.json().get("accessJwt")
+        return _bluesky_jwt
+    except Exception as ex:
+        log.warning("  bluesky: fallo createSession: %s", ex)
+        return None
+
+
+def fetch_bluesky(source: Source, lens: dict, limit: int) -> list[NewsItem]:
+    """Bluesky: feed What's Hot o searchPosts según la lente. Requiere auth."""
+    jwt = _bluesky_auth()
+    if not jwt:
+        return []
+    base_public = "https://public.api.bsky.app/xrpc"
+    headers = {"Authorization": f"Bearer {jwt}"}
+    try:
+        if lens.get("trend"):
+            # Feed "What's Hot": público, sin auth. DID verificado en vivo 2026-06-23.
+            url = f"{base_public}/app.bsky.feed.getFeed"
+            params = {
+                "feed": "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.generator/whats-hot",
+                "limit": limit,
+            }
+        else:
+            query = str(lens.get("bluesky_query", "")).strip()
+            if not query:
+                log.warning("  bluesky: lente sin bluesky_query y sin trend; se omite")
+                return []
+            # searchPosts requiere el appview autenticado (api.bsky.app, no el público).
+            url = "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts"
+            params = {"q": query, "sort": "top", "limit": limit}
+        r = _get(url, params=params, timeout=25, headers=headers)
+        data = r.json()
+        raw_posts = data.get("feed", data.get("posts", [])) if isinstance(data, dict) else []
+    except Exception as ex:
+        log.warning("  bluesky: fallo API: %s", ex)
+        return []
+    items = []
+    for entry in raw_posts[:limit]:
+        post = entry.get("post", entry) if isinstance(entry, dict) else entry
+        author = post.get("author", {}) or {}
+        handle = author.get("handle", "")
+        rkey_raw = str((post.get("uri") or "").split("/")[-1]) if post.get("uri") else ""
+        tid = post.get("cid", "")
+        post_url = f"https://bsky.app/profile/{handle}/post/{rkey_raw}" if handle and rkey_raw else ""
+        text = (post.get("record", {}).get("text") if isinstance(post.get("record"), dict) else "") or ""
+        title = text[:90] + ("…" if len(text) > 90 else "") or f"post {tid}"
+        created = post.get("record", {}).get("createdAt", "") if isinstance(post.get("record"), dict) else ""
+        items.append(NewsItem(
+            title=title,
+            url=post_url,
+            source_id=source.id,
+            source_name=f"{source.name} › @{handle}" if handle else source.name,
+            tier=source.tier,
+            published=_parse_date(created),
+            summary=text,
+            extra={"kind": "post", "network": "bluesky",
+                   "likes": post.get("likeCount", 0),
+                   "reposts": post.get("repostCount", 0),
+                   "author": handle, "is_repost": False},
+        ))
+    log.info("  %-16s [lente:%s] -> %d posts", source.id,
+             lens.get("name", "?"), len(items))
+    return items
+
+
+# --- Reddit (gratis, OAuth app-only) -----------------------------------------
+_reddit_token: str | None = None
+
+
+def _reddit_auth() -> str | None:
+    """OAuth client_credentials → bearer token. Cacheado por corrida."""
+    global _reddit_token
+    if _reddit_token:
+        return _reddit_token
+    import os
+    client_id = os.getenv("REDDIT_CLIENT_ID")
+    secret = os.getenv("REDDIT_CLIENT_SECRET")
+    if not (client_id and secret):
+        log.warning("  reddit: falta REDDIT_CLIENT_ID o REDDIT_CLIENT_SECRET en .env")
+        return None
+    reddit_ua = os.getenv("REDDIT_USER_AGENT", UA)
+    try:
+        r = requests.post(
+            "https://www.reddit.com/api/v1/access_token",
+            data={"grant_type": "client_credentials"},
+            auth=(client_id, secret),
+            headers={"User-Agent": reddit_ua},
+            timeout=25,
+        )
+        r.raise_for_status()
+        _reddit_token = r.json().get("access_token")
+        return _reddit_token
+    except Exception as ex:
+        log.warning("  reddit: fallo OAuth: %s", ex)
+        return None
+
+
+def fetch_reddit(source: Source, lens: dict, limit: int) -> list[NewsItem]:
+    """Reddit: /r/all/hot o búsqueda en subs según la lente. OAuth app-only."""
+    import os
+    token = _reddit_auth()
+    if not token:
+        return []
+    reddit_ua = os.getenv("REDDIT_USER_AGENT", UA)
+    headers = {"Authorization": f"Bearer {token}", "User-Agent": reddit_ua}
+    base = "https://oauth.reddit.com"
+    try:
+        if lens.get("trend"):
+            url = f"{base}/r/all/hot"
+            params = {"limit": limit}
+            r = _get(url, params=params, timeout=25, headers=headers)
+            data = r.json()
+            raw_posts = data.get("data", {}).get("children", [])
+        else:
+            subs = lens.get("reddit_subs", [])
+            if not subs:
+                log.warning("  reddit: lente sin reddit_subs y sin trend; se omite")
+                return []
+            subreddit = "+".join(str(s).strip() for s in subs)
+            query = str(lens.get("bluesky_query", "")).strip()
+            url = f"{base}/r/{subreddit}/search"
+            params = {"q": query, "sort": "hot", "limit": limit, "restrict_sr": "true"}
+            r = _get(url, params=params, timeout=25, headers=headers)
+            data = r.json()
+            raw_posts = data.get("data", {}).get("children", [])
+    except Exception as ex:
+        log.warning("  reddit: fallo API: %s", ex)
+        return []
+    items = []
+    for child in raw_posts[:limit]:
+        d = child.get("data", {}) if isinstance(child, dict) else {}
+        author = d.get("author", "")
+        pid = d.get("id", "")
+        permalink = d.get("permalink", "")
+        post_url = f"https://www.reddit.com{permalink}" if permalink else ""
+        title = d.get("title", "")
+        text = d.get("selftext", "") or ""
+        summary = text if text else title
+        created = d.get("created_utc")
+        items.append(NewsItem(
+            title=title or f"post {pid}",
+            url=post_url,
+            source_id=source.id,
+            source_name=f"{source.name} › u/{author}" if author else source.name,
+            tier=source.tier,
+            published=datetime.fromtimestamp(created, tz=timezone.utc) if created else None,
+            summary=summary,
+            extra={"kind": "post", "network": "reddit",
+                   "likes": d.get("score", 0),
+                   "reposts": 0,
+                   "author": author, "is_repost": False,
+                   "num_comments": d.get("num_comments", 0)},
+        ))
+    log.info("  %-16s [lente:%s] -> %d posts", source.id,
+             lens.get("name", "?"), len(items))
+    return items
+
+
+# --- House posts: cuentas propias de Sibylla ---------------------------------
+def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
+    """Feed de una cuenta Mastodon (incluye reposts/blogs)."""
+    import os
+    instance = os.getenv("MASTODON_INSTANCE", "mastodon.social")
+    handle_clean = handle.lstrip("@").strip()
+    base = f"https://{instance}/api/v1"
+    # Resolver account id
+    try:
+        r = _get(f"{base}/accounts/lookup", params={"acct": handle_clean})
+        acc = r.json()
+        acc_id = acc.get("id")
+        if not acc_id:
+            return []
+    except Exception as ex:
+        log.warning("  house/mastodon: lookup falló para %s: %s", handle, ex)
+        return []
+    try:
+        r = _get(f"{base}/accounts/{acc_id}/statuses",
+                 params={"limit": 10, "exclude_replies": "true"})
+        posts = r.json()
+    except Exception as ex:
+        log.warning("  house/mastodon: statuses falló para %s: %s", handle, ex)
+        return []
+    items = []
+    for p in posts[:10]:
+        username = acc.get("acct") or acc.get("username", "")
+        pid = p.get("id", "")
+        post_url = p.get("url") or p.get("uri") or ""
+        text = _clean_text(p.get("content") or "")
+        title = text[:90] + ("…" if len(text) > 90 else "") or f"post {pid}"
+        created = p.get("created_at", "")
+        is_repost = bool(p.get("reblog"))
+        items.append(NewsItem(
+            title=title,
+            url=post_url,
+            source_id="mastodon",
+            source_name=f"Mastodon › @{username}",
+            tier=3,
+            published=_parse_date(created),
+            summary=text,
+            extra={"kind": "post", "network": "mastodon", "house": True,
+                   "likes": p.get("favourites_count", 0),
+                   "reposts": p.get("reblogs_count", 0),
+                   "author": username, "is_repost": is_repost},
+        ))
+    return items
+
+
+def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
+    """Feed de una cuenta Bluesky (incluye reposts nativos)."""
+    jwt = _bluesky_auth()
+    if not jwt:
+        return []
+    try:
+        r = _get(
+            "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed",
+            params={"actor": handle, "limit": 10},
+            headers={"Authorization": f"Bearer {jwt}"},
+            timeout=25,
+        )
+        data = r.json()
+        feed = data.get("feed", [])
+    except Exception as ex:
+        log.warning("  house/bluesky: falló para %s: %s", handle, ex)
+        return []
+    items = []
+    for entry in feed[:10]:
+        post = entry.get("post", entry) if isinstance(entry, dict) else entry
+        author = post.get("author", {}) or {}
+        h = author.get("handle", "")
+        rkey_raw = str((post.get("uri") or "").split("/")[-1]) if post.get("uri") else ""
+        post_url = f"https://bsky.app/profile/{h}/post/{rkey_raw}" if h and rkey_raw else ""
+        text = (post.get("record", {}).get("text") if isinstance(post.get("record"), dict) else "") or ""
+        title = text[:90] + ("…" if len(text) > 90 else "") or "post"
+        created = post.get("record", {}).get("createdAt", "") if isinstance(post.get("record"), dict) else ""
+        items.append(NewsItem(
+            title=title,
+            url=post_url,
+            source_id="bluesky",
+            source_name=f"Bluesky › @{h}",
+            tier=3,
+            published=_parse_date(created),
+            summary=text,
+            extra={"kind": "post", "network": "bluesky", "house": True,
+                   "likes": post.get("likeCount", 0),
+                   "reposts": post.get("repostCount", 0),
+                   "author": h, "is_repost": False},
+        ))
+    return items
+
+
+def _fetch_house_reddit(handle: str) -> list[NewsItem]:
+    """Historial de posts de una cuenta Reddit."""
+    import os
+    token = _reddit_auth()
+    if not token:
+        return []
+    reddit_ua = os.getenv("REDDIT_USER_AGENT", UA)
+    headers = {"Authorization": f"Bearer {token}", "User-Agent": reddit_ua}
+    name = handle.lstrip("u/").strip().lstrip("/")
+    try:
+        r = _get(
+            f"https://oauth.reddit.com/user/{name}/submitted",
+            params={"sort": "new", "limit": 10},
+            headers=headers,
+            timeout=25,
+        )
+        data = r.json()
+        raw_posts = data.get("data", {}).get("children", [])
+    except Exception as ex:
+        log.warning("  house/reddit: falló para %s: %s", handle, ex)
+        return []
+    items = []
+    for child in raw_posts[:10]:
+        d = child.get("data", {}) if isinstance(child, dict) else {}
+        author = d.get("author", "")
+        pid = d.get("id", "")
+        permalink = d.get("permalink", "")
+        post_url = f"https://www.reddit.com{permalink}" if permalink else ""
+        title = d.get("title", "")
+        text = d.get("selftext", "") or ""
+        summary = text if text else title
+        created = d.get("created_utc")
+        items.append(NewsItem(
+            title=title or f"post {pid}",
+            url=post_url,
+            source_id="reddit",
+            source_name=f"Reddit › u/{author}",
+            tier=3,
+            published=datetime.fromtimestamp(created, tz=timezone.utc) if created else None,
+            summary=summary,
+            extra={"kind": "post", "network": "reddit", "house": True,
+                   "likes": d.get("score", 0),
+                   "reposts": 0,
+                   "author": author, "is_repost": False,
+                   "num_comments": d.get("num_comments", 0)},
+        ))
+    return items
+
+
+def fetch_house_posts(accounts: list[dict]) -> list[NewsItem]:
+    """Consulta el feed de cada cuenta propia, incluyendo reposts.
+
+    `accounts`: [{"network": "bluesky", "handle": "sibylla.cl"}, ...]
+    Devuelve ítems con `extra["house"]=True`. Cada cuenta que falla se aísla.
+    """
+    items: list[NewsItem] = []
+    for acc in accounts:
+        net = str(acc.get("network", "")).strip().lower()
+        handle = str(acc.get("handle", "")).strip()
+        if not net or not handle:
+            continue
+        try:
+            if net == "mastodon":
+                items.extend(_fetch_house_mastodon(handle))
+            elif net == "bluesky":
+                items.extend(_fetch_house_bluesky(handle))
+            elif net == "reddit":
+                items.extend(_fetch_house_reddit(handle))
+            elif net == "x" or net == "x_twitter":
+                # X house solo con --with-x (la fuente en sí no se fetchea sin él);
+                # si se quiere, se implementa aparte. Por ahora, omitir sin error.
+                pass
+            else:
+                log.warning("  house: red desconocida '%s' para %s; se omite", net, handle)
+        except Exception as ex:  # noqa: BLE001
+            log.warning("  house/%s: %s FALLÓ: %s", net, handle, ex)
+    return items
+
+
 # --- X / Twitter (DE PAGO: recent search con tope de presupuesto) -----------
 def _x_usage_path():
     from .config import ROOT
@@ -396,7 +823,8 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
             tier=source.tier,
             published=_parse_date(tw.get("created_at")),
             summary=text,
-            extra={"kind": "post", "likes": m.get("like_count"),
+            extra={"kind": "post", "network": "x",
+                   "likes": m.get("like_count"),
                    "reposts": m.get("retweet_count"),
                    "author": username, "curated": curated},
         ))
@@ -404,27 +832,6 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
     log.info("  %-16s -> %d posts (%d curados; lecturas del mes: %d/%d)",
              source.id, len(tweets), n_cur, used + len(tweets), monthly_budget)
     return items
-
-
-def _build_x_social_query(source: Source, handles: list[str],
-                          topic_cfgs: list[tuple[str, dict]]) -> str:
-    """Arma la consulta híbrida de X para 'Voces de la red' en UNA sola llamada.
-
-    Combina dos señales con OR (la preferencia por lo curado se resuelve después,
-    en `_social_score`):
-      - cuentas curadas: `(from:a OR from:b OR …)`  → base de alta señal.
-      - palabras clave:  `social_query` de sources.yaml, o si falta, la unión de
-        las consultas `news` de los temas pedidos → relleno (búsqueda abierta).
-    """
-    parts: list[str] = []
-    if handles:
-        parts.append("(" + " OR ".join(f"from:{h}" for h in handles) + ")")
-    keywords = (source.raw.get("social_query") or "").strip()
-    if not keywords:
-        keywords = " OR ".join(cfg["news"] for _, cfg in topic_cfgs if cfg.get("news"))
-    if keywords:
-        parts.append(f"({keywords})")
-    return " OR ".join(parts) if parts else keywords
 
 
 def _build_nacional_gnews_query(source: Source) -> str:
@@ -441,6 +848,10 @@ def _build_nacional_gnews_query(source: Source) -> str:
 
 QUERY_SOURCES = {"arxiv_api", "pubmed_eutils", "hacker_news", "google_news_rss"}
 
+# Fuentes que alimentan "Voces de la red" (cada una se consulta con UNA lente,
+# no por tema). Los ítems van sin `topics` y se seleccionan en `_select_social`.
+SOCIAL_API_SOURCES = {"mastodon", "bluesky", "reddit"}
+
 
 def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int) -> list[NewsItem]:
     """Dispatcher: enruta a cada fetcher y etiqueta los ítems por tema.
@@ -454,19 +865,56 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
 
     if source.id == "x_twitter":
         # X NO enriquece los temas: va solo a "Voces de la red". Una SOLA consulta
-        # híbrida combinada (cuentas curadas + palabras clave) para no duplicar
-        # lecturas (~10/día). Los ítems quedan SIN topic (no son tarjetas de tema).
+        # por corrida. La lente (elegida al azar por día) determina el tema de
+        # las palabras clave; las cuentas curadas siempre entran.
         budget = int(source.raw.get("monthly_read_budget", 300) or 300)
         freshness = int(source.raw.get("social_freshness_hours", 48) or 48)
         handles = [h.strip().lstrip("@")
                    for h in (source.raw.get("curated_accounts") or []) if h.strip()]
         curated_set = frozenset(h.lower() for h in handles)
-        query = _build_x_social_query(source, handles, topic_cfgs)
+        # Elegir lente para X (misma semilla que las otras redes)
+        sc = load_social_config()
+        lenses = sc.get("lenses", [])
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        lens = pick_lens("x_twitter", lenses, today) if lenses else {}
+        x_topic = lens.get("x_topic", "")
+        cfg = TOPIC_CONFIG.get(x_topic, {})
+        keywords = cfg.get("news", "") if cfg else ""
+        if not keywords:
+            keywords = (source.raw.get("social_query") or "").strip()
+        # Armar query: cuentas curadas OR keywords de la lente
+        parts: list[str] = []
+        if handles:
+            parts.append("(" + " OR ".join(f"from:{h}" for h in handles) + ")")
+        if keywords:
+            parts.append(f"({keywords})")
+        query = " OR ".join(parts) if parts else keywords
         try:
             items.extend(fetch_x(source, query, limit, budget,
                                  curated_handles=curated_set, freshness_hours=freshness))
         except Exception as ex:  # noqa: BLE001
             log.warning("  x_twitter FALLÓ: %s", ex)
+        return items
+
+    if source.id in SOCIAL_API_SOURCES:
+        # Mastodon, Bluesky, Reddit: una lente al azar por red (estable en el día),
+        # una sola consulta. Ítems SIN topic (van solo a "Voces de la red").
+        try:
+            sc = load_social_config()
+            lenses = sc.get("lenses", [])
+            if not lenses:
+                log.warning("  %-16s: sin lentes configurados; se omite", source.id)
+                return []
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            lens = pick_lens(source.id, lenses, today)
+            if source.id == "mastodon":
+                items.extend(fetch_mastodon(source, lens, limit))
+            elif source.id == "bluesky":
+                items.extend(fetch_bluesky(source, lens, limit))
+            elif source.id == "reddit":
+                items.extend(fetch_reddit(source, lens, limit))
+        except Exception as ex:  # noqa: BLE001
+            log.warning("  %-16s FALLÓ: %s", source.id, ex)
         return items
 
     if source.id == "google_news_nacional":

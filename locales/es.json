@@ -70,6 +70,11 @@
     "social_voice": "Sibylla explora",
     "social_voice_text": "Estas conversaciones resuenan en las redes. Son señal débil, sin confirmar: trátalas como rumor, no como hecho.",
     "social_topic_label": "Redes sociales",
+    "net_mastodon": "Mastodon",
+    "net_bluesky": "Bluesky",
+    "net_reddit": "Reddit",
+    "net_x": "X",
+    "social_house_badge": "Sibylla",
     "months": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
     "topics": {
       "nacional": "Nacional",
