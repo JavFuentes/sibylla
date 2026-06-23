@@ -5,3 +5,4 @@ PyYAML>=6.0.2             # cargar config/sources.yaml
 python-dotenv>=1.0.1      # cargar claves desde .env
 python-dateutil>=2.9.0    # parseo robusto de fechas
 Jinja2>=3.1.0             # plantillas de la web estática (sibylla/web.py)
+tzdata>=2025.1            # zonas horarias para zoneinfo (Windows/CI no traen base del sistema)

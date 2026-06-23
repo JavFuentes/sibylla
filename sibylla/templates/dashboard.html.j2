@@ -65,8 +65,7 @@
     margin:0 0 6px; font-size:1.05rem; }
 
   /* Cards de resumen */
-  .resumen-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin:28px 0 42px; }
-  .resumen-grid.x-visible{ grid-template-columns:repeat(5,1fr); }
+  .resumen-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:18px; margin:28px 0 42px; }
   .resumen-card{ background:var(--panel); border:1px solid var(--panel-borde);
     border-radius:var(--radio); padding:22px 20px; text-align:center;
     backdrop-filter:blur(6px); transition:.25s; }
@@ -176,12 +175,10 @@
   /* Responsive */
   @media (max-width:860px){
     .resumen-grid{ grid-template-columns:repeat(2,1fr); }
-    .resumen-grid.x-visible{ grid-template-columns:repeat(3,1fr); }
   }
   @media (max-width:480px){
     .lienzo-central{ padding:0 16px; }
     .resumen-grid{ grid-template-columns:1fr 1fr; gap:10px; }
-    .resumen-grid.x-visible{ grid-template-columns:1fr 1fr; }
     .resumen-card{ padding:16px 12px; }
     .resumen-card .valor{ font-size:1.3rem; }
     .barra-row .run-id{ width:100px; font-size:.7rem; }
@@ -193,6 +190,76 @@
     .day-header{ flex-wrap:wrap; }
     .day-header .day-stats{ gap:12px; }
   }
+
+  /* Hora dual (Santiago / UTC) */
+  .hora-scl{ color:var(--marfil); }
+  .hora-utc{ font-size:.7rem; color:var(--tenue); display:block; }
+
+  /* Desglose de costos */
+  .desglose{ margin:42px 0; }
+  .desglose h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.14em;
+    font-size:1.15rem; color:var(--marfil); margin:36px 0 16px; }
+  .desglose h3{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.1em;
+    font-size:.95rem; color:var(--marfil-2); margin:28px 0 12px; }
+  .warning-banner{ background:rgba(217,184,95,.08); border:1px solid rgba(217,184,95,.3);
+    border-radius:var(--radio); padding:14px 18px; color:var(--oro-claro); font-size:.8rem;
+    margin-bottom:24px; line-height:1.5; }
+  .warning-banner code{ background:rgba(217,184,95,.1); padding:1px 6px;
+    border-radius:4px; font-size:.78rem; }
+  .desglose-table{ width:100%; border-collapse:collapse; font-size:.82rem; margin-bottom:8px; }
+  .desglose-table thead th{ text-align:left; font-weight:500; font-size:.72rem;
+    letter-spacing:.1em; text-transform:uppercase; color:var(--tenue);
+    padding:8px 14px 10px; border-bottom:1px solid rgba(217,184,95,.16);
+    background:rgba(13,19,34,.5); }
+  .desglose-table tbody td{ padding:10px 14px; border-bottom:1px solid rgba(217,184,95,.06);
+    color:var(--marfil-2); }
+  .desglose-table tbody td.pct-cell{ color:var(--tenue); font-variant-numeric:tabular-nums; }
+  .desglose-table tbody tr.provider-row{ cursor:pointer; transition:background .15s; }
+  .desglose-table tbody tr.provider-row:hover{ background:rgba(217,184,95,.05); }
+  .provider-arrow{ color:var(--oro); font-size:1rem; transition:transform .25s;
+    display:inline-block; margin-right:6px; }
+  .provider-row.expanded .provider-arrow{ transform:rotate(90deg); }
+  tr.model-sub{ display:none; background:rgba(13,19,34,.4); }
+  tr.model-sub.visible{ display:table-row; }
+  tr.model-sub td{ padding-left:40px; font-size:.76rem; }
+
+  /* Presupuesto X */
+  .budget-card{ margin-top:8px; }
+  .budget-card .budget-stats{ display:flex; gap:18px; font-size:.78rem; color:var(--marfil-2);
+    margin-bottom:8px; font-variant-numeric:tabular-nums; }
+  .budget-bar{ height:6px; background:rgba(20,27,46,.6); border-radius:3px; overflow:hidden; }
+  .budget-fill{ height:100%; border-radius:3px; transition:width .3s;
+    background:linear-gradient(90deg, var(--cian), rgba(94,230,224,.7)); }
+  .budget-fill.warn{ background:linear-gradient(90deg, var(--oro), rgba(217,184,95,.7)); }
+  .budget-fill.danger{ background:linear-gradient(90deg, #E06060, rgba(224,96,96,.5)); }
+
+  /* Botón toggle-all */
+  .historial-header{ display:flex; align-items:center; justify-content:space-between;
+    gap:14px; margin:44px 0 20px; }
+  .historial-header h2{ margin:0; }
+  .historial-header .historial-info{ font-size:.78rem; color:var(--tenue);
+    font-family:'Cormorant Garamond',serif; font-style:italic; }
+  .toggle-all-btn{ background:var(--panel); border:1px solid var(--panel-borde);
+    color:var(--marfil-2); padding:6px 14px; border-radius:8px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:.76rem; letter-spacing:.06em;
+    transition:border-color .2s, color .2s; white-space:nowrap; }
+  .toggle-all-btn:hover{ border-color:rgba(242,221,147,.5); color:var(--oro-claro); }
+
+  /* Eficiencia y subtotales en detalle */
+  .subtotales{ display:flex; gap:24px; flex-wrap:wrap; padding:10px 0 4px;
+    border-top:1px solid rgba(217,184,95,.1); margin-top:12px; }
+  .subtotales .sub-line{ font-size:.78rem; color:var(--marfil-2); }
+  .subtotales .sub-line .sub-val{ color:var(--oro-claro); font-variant-numeric:tabular-nums; }
+  .eficiencia{ margin-top:8px; font-size:.74rem; color:var(--tenue);
+    font-family:'Cormorant Garamond',serif; font-style:italic; }
+
+  /* Tendencia de costo por día */
+  .tendencia-barras{ margin:42px 0; }
+  .tendencia-barras h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.14em;
+    font-size:1.15rem; color:var(--marfil); margin:0 0 20px; }
+  .tendencia-barras .barra-row .run-id{ width:150px; }
+  .tendencia-barras .barra-row .barra-fill{
+    background:linear-gradient(90deg, rgba(217,184,95,.55), rgba(242,221,147,.35)); }
 </style>
 </head>
 <body>
@@ -221,7 +288,7 @@
 
   {% if runs %}
   <!-- ---- Resumen ---- -->
-  <div class="resumen-grid{% if summary.has_x %} x-visible{% endif %}">
+  <div class="resumen-grid">
     <div class="resumen-card">
       <div class="valor">{{ summary.runs_n }}</div>
       <div class="label">Ejecuciones</div>
@@ -234,6 +301,10 @@
       <div class="valor">{{ summary.items_total }}</div>
       <div class="label">Ítems procesados</div>
     </div>
+    <div class="resumen-card">
+      <div class="valor">{% if summary.has_llm %}${{ "%.2f"|format(summary.llm_cost) }}{% else %}—{% endif %}</div>
+      <div class="label">Costo LLM</div>
+    </div>
     {% if summary.has_x %}
     <div class="resumen-card">
       <div class="valor">${{ "%.3f"|format(summary.x_cost) }}</div>
@@ -244,6 +315,19 @@
       <div class="valor">${{ "%.2f"|format(summary.cost_total) }}</div>
       <div class="label">Costo total</div>
     </div>
+    {% if summary.has_x %}
+    <div class="resumen-card budget-card">
+      <div class="valor">${{ "%.3f"|format(x_budget.cost) }}</div>
+      <div class="label">Presupuesto X</div>
+      <div class="budget-stats">
+        <span>{{ x_budget.reads }}/{{ x_budget.cap }} posts</span>
+        <span>{{ x_budget.pct }}%</span>
+      </div>
+      <div class="budget-bar">
+        <div class="budget-fill{% if x_budget.pct > 95 %} danger{% elif x_budget.pct > 80 %} warn{% endif %}" style="width:{{ x_budget.pct }}%"></div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <!-- ---- Barras de tokens por ejecución ---- -->
@@ -253,7 +337,7 @@
     {% if r.tokens_total > 0 %}
     {% set pct = (r.tokens_total / max_token * 100) if max_token else 0 %}
     <div class="barra-row">
-      <span class="run-id" title="{{ r.ts }}">{{ r.run_id }}</span>
+      <span class="run-id" title="{{ r.ts_full }}">{{ r.run_id }}</span>
       <div class="barra-track">
         <div class="barra-fill" style="width:{{ "%.1f"|format(pct) }}%"></div>
       </div>
@@ -270,9 +354,95 @@
     {% endif %}
   </section>
 
+  <!-- ---- Desglose de costos (todo el historial) ---- -->
+  {% if breakdown.has_data %}
+  <section class="desglose">
+    <h2>Desglose de costos</h2>
+
+    {% if breakdown.unknown %}
+    <div class="warning-banner">
+      ⚠ {{ breakdown.unknown|sum(attribute="calls") }} llamadas con modelo sin precio conocido:
+      {% for u in breakdown.unknown %}<code>{{ u.model }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+      Añádelos a <code>_MODEL_PRICING</code> en <code>metrics.py</code>.
+    </div>
+    {% endif %}
+
+    {% if breakdown.by_category %}
+    <h3>Por característica</h3>
+    <table class="desglose-table">
+      <thead>
+        <tr><th>Categoría</th><th>Tokens</th><th>Costo</th><th>% costo LLM</th></tr>
+      </thead>
+      <tbody>
+        {% for cat in breakdown.by_category %}
+        <tr>
+          <td>{{ cat.name }}</td>
+          <td class="tokens-cell">{{ "{:,}".format(cat.tokens) }}</td>
+          <td class="cost-cell">${{ "%.4f"|format(cat.cost) }}</td>
+          <td class="pct-cell">{{ cat.pct }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if breakdown.by_provider %}
+    <h3>Por proveedor</h3>
+    <table class="desglose-table" id="provider-table">
+      <thead>
+        <tr><th></th><th>Proveedor</th><th>Tokens</th><th>Costo</th><th>% costo LLM</th></tr>
+      </thead>
+      <tbody>
+        {% for prov in breakdown.by_provider %}
+        <tr class="provider-row" onclick="toggleProvider(this)">
+          <td style="width:24px;"><span class="provider-arrow">▶</span></td>
+          <td>{{ prov.name }}</td>
+          <td class="tokens-cell">{{ "{:,}".format(prov.tokens) }}</td>
+          <td class="cost-cell">${{ "%.4f"|format(prov.cost) }}</td>
+          <td class="pct-cell">{{ prov.pct }}%</td>
+        </tr>
+        {% for m in prov.models %}
+        <tr class="model-sub">
+          <td></td>
+          <td style="font-size:.74rem;">{{ m.name }}</td>
+          <td class="tokens-cell">{{ "{:,}".format(m.tokens) }}</td>
+          <td class="cost-cell">${{ "%.4f"|format(m.cost) }}</td>
+          <td class="pct-cell">{{ m.pct }}%</td>
+        </tr>
+        {% endfor %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <!-- ---- Tendencia de costo por día ---- -->
+  {% if days|length > 1 %}
+  <section class="tendencia-barras">
+    <h2>Tendencia de costo por día</h2>
+    {% for day in days %}
+    {% set pct = (day.cost_day / max_cost_day * 100) if max_cost_day else 0 %}
+    <div class="barra-row">
+      <span class="run-id">{{ day.label }}</span>
+      <div class="barra-track">
+        <div class="barra-fill" style="width:{{ "%.1f"|format(pct) }}%"></div>
+      </div>
+      <span class="barra-val">{% if day.cost_day > 0 %}${{ "%.4f"|format(day.cost_day) }}{% else %}—{% endif %}</span>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
   <!-- ---- Tabla de historial (agrupado por día) ---- -->
   <section class="historial">
-    <h2>Historial</h2>
+    <div class="historial-header">
+      <div>
+        <h2>Historial</h2>
+        <span class="historial-info">{{ summary.runs_n }} ejecuciones{% if primer_dia %} · del {{ primer_dia }} al {{ ultimo_dia }} (Santiago){% endif %}</span>
+      </div>
+      <button class="toggle-all-btn" id="toggle-all-btn" onclick="toggleAllDays()">Expandir todo</button>
+    </div>
 
     {% for day in days %}
     <div class="day-group" id="day-{{ loop.index }}">
@@ -310,7 +480,10 @@
             <td style="width:28px; color:var(--tenue); font-size:.7rem; text-align:right; padding-right:4px;">
               {{ loop.index }}
             </td>
-            <td style="color:var(--marfil);">{{ r.ts.split(",")[1].strip() if "," in r.ts else r.ts }}</td>
+            <td title="{{ r.ts_full }}">
+              <span class="hora-scl">{{ r.ts_scl }}</span>
+              <span class="hora-utc">{{ r.ts_utc }} UTC</span>
+            </td>
             <td>{{ r.topics }}</td>
             <td>{{ r.items_final }}</td>
             <td class="tokens-cell">{% if r.tokens_total > 0 %}{{ "{:,}".format(r.tokens_total) }}{% else %}—{% endif %}</td>
@@ -341,7 +514,7 @@
                 <h4>X / Twitter</h4>
                 <div class="x-detail">
                   <span><span class="x-label">Posts leídos:</span> <span class="x-val">{{ r.x_reads }}</span></span>
-                  <span><span class="x-label">Costo:</span> <span class="x-val">${{ "%.5f"|format(r.x_cost) }}</span></span>
+                  <span><span class="x-label">Costo:</span> <span class="x-val">${{ "%.5f"|format(r.cost_x) }}</span></span>
                 </div>
               </div>
               {% endif %}
@@ -353,7 +526,7 @@
                   <tbody>
                   {% for c in r.calls %}
                   <tr>
-                    <td>{{ c.purpose }}</td>
+                    <td>{{ c.purpose_label }}</td>
                     <td style="font-size:.7rem;">{{ c.model_short }}</td>
                     <td class="tokens-cell">{{ "{:,}".format(c.input) }}</td>
                     <td class="tokens-cell">{{ "{:,}".format(c.output) }}</td>
@@ -368,6 +541,26 @@
               {% if not r.has_x and not r.calls %}
               <div class="detail-section">
                 <p style="color:var(--tenue); font-size:.8rem;">Sin llamadas externas en esta ejecución.</p>
+              </div>
+              {% endif %}
+            </div>
+            <div class="detail-inner" style="padding-top:0;">
+              {% if r.has_x or r.has_llm %}
+              <div class="detail-section subtotales">
+                {% if r.has_llm %}
+                <span class="sub-line">LLM: <span class="sub-val">${{ "%.5f"|format(r.cost_llm) }}</span></span>
+                {% endif %}
+                {% if r.has_x %}
+                <span class="sub-line">X: <span class="sub-val">${{ "%.5f"|format(r.cost_x) }}</span></span>
+                {% endif %}
+                <span class="sub-line">Total: <span class="sub-val">${{ "%.4f"|format(r.cost) }}</span></span>
+              </div>
+              {% endif %}
+              {% if r.cost_per_item > 0 or r.tokens_per_item > 0 %}
+              <div class="eficiencia">
+                {% if r.cost_per_item > 0 %}costo/ítem ${{ "%.5f"|format(r.cost_per_item) }}{% endif %}
+                {% if r.cost_per_item > 0 and r.tokens_per_item > 0 %} · {% endif %}
+                {% if r.tokens_per_item > 0 %}tokens/ítem {{ "%.1f"|format(r.tokens_per_item) }}{% endif %}
               </div>
               {% endif %}
             </div>
@@ -415,6 +608,29 @@ function toggleDetail(id, row){
     detail.classList.add('visible');
     row.classList.add('expanded');
   }
+}
+
+/* Toggle de fila de proveedor en el desglose: expande/colapsa sus modelos. */
+function toggleProvider(row){
+  row.classList.toggle('expanded');
+  var next=row.nextElementSibling;
+  while(next && next.classList.contains('model-sub')){
+    next.classList.toggle('visible');
+    next=next.nextElementSibling;
+  }
+}
+
+/* Expandir / colapsar todos los grupos de día. */
+function toggleAllDays(){
+  var groups=document.querySelectorAll('.day-group');
+  var anyOpen=false;
+  groups.forEach(function(g){ if(!g.classList.contains('collapsed')) anyOpen=true; });
+  groups.forEach(function(g){
+    if(anyOpen) g.classList.add('collapsed');
+    else g.classList.remove('collapsed');
+  });
+  var btn=document.getElementById('toggle-all-btn');
+  btn.textContent=anyOpen ? 'Expandir todo' : 'Colapsar todo';
 }
 
 /* Colapsar todos los grupos de día por defecto (excepto el más reciente). */
