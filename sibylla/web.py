@@ -47,7 +47,7 @@ SOCIAL_SOURCE_IDS: set[str] = {"x_twitter"}
 # `SOCIAL_MAX_PER_SOURCE` solo expresa una PREFERENCIA de diversidad (1 por red);
 # si no hay suficientes redes para llenar `SOCIAL_MAX_TOTAL`, los huecos se
 # rellenan con los mejores posts restantes aunque repitan red (ver _select_social).
-SOCIAL_MAX_TOTAL = 2
+SOCIAL_MAX_TOTAL = 6
 SOCIAL_MAX_PER_SOURCE = 1
 
 
@@ -64,8 +64,7 @@ def _select_social(items: list[NewsItem], max_total: int = SOCIAL_MAX_TOTAL,
       1) Diversidad: hasta `max_per_source` por red, para repartir entre fuentes
          cuando hay varias (X, Mastodon, Bluesky…).
       2) Relleno: si quedan huecos hasta `max_total`, se completan con los mejores
-         posts restantes AUNQUE sean de la misma red. Hoy, con solo X, esto hace
-         que se muestren 2 tarjetas de X en vez de 1.
+         posts restantes AUNQUE sean de la misma red.
     """
     if not items:
         return []
