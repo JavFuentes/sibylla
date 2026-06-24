@@ -13,11 +13,7 @@ ni base de datos). El generador produce, en la carpeta `web/`:
 
 ```
 web/
-  index.html   ← aterrizaje: español + JS que auto-detecta el idioma del navegador
-  es.html      ← español
-  en.html      ← inglés
-  it.html      ← italiano
-  pt.html      ← portugués
+  index.html   ← la única página del sitio (español)
 ```
 (El `dashboard.html` de métricas **no** se genera aquí ni se publica — es una
 herramienta de monitoreo local, ver §1.1.)

@@ -9,19 +9,17 @@
   presente. Acento oro/mármol. El avatar vive en el "portal" (.portal .lienzo).
 
   Variables que inyecta web.py:
-    lang        -> código de idioma (es, en, it, pt)
-    is_landing  -> true solo en index.html (activa JS de auto-detección)
-    lang_label  -> "ESPAÑOL" | "ENGLISH" | "ITALIANO" | "PORTUGUÊS"
-    lang_options-> [(code, label), ...] de los otros 3 idiomas
-    all_langs   -> ["es","en","it","pt"]
+    lang        -> código de idioma (siempre "es": sitio monolingüe)
     generado    -> "21 jun 2026, 06:54 UTC"
     hero_timestamp -> "Última lectura · 21 jun 2026…" (ya formateado)
     total       -> nº de señales analizadas (int)
     n_fuentes   -> nº de fuentes distintas (int)
     observa     -> texto del apunte "Sibylla observa"
-    t           -> dict con las traducciones de la sección "web" del locale
+    t           -> dict con las traducciones de la sección "web" del locale es
     grupos      -> [{id, label, cards:[{url,title,source_name,date,
-                    seal_roman,seal_class,seal_color,snippet}]}]
+                    seal_roman,seal_class,seal_color,snippet,image,
+                    resumen,has_resumen,related,...}]}]
+    social_cards-> lo mismo, para "Voces de la red"
 #}
 {% macro busto() -%}
 <span class="busto" aria-hidden="true"></span>
@@ -57,21 +55,6 @@
 <head>
 <meta charset="utf-8">
 {% if google_verification %}<meta name="google-site-verification" content="{{ google_verification }}">{% endif %}
-{% if is_landing %}<script>
-/* Sibylla — auto-detección de idioma (solo en index.html de aterrizaje).
-   Si el usuario ya eligió, respeta su preferencia (localStorage).
-   Si no, detecta el idioma del navegador y redirige a {codigo}.html. */
-(function(){
-  var lang=document.documentElement.lang||'es';
-  var files={% for c in all_langs %}"{{ c }}":"{{ c }}.html"{% if not loop.last %},{% endif %}{% endfor %};
-  var prefer=localStorage.getItem('sibylla_lang');
-  if(!prefer){
-    var nav=(navigator.language||'').split('-')[0];
-    prefer=(files[nav]&&nav!==lang)?nav:lang;
-  }
-  if(prefer&&prefer!==lang&&files[prefer])location.replace(files[prefer]);
-})();
-</script>{% endif %}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="96x96" href="favicon-96x96.png">
@@ -85,10 +68,8 @@
 {% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="{{ site_url }}/{{ page_file }}">
-{%- for lc in all_langs %}
-<link rel="alternate" hreflang="{{ lc }}" href="{{ site_url }}/{{ lc }}.html">
-{%- endfor %}
-<link rel="alternate" hreflang="x-default" href="{{ site_url }}/index.html">
+<link rel="alternate" hreflang="es" href="{{ site_url }}/{{ page_file }}">
+<link rel="alternate" hreflang="x-default" href="{{ site_url }}/{{ page_file }}">
 <meta property="og:title" content="{{ t.page_title }}">
 {% if meta_description %}<meta property="og:description" content="{{ meta_description }}">{% endif %}
 <meta property="og:url" content="{{ site_url }}/{{ page_file }}">
@@ -178,26 +159,6 @@
   nav.menu a{ color:var(--marfil-2); text-decoration:none; font-size:.8rem; letter-spacing:.14em;
     text-transform:uppercase; transition:color .2s; }
   nav.menu a:hover{ color:var(--oro-claro); }
-  /* ---- Selector de idioma ---- */
-  .lang-wrap{ position:relative; }
-  .lang-current{ font-size:.8rem; letter-spacing:.14em; text-transform:uppercase;
-    color:var(--oro-claro); cursor:default; padding:0 6px; border-radius:6px;
-    transition:.2s; display:flex; align-items:center; gap:4px; user-select:none;
-    white-space:nowrap; line-height:1.6; }
-  .lang-current::after{ content:'\25BE'; font-size:.6rem; margin-left:2px; opacity:.7; }
-  .lang-wrap:hover .lang-current{ background:rgba(217,184,95,.10); }
-  .lang-drop{ visibility:hidden; opacity:0; pointer-events:none;
-    position:absolute; top:100%; right:0;
-    background:rgba(13,19,34,.97); border:1px solid var(--panel-borde);
-    border-radius:var(--radio); padding:6px 0; min-width:136px;
-    backdrop-filter:blur(12px); z-index:20;
-    transition:opacity .12s, visibility .12s; }
-  .lang-wrap:hover .lang-drop, .lang-wrap:focus-within .lang-drop{
-    visibility:visible; opacity:1; pointer-events:auto; }
-  .lang-opt{ display:block; padding:8px 18px; font-size:.76rem; letter-spacing:.11em;
-    text-transform:uppercase; color:var(--marfil-2); text-decoration:none;
-    transition:.15s; }
-  .lang-opt:hover{ color:var(--oro-claro); background:rgba(217,184,95,.08); }
   /* ---- Hamburguesa (móvil) ---- */
   .menu-toggle{ display:none; }
   .menu-icon{ display:none; flex-direction:column; justify-content:center; align-items:center; gap:5px; width:44px; height:44px; cursor:pointer; border-radius:8px; transition:.2s; }
@@ -391,12 +352,6 @@
       min-width:200px; backdrop-filter:blur(12px); z-index:20; }
     .menu-toggle:checked ~ nav.menu{ display:flex; }
     nav.menu a{ padding:6px 0; }
-    .lang-current{ padding:6px 0; border:none; }
-    .lang-current:hover{ background:transparent; border:none; }
-    .lang-drop{ visibility:visible; opacity:1; pointer-events:auto;
-      position:static; background:transparent; border:none;
-      border-radius:0; padding:4px 0 0 12px; margin-top:0; }
-    .lang-opt{ padding:6px 0; }
   }
   /* ================= Responsive: teléfono ================= */
   @media (max-width:480px){
@@ -454,14 +409,6 @@
       {% if social_cards %}<a href="#voces">{{ t.social_heading }}</a>{% endif %}
       <a href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.nav_github }}</a>
       <a href="#">{{ t.nav_about }}</a>
-      <div class="lang-wrap">
-        <span class="lang-current" tabindex="0" role="button" aria-label="{{ lang_label }}">{{ lang_label }}</span>
-        <div class="lang-drop">
-          {%- for code, label in lang_options %}
-          <a href="{{ code }}.html" class="lang-opt">{{ label }}</a>
-          {%- endfor %}
-        </div>
-      </div>
     </nav>
   </div>
 </header>
@@ -553,16 +500,6 @@
   </div>
 </footer>
 <script>
-/* Guarda la preferencia de idioma al hacer clic en el selector. */
-(function(){
-  var opts=document.querySelectorAll('.lang-opt');
-  for(var i=0;i<opts.length;i++){
-    opts[i].addEventListener('click',function(e){
-      var code=this.getAttribute('href').replace('.html','');
-      try{localStorage.setItem('sibylla_lang',code);}catch(_){}
-    });
-  }
-})();
 /* Selector de tarjetas por tema. Steps configurables vía data-steps="0,2,4,6"
    (por defecto) o data-steps="0,1,2" para la sección social. */
 (function(){

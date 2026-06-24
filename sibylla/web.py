@@ -1,17 +1,21 @@
 """Genera la web estática de Sibylla a partir de los ítems del pipeline.
 
-Produce `web/index.html` (aterrizaje con auto-detección de idioma) y una
-página por idioma: `web/es.html`, `web/en.html`, `web/it.html`, `web/pt.html`.
+Produce una única página `web/index.html` (sitio monolingüe en español,
+enfocado en Chile). No hay selector de idioma, página de aterrizaje con
+auto-detección ni versiones por idioma.
 
-La portada es DETERMINISTA — no requiere LLM. La voz de Sibylla (los
-"apuntes") se compone con plantillas simples a partir de los conteos.
+La portada es DETERMINISTA en su estructura — no requiere LLM. La voz de
+Sibylla (los "apuntes") se compone con plantillas simples a partir de los
+conteos. El LLM entra solo en dos pasos opcionales de build: la traducción del
+título+snippet al español (`translate.py`) y el resumen por tarjeta
+(`resumen.py`); ambos degradan con elegancia si no hay LLM.
 
 El diseño vive en `sibylla/templates/index.html.j2` (fuente de verdad). Este
 módulo solo lo alimenta con datos: para cambiar la estética, edita la plantilla,
 no los HTML generados (se sobrescriben en cada corrida).
 
 Las etiquetas de tema, meses y demás cadenas visibles se cargan desde el
-archivo de traducción del idioma activo (locales/{lang}.json).
+archivo de traducción del español (locales/es.json).
 """
 from __future__ import annotations
 
@@ -33,7 +37,9 @@ STATIC_DIR = ROOT / "static"  # assets a publicar tal cual (favicons, manifest, 
 
 # Etiqueta del idioma en su propia lengua (mayúsculas, para el selector).
 LANG_LABELS = {"es": "ESPAÑOL", "en": "ENGLISH", "it": "ITALIANO", "pt": "PORTUGUÊS"}
-ALL_LANGS = ["es", "en", "it", "pt"]
+# El sitio es monolingüe (español, enfocado en Chile). Se mantiene como lista
+# para no romper el molde del código, pero solo hay una página: index.html.
+ALL_LANGS = ["es"]
 
 # Mapa de código de idioma → locale de Open Graph (sin guion bajo, con guion).
 OG_LOCALE: dict[str, str] = {"es": "es_CL", "en": "en_US", "it": "it_IT", "pt": "pt_BR"}
@@ -328,16 +334,14 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     if social_items:
         social_cards = [_tarjeta(it, months, no_date, translations, resumenes) for it in social_items]
 
-    # Datos para el selector de idioma.
+    # Datos de idioma (el sitio es monolingüe; se conservan por el molde del código).
     lang_label = LANG_LABELS.get(lang, lang.upper())
     lang_options = [(lc, LANG_LABELS[lc]) for lc in ALL_LANGS if lc != lang]
-    # Mapa código → nombre de archivo (es → es.html, excepto el default que es index.html).
-    # Para que el JS de auto-detección sepa a dónde redirigir.
     lang_files = {lc: f"{lc}.html" for lc in ALL_LANGS}
 
     # Variables SEO.
     site_url = get_site_url()
-    page_file = "index.html" if is_landing else f"{lang}.html"
+    page_file = "index.html"  # sitio de una sola página (index.html)
     meta_description = tw.get("meta_description", "")
     og_locale = OG_LOCALE.get(lang, f"{lang}_{lang.upper()}")
     google_verification = get_google_verification()
@@ -461,49 +465,18 @@ def _write_robots(site_url: str) -> Path:
 
 
 def _write_sitemap(site_url: str, lastmod: str) -> Path:
-    """Escribe web/sitemap.xml con todas las páginas y anotaciones hreflang."""
-    urls: list[str] = []
-    # Páginas de idioma.
-    for lang in ALL_LANGS:
-        loc = f"{site_url}/{lang}.html"
-        alts = "\n".join(
-            f'    <xhtml:link rel="alternate" hreflang="{lc}" href="{site_url}/{lc}.html"/>'
-            for lc in ALL_LANGS
-        )
-        default = f'    <xhtml:link rel="alternate" hreflang="x-default" href="{site_url}/index.html"/>'
-        urls.append(
-            f"  <url>\n"
-            f"    <loc>{loc}</loc>\n"
-            f"    <lastmod>{lastmod}</lastmod>\n"
-            f"    <changefreq>hourly</changefreq>\n"
-            f"    <priority>0.9</priority>\n"
-            f"{alts}\n"
-            f"{default}\n"
-            f"  </url>"
-        )
-    # Página de aterrizaje (x-default).
-    loc_index = f"{site_url}/index.html"
-    alts_index = "\n".join(
-        f'    <xhtml:link rel="alternate" hreflang="{lc}" href="{site_url}/{lc}.html"/>'
-        for lc in ALL_LANGS
-    )
-    default_index = f'    <xhtml:link rel="alternate" hreflang="x-default" href="{loc_index}"/>'
-    urls.append(
-        f"  <url>\n"
-        f"    <loc>{loc_index}</loc>\n"
-        f"    <lastmod>{lastmod}</lastmod>\n"
-        f"    <changefreq>hourly</changefreq>\n"
-        f"    <priority>1.0</priority>\n"
-        f"{alts_index}\n"
-        f"{default_index}\n"
-        f"  </url>"
-    )
+    """Escribe web/sitemap.xml con la única página del sitio (index.html)."""
+    loc = f"{site_url}/index.html"
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
-        '        xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
-        + "\n".join(urls) +
-        "\n</urlset>\n"
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url>\n"
+        f"    <loc>{loc}</loc>\n"
+        f"    <lastmod>{lastmod}</lastmod>\n"
+        "    <changefreq>hourly</changefreq>\n"
+        "    <priority>1.0</priority>\n"
+        "  </url>\n"
+        "</urlset>\n"
     )
     out = SITE_DIR / "sitemap.xml"
     out.write_text(xml, encoding="utf-8")
@@ -515,15 +488,12 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                      translate_tracker: list[dict] | None = None) -> list[Path]:
     """Genera un HTML por idioma + index.html de aterrizaje con auto-detección.
 
-    Estructura generada:
-        web/index.html  → landing (español + JS que redirige según navegador)
-        web/es.html     → español
-        web/en.html     → inglés
-        web/it.html     → italiano
-        web/pt.html     → portugués
+    Estructura generada (sitio monolingüe, español):
+        web/index.html  → la única página del sitio (español)
 
-    Si `translate` es True y hay LLM configurado, las tarjetas (título + snippet)
-    se traducen al idioma de cada página; si no, quedan en su idioma original.
+    Si `translate` es True y hay LLM configurado, el título y snippet de las
+    tarjetas en otros idiomas se traducen al español; las que ya están en
+    español se devuelven iguales.
 
     Si se pasa `translate_tracker`, se apendea el uso de tokens de cada llamada LLM.
 
@@ -545,34 +515,26 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     social_top = _select_social(social_raw, house_items, sc, today)
 
-    by_lang = {}
+    # Traducción de tarjetas (título + snippet) al español si hay LLM.
+    translations = None
     if translate:
         by_lang = _build_translations(normal_items, topics, max_por_tema,
                                       tracker=translate_tracker,
                                       social_items=social_top)
+        translations = by_lang.get("es")
 
     # Resúmenes en español de las tarjetas renderizadas (botón "Resumen" + acordeón).
-    # Se generan una sola vez (agnósticos al idioma de la página: siempre en ES).
     from .resumen import build_resumenes
     rendered_for_resumen = _rendered_items(normal_items, topics, max_por_tema, social_top)
     resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
 
-    # Páginas por idioma (sin auto-detección).
-    for lang in ALL_LANGS:
-        html = render_html(normal_items, topics, meta, lang=lang, max_por_tema=max_por_tema,
-                           is_landing=False, translations=by_lang.get(lang),
-                           social_items=social_top, resumenes=resumenes)
-        out = SITE_DIR / f"{lang}.html"
-        out.write_text(html, encoding="utf-8")
-        paths.append(out)
-
-    # Página de aterrizaje (español + JS de auto-detección).
-    html_landing = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
-                                is_landing=True, translations=by_lang.get("es"),
-                                social_items=social_top, resumenes=resumenes)
-    out_landing = SITE_DIR / "index.html"
-    out_landing.write_text(html_landing, encoding="utf-8")
-    paths.append(out_landing)
+    # Única página del sitio (español).
+    html = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
+                       is_landing=False, translations=translations,
+                       social_items=social_top, resumenes=resumenes)
+    out = SITE_DIR / "index.html"
+    out.write_text(html, encoding="utf-8")
+    paths.append(out)
 
     # Assets estáticos (favicons, iconos, manifest) → se publican en la raíz.
     paths.extend(_copy_static_assets())

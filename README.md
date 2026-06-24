@@ -41,7 +41,7 @@ Sibylla revisa cada cierto tiempo los temas que te interesan (**ciencia y tecnol
 - **Agrupación de misma historia entre medios** (near-dedup conservador por similitud de título): una noticia cubierta por varios medios se muestra una vez, con "También en: …" enlazando a los demás. Señal débil a propósito; prefiere no fusionar a fusionar de más.
 - **Ranking** por `tier × frescura` y **diversidad** (una sola fuente no tapa al resto).
 - **Resumen con IA opcional y multi-proveedor:** Anthropic (Claude), OpenAI, OpenRouter, cualquier endpoint compatible o **Ollama** (local). Sin LLM, genera una lista determinista.
-- **Web estática multilingüe con contenido localizado:** una página por idioma (es/en/it/pt); los títulos y snippets de las tarjetas se traducen con IA al idioma de cada página (estrategia B+A: solo lo visible, con cache en `data/`). Sin LLM, las tarjetas quedan en el idioma original de la fuente.
+- **Web estática monolingüe (español) con contenido localizado:** una sola página `index.html` enfocada en Chile. Los títulos y snippets de las tarjetas en otros idiomas se traducen al español con IA; cada tarjeta trae además un **botón "Resumen"** con un resumen en español generado por IA (abstract de papers, cuerpo de prensa extraído con trafilatura). Sin LLM, las tarjetas quedan en el idioma original de la fuente y sin botón de resumen.
 - **X / Twitter opcional** con **tope de presupuesto mensual duro** (es de pago por uso), aislado en su propia sección de redes sociales.
 - **Dashboard local de métricas:** `--dashboard` genera un panel con historial de ejecuciones y consumo/costo de tokens (lee `data/runs.json`).
 - **SEO listo para producción:** favicons (con fondo transparente), `manifest`, `og:image`, `robots.txt` y `sitemap.xml`.
@@ -67,8 +67,8 @@ Sibylla revisa cada cierto tiempo los temas que te interesan (**ciencia y tecnol
 │ Nacional CL  │   └────────────────┘   ├──────────────────┤   │ web.py           │
 │ X (opcional) │        │               │ nacional.py      │   │ -> HTML estático │
 └──────────────┘   i18n.py +            │ (juez LLM +      │   │ (web/*.html)     │
-                   locales/{es,en,      │  cuota regional) │   │ 4 idiomas        │
-                   it,pt}               └──────────────────┘   ├──────────────────┤
+                    locales/{es,...}    │  cuota regional) │   │ (solo español)   │
+                    (traducciones)      └──────────────────┘   ├──────────────────┤
                    (traducciones)                              │ dashboard.py +   │
                                             IA opcional         │ metrics.py       │
                                             (llm.py)            │ -> métricas      │

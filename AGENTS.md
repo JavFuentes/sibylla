@@ -16,14 +16,16 @@ sibylla/
   summarize.py   # resumen con IA (usa llm.py); None si no hay LLM configurado
   llm.py         # capa LLM agnóstica de proveedor (requests puro, sin SDKs)
   i18n.py        # internacionalización simple (JSON sin dependencias)
-  web.py         # genera web estática a partir de los ítems del pipeline
-  translate.py   # traduce tarjetas de la web (título+snippet) con LLM; cache en data/
+  web.py         # genera la web estática (una sola página index.html, en español) desde el pipeline
+  translate.py   # traduce tarjetas de la web (título+snippet) al español con LLM; cache en data/
+  articles.py    # extrae el cuerpo de artículos de prensa (trafilatura) para los resúmenes; cache en data/
+  resumen.py     # resumen en español por tarjeta (abstract de papers / cuerpo de prensa) con LLM; cache en data/
   cli.py         # punto de entrada: python -m sibylla.cli
   templates/     # plantillas Jinja2 de la web (index.html.j2)
 config/
   sources.yaml   # registro curado de fuentes (tiers, acceso, costo)
   README.md      # documentación del registro y plan de presupuesto de X
-locales/         # traducciones JSON (es, en, it, pt)
+locales/         # traducciones JSON (es es la del sitio; en/it/pt se conservan para prompts/digest)
 tests/           # tests unitarios (pytest, sin red)
   test_models.py    # canonicalize_url, clean_text, NewsItem
   test_relevance.py # _strip_accents, is_relevant, classify_topics
@@ -87,8 +89,24 @@ correcto: preferimos no fusionar a fusionar de más. Subir de nivel requiere una
 
 La web se renderiza desde `sibylla/templates/index.html.j2` (fuente de verdad). **Nunca edites `web/*.html` a mano**; se sobrescriben en cada corrida. Para cambiar diseño/textos:
 - **CSS/estructura** → `templates/index.html.j2`
-- **Textos UI** → `locales/{es,en,it,pt}.json` (sección `"web"`)
+- **Textos UI** → `locales/es.json` (sección `"web"`; el sitio es **monolingüe español**)
 - **Contenido** → lo genera el pipeline automáticamente
+
+### Sitio monolingüe (español)
+
+El sitio es **una sola página `index.html` en español** (enfocado en Chile). Ya no hay
+selector de idioma, página *landing* con auto-detección ni versiones en/en/it/pt: ese
+código se retiró. `ALL_LANGS = ["es"]` en `web.py` se conserva como lista solo para no
+romper el molde del código. `locales/en,it,pt.json` siguen en el repo porque los usan los
+prompts de `summarize`/`digest` y el test de paridad de locales, pero **no se publican**.
+
+Cada tarjeta trae (además del enlace del título a la fuente):
+- **Botón "Resumen"** (acordeón inline): resumen en español generado por LLM desde el
+  contenido fuente (abstract para papers; cuerpo del artículo para prensa, vía
+  `articles.py`/trafilatura). Si no hay LLM o falla el fetch, el botón no aparece.
+- **Botón "Original"**: enlace a la fuente (como el título).
+El snippet visible de la tarjeta es el de la fuente (traducido al ES); si la fuente no
+trae snippet, cae a un recorte del resumen. Ver `resumen.py` y `articles.py`.
 
 ### Selector de tarjetas por tema
 
@@ -199,25 +217,33 @@ social:
 2. Las probabilidades se reparten automáticamente según `weight`. Si el `x_topic`
    no está en `TOPIC_CONFIG`, X cae a `social_query`.
 
-### Localización de contenido (estrategia B+A — implementada)
+### Localización de contenido (español) y resúmenes por tarjeta
 
-La "cáscara" de la web (UI) se traduce de forma estática vía `locales/*.json` (**A**).
-El **contenido** de las tarjetas (título + snippet) se traduce con LLM en `translate.py` (**B**),
-en tiempo de *build*, y se hornea en el HTML. Claves:
+El sitio es **monolingüe (español)**. La "cáscara" de la web (UI) vive en `locales/es.json`.
+El **contenido** de las tarjetas se procesa en dos capas (ambas *build-time*, el visitante
+solo descarga HTML ya procesado; la API key es secreto del *operador*):
 
-- **El LLM es de build-time, no del visitante.** Las 4 páginas se pre-traducen al generar;
-  el visitante solo descarga HTML ya traducido. La API key es secreto del *operador*.
-- **Solo se traducen las tarjetas renderizadas** (≤ `max_por_tema` por tema, vía `_rendered_items`),
-  nunca el overflow → ahorra tokens.
-- **Cache** en `data/translations.json` (ignorado por git), por `{lang: {dedup_key: {...}}}` con
-  `src_title` para invalidar si la fuente cambia el título. Regenerar solo re-traduce ítems nuevos.
-- **Degradación elegante:** sin LLM o ante error, `translate_cards` devuelve solo aciertos del cache
-  y las tarjetas restantes caen a su idioma original (`_tarjeta` hace el fallback por `dedup_key`).
-  Nunca rompe el build. Si el modelo omite ítems en un lote, se reintenta **una vez** solo los que
-  falten (`_MAX_ATTEMPTS`); lo que siga faltando queda sin cachear y se reintenta en la próxima corrida.
-- **Prompts** en cada locale bajo `"translate"` (sin llaves literales: solo `{lang}` y `{items_json}`,
-  para no romper `str.format` de `i18n.t`).
-- **CLI:** `--translate auto` (defecto) traduce si hay LLM; `--translate off` deja el idioma original.
+- **Título + snippet** (`translate.py`): el snippet de la fuente se **traduce al español**
+  (para fuentes en inglés) en `translate.py`, horneado en el HTML. Aunque el molde permite
+  varios idiomas (`ALL_LANGS`), hoy solo se genera la página `es`.
+- **Resumen por tarjeta** (`resumen.py` + `articles.py`): cada tarjeta trae un **botón
+  "Resumen"** que despliega (acordeón inline) un resumen en español generado por el LLM:
+  - *Papers* (arXiv/PubMed): traduce/resume el **abstract** del feed (robusto, sin red).
+  - *Prensa*: `articles.py` extrae el cuerpo con **trafilatura** (`fetch_article_text`) y el
+    LLM lo resume. **Frágil** (paywall/bloqueo/JS): si falla, la tarjeta no muestra botón.
+  - Si la fuente no trae snippet, el snippet visible cae a un recorte de este resumen.
+
+Claves comunes a ambas capas:
+- **Solo se procesan las tarjetas renderizadas** (≤ `max_por_tema` por tema, vía
+  `_rendered_items`), nunca el overflow → ahorra tokens.
+- **Cache** en `data/translations.json` (título+snippet) y `data/resumenes.json` (resúmenes),
+  más `data/articles.json` (cuerpo extraído). Todos ignorados por git, por `dedup_key` con
+  `src_title` para invalidar si cambia el título fuente.
+- **Degradación elegante:** sin LLM o ante error, se devuelven solo los aciertos del cache y
+  el resto cae al idioma original / sin botón de resumen. **Nunca rompe el build.**
+- **Prompts** en cada locale bajo `"translate"` y `"resumen"` (sin llaves literales: solo los
+  placeholders `{lang}` / `{items_json}`, para no romper `str.format` de `i18n.t`).
+- **CLI:** `--translate auto` (defecto) procesa si hay LLM; `--translate off` deja el original.
 
 ### Despliegue y automatización
 
