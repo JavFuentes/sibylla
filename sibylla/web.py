@@ -177,6 +177,7 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         "seal_class": clase,
         "seal_color": color,
         "snippet": snippet,
+        "image": it.image,
         "related": [{"source_name": r["source_name"], "url": r["url"]} for r in rel[:_RELATED_CAP]],
         "related_extra": max(0, len(rel) - _RELATED_CAP),
         "network": network,
@@ -259,7 +260,7 @@ def _render_jsonld(site_url: str, description: str,
     if cards:
         items_json: list[str] = []
         for i, c in enumerate(cards, start=1):
-            items_json.append(
+            item = (
                 '{"@type":"ListItem","position":' + str(i) + ','
                 '"item":{"@type":"NewsArticle",'
                 f'"headline":"{esc(c["title"])}",'
@@ -269,8 +270,11 @@ def _render_jsonld(site_url: str, description: str,
                 f'"name":"{esc(c["source_name"])}"'
                 '},'
                 f'"description":"{esc(c["snippet"])}"'
-                '}}'
             )
+            if c.get("image"):
+                item += f',"image":"{esc(c["image"])}"'
+            item += "}}"
+            items_json.append(item)
         partes.append(
             '{"@context":"https://schema.org","@type":"ItemList",'
             f'"itemListElement":[{",".join(items_json)}]'

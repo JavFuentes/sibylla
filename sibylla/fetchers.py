@@ -156,6 +156,53 @@ def _parse_date(s: str) -> Optional[datetime]:
         return None
 
 
+_IMG_SRC_RE = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
+
+
+def _valid_image_url(s: str) -> Optional[str]:
+    """Devuelve la URL si es http(s) válida; None si está vacía o no lo es."""
+    if not s:
+        return None
+    s = s.strip()
+    if s.lower().startswith(("http://", "https://")):
+        return s
+    return None
+
+
+def _rss_image(e) -> Optional[str]:
+    """Extrae la primera imagen útil de una entrada de feed (feedparser).
+
+    Orden de búsqueda (estándares de RSS/Atom/Media RSS):
+      1. <media:content>     -> e.media_content[0]['url']
+      2. <media:thumbnail>   -> e.media_thumbnail[0]['url']
+      3. <enclosure>         -> e.enclosures[0]['href']  (solo si es imagen)
+      4. <img src> del cuerpo-> primer src en e.summary o e.content[0].value
+    Devuelve None si no hay ninguna imagen usable.
+    """
+    for m in (e.get("media_content") or []):
+        url = _valid_image_url((m or {}).get("url"))
+        if url:
+            return url
+    for m in (e.get("media_thumbnail") or []):
+        url = _valid_image_url((m or {}).get("url"))
+        if url:
+            return url
+    for enc in (e.get("enclosures") or []):
+        if isinstance(enc, dict) and "image" in str(enc.get("type", "")).lower():
+            url = _valid_image_url(enc.get("href"))
+            if url:
+                return url
+    # Último recurso: <img> dentro del HTML del resumen o del contenido.
+    for cuerpo in (e.get("summary"), (e.get("content") or [{}])[0].get("value")):
+        if cuerpo:
+            m = _IMG_SRC_RE.search(cuerpo)
+            if m:
+                url = _valid_image_url(m.group(1))
+                if url:
+                    return url
+    return None
+
+
 def _get(url: str, params: dict | None = None, timeout: int = 25,
          headers: dict | None = None) -> requests.Response:
     if headers:
@@ -299,6 +346,7 @@ def fetch_googlenews(source: Source, query: str, limit: int,
             tier=source.tier,
             published=_from_struct(e.get("published_parsed")),
             summary="",  # la descripción de Google News solo repite el título; no aporta
+            image=_rss_image(e),
             extra={"publisher": publisher, "gnews_url": e.get("link", "")},
         ))
     return items
@@ -319,6 +367,7 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
             tier=source.tier,
             published=_from_struct(e.get("published_parsed") or e.get("updated_parsed")),
             summary=e.get("summary", ""),
+            image=_rss_image(e),
             # `feed_pos` = orden en el feed (0 = titular del medio): señal de
             # prominencia editorial que aprovecha el score de la sección Nacional.
             extra={"feed_pos": pos},
@@ -327,6 +376,16 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
 
 
 # --- Mastodon / Fediverso (gratis, sin auth en instancias públicas) ---------
+def _mastodon_image(attachments: list) -> Optional[str]:
+    """Primera imagen (type=image) de un post Mastodon. URL completa."""
+    for a in attachments or []:
+        if isinstance(a, dict) and a.get("type") == "image":
+            url = _valid_image_url(a.get("url") or a.get("preview_url"))
+            if url:
+                return url
+    return None
+
+
 def fetch_mastodon(source: Source, lens: dict, limit: int) -> list[NewsItem]:
     """Mastodon: trends o hashtag según la lente. Sin auth en instancias públicas."""
     import os
@@ -368,6 +427,7 @@ def fetch_mastodon(source: Source, lens: dict, limit: int) -> list[NewsItem]:
             tier=source.tier,
             published=_parse_date(created),
             summary=text,
+            image=_mastodon_image(p.get("media_attachments") or []),
             extra={"kind": "post", "network": "mastodon",
                    "likes": p.get("favourites_count", 0),
                    "reposts": p.get("reblogs_count", 0),
@@ -379,6 +439,26 @@ def fetch_mastodon(source: Source, lens: dict, limit: int) -> list[NewsItem]:
 
 
 # --- Bluesky / AT Protocol (gratis, requiere app password) ------------------
+def _bluesky_image(post: dict) -> Optional[str]:
+    """Primera imagen de un post Bluesky (fullsize). Cubre embed.images y embed.external."""
+    embed = post.get("embed") if isinstance(post, dict) else None
+    if not isinstance(embed, dict):
+        return None
+    # app.bsky.embed.images: lista de imágenes propias.
+    for img in (embed.get("images") or []):
+        if isinstance(img, dict):
+            url = _valid_image_url(img.get("fullsize") or img.get("thumb"))
+            if url:
+                return url
+    # app.bsky.embed.external: tarjeta con miniatura (enlace previsualizado).
+    ext = embed.get("external")
+    if isinstance(ext, dict):
+        url = _valid_image_url(ext.get("thumb"))
+        if url:
+            return url
+    return None
+
+
 _bluesky_jwt: str | None = None
 
 
@@ -455,6 +535,7 @@ def fetch_bluesky(source: Source, lens: dict, limit: int) -> list[NewsItem]:
             tier=source.tier,
             published=_parse_date(created),
             summary=text,
+            image=_bluesky_image(post),
             extra={"kind": "post", "network": "bluesky",
                    "likes": post.get("likeCount", 0),
                    "reposts": post.get("repostCount", 0),
@@ -506,6 +587,7 @@ def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
             tier=3,
             published=_parse_date(created),
             summary=text,
+            image=_mastodon_image(p.get("media_attachments") or []),
             extra={"kind": "post", "network": "mastodon", "house": True,
                    "likes": p.get("favourites_count", 0),
                    "reposts": p.get("reblogs_count", 0),
@@ -549,6 +631,7 @@ def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
             tier=3,
             published=_parse_date(created),
             summary=text,
+            image=_bluesky_image(post),
             extra={"kind": "post", "network": "bluesky", "house": True,
                    "likes": post.get("likeCount", 0),
                    "reposts": post.get("repostCount", 0),
@@ -641,9 +724,10 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
     params = {
         "query": f"({query}) -is:retweet -is:reply -job -hiring -\"job alert\" lang:en",
         "max_results": max_results,
-        "tweet.fields": "created_at,public_metrics,lang,author_id",
-        "expansions": "author_id",
+        "tweet.fields": "created_at,public_metrics,lang,author_id,attachments",
+        "expansions": "author_id,attachments.media_keys",
         "user.fields": "username",
+        "media.fields": "url,preview_image_url",
     }
     # Ventana de frescura: solo posts recientes (más "buzz" actual, mismo costo).
     if freshness_hours and freshness_hours > 0:
@@ -661,6 +745,16 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
     # author_id -> username (las expansiones no cuestan lecturas extra).
     users = {u.get("id"): (u.get("username") or "")
              for u in payload.get("includes", {}).get("users", []) or []}
+    # media_key -> URL de imagen (foto). El video trae preview_image_url.
+    media: dict[str, str] = {}
+    for m in payload.get("includes", {}).get("media", []) or []:
+        mk = m.get("media_key")
+        if not mk:
+            continue
+        # type=="photo" -> url; video/anim_gif -> preview_image_url.
+        url = _valid_image_url(m.get("url") or m.get("preview_image_url"))
+        if url:
+            media[mk] = url
     _x_save_usage(month, used + len(tweets))  # se cobra por post leído
     items = []
     for tw in tweets:
@@ -669,6 +763,12 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
         m = tw.get("public_metrics", {}) or {}
         username = users.get(tw.get("author_id"), "")
         curated = username.lower() in curated_handles
+        # Primera foto adjunta al tweet (si la hay).
+        img = None
+        for mk in (tw.get("attachments", {}) or {}).get("media_keys", []) or []:
+            if mk in media:
+                img = media[mk]
+                break
         post_url = (f"https://x.com/{username}/status/{tid}" if username
                     else f"https://x.com/i/web/status/{tid}")
         items.append(NewsItem(
@@ -679,6 +779,7 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
             tier=source.tier,
             published=_parse_date(tw.get("created_at")),
             summary=text,
+            image=img,
             extra={"kind": "post", "network": "x",
                    "likes": m.get("like_count"),
                    "reposts": m.get("retweet_count"),

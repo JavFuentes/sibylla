@@ -258,3 +258,21 @@ def test_canonical_url_property():
         source_id="s", source_name="S", tier=1,
     )
     assert it.canonical_url == "https://example.com/a"
+
+
+# ---------------------------------------------------------------------------
+# NewsItem.image
+# ---------------------------------------------------------------------------
+def test_image_default_none():
+    it = NewsItem(
+        title="t", url="https://x.com", source_id="s", source_name="S", tier=1,
+    )
+    assert it.image is None
+
+
+def test_image_se_guarda():
+    it = NewsItem(
+        title="t", url="https://x.com", source_id="s", source_name="S", tier=1,
+        image="https://cdn.example.com/img.jpg",
+    )
+    assert it.image == "https://cdn.example.com/img.jpg"

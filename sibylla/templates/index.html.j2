@@ -37,6 +37,7 @@
 {%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
 <article class="carta" style="--sello:{{ c.seal_color }};">
+  {% if c.image %}<div class="carta-img"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();"></div>{% else %}<div class="carta-img ph" aria-hidden="true"></div>{% endif %}
   <h4>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
     <a href="{{ c.url }}">{{ c.title }}</a>
@@ -279,6 +280,21 @@
   article.carta.futura{ --sello:var(--cian); }
   article.carta.futura:hover{ border-color:rgba(94,230,224,.5);
     box-shadow:0 22px 50px -26px rgba(94,230,224,.5), inset 0 0 30px rgba(94,230,224,.05); }
+  /* ---- Banda de imagen (real o placeholder) ---- */
+  .carta-img{ margin:-22px -24px 14px; aspect-ratio:16/9; overflow:hidden;
+    background:var(--noche); position:relative; }
+  .carta-img img{ width:100%; height:100%; object-fit:cover; display:block;
+    transition:transform .4s; }
+  .carta:hover .carta-img img{ transform:scale(1.04); }
+  /* Placeholder elegante: brillo del color del tier, sin imagen */
+  .carta-img.ph{ background:
+      radial-gradient(130% 120% at 85% -10%, var(--sello), transparent 55%),
+      linear-gradient(180deg, rgba(217,184,95,.04), rgba(94,230,224,.03)); opacity:.55; }
+  .carta-img.ph::after{ content:''; position:absolute; inset:0;
+    background-image:radial-gradient(1px 1px at 40% 60%, rgba(255,255,255,.25), transparent),
+      radial-gradient(1px 1px at 70% 30%, rgba(94,230,224,.30), transparent),
+      radial-gradient(1px 1px at 20% 25%, rgba(217,184,95,.30), transparent);
+    background-size:120px 90px; opacity:.6; }
   .carta h4{ margin:0 0 12px; font-family:'Cormorant Garamond',serif; font-weight:600;
     font-size:clamp(1.15rem,2.5vw,1.35rem); line-height:1.28; }
   .carta h4 a{ color:var(--marfil); text-decoration:none; transition:color .2s; }
@@ -373,6 +389,7 @@
     .boton{ padding:13px 18px; text-align:center; }
     .carta{ padding:18px 16px; }
     .carta .fuente{ font-size:.7rem; gap:6px; }
+    .carta-img{ margin:-18px -16px 12px; }
     .sello{ width:26px; height:26px; font-size:.66rem; }
     .rejilla{ gap:14px; }
     .tema{ margin:28px 0 14px; gap:12px; }

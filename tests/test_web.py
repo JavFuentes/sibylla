@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import pytest
 
 from sibylla.models import NewsItem
-from sibylla.web import _agrupar, _assert_min_items, _fecha, _instante, _snippet
+from sibylla.web import _agrupar, _assert_min_items, _fecha, _instante, _snippet, _tarjeta
 
 # --- helpers ---------------------------------------------------------------
 
@@ -22,13 +22,13 @@ TOPIC_LABELS = {"ai": "Inteligencia artificial", "space": "Espacio",
 
 
 def _item(title="T", url="https://x.com", source_name="S", tier=2,
-          topics=None, published=FECHA, summary=""):
+          topics=None, published=FECHA, summary="", image=None):
     if topics is None:
         topics = ["ai"]
     return NewsItem(
         title=title, url=url, source_id="test", source_name=source_name,
         tier=tier, topics=topics, published=published,
-        summary=summary,
+        summary=summary, image=image,
     )
 
 
@@ -175,6 +175,22 @@ def test_agrupar_tema_duplicado_en_orden_no_se_repite():
                       topic_labels=TOPIC_LABELS, months=MESES_ES, no_date=NO_DATE_ES)
     assert len(grupos) == 1
     assert grupos[0]["id"] == "ai"
+
+
+# ---------------------------------------------------------------------------
+# _tarjeta (propagación de imagen)
+# ---------------------------------------------------------------------------
+def test_tarjeta_propaga_image():
+    it = _item(image="https://cdn.example.com/x.jpg")
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES)
+    assert card["image"] == "https://cdn.example.com/x.jpg"
+
+
+def test_tarjeta_image_none_cuando_no_hay():
+    it = _item()
+    assert it.image is None
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES)
+    assert card["image"] is None
 
 
 # ---------------------------------------------------------------------------

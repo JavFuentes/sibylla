@@ -72,6 +72,7 @@ class NewsItem:
     topics: list[str] = field(default_factory=list)
     published: Optional[datetime] = None
     summary: str = ""
+    image: Optional[str] = None  # URL de imagen (miniatura de la noticia/post); None = sin imagen
     authors: list[str] = field(default_factory=list)
     extra: dict = field(default_factory=dict)  # datos propios de la fuente (puntos HN, journal, pmid...)
     related: list[dict] = field(default_factory=list)  # otros medios con la misma historia: [{"source_name","url","tier"}]
