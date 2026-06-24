@@ -24,7 +24,7 @@ DEFAULT_FREE_SOURCES = [
     "lavoz_pucon", "diario_aysen", "puranoticia", "mapuexpress",
     "google_news_nacional",
     # Social (gratis): una tarjeta por red en "Voces de la red"
-    "mastodon", "bluesky", "reddit",
+    "mastodon", "bluesky",
 ]
 
 # Peso por confiabilidad. Tier 1 (peer-review/oficial) pesa más que un agregador.

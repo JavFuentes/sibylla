@@ -585,22 +585,6 @@ sources:
     status: verified_2026-06-20
     notes: "Mejor alternativa gratis a X para tech/IA/ciencia dura. Sin auth. Filtrar por puntos/comentarios para quedarse con lo relevante."
 
-  - id: reddit
-    name: "Reddit (Data API)"
-    publisher: "Reddit"
-    tier: 3
-    type: api
-    endpoint: "https://oauth.reddit.com/r/{subreddit}/new"
-    public_json: "https://www.reddit.com/r/{subreddit}/new.json"
-    suggested_subs: [science, medicine, technology, Futurology, askscience, EverythingScience, artificial, MachineLearning, space]
-    topics: [general_science, medicine, general_tech, ai, space]
-    lang: en
-    license: "uso no comercial en tier gratuito"
-    access: needs_key
-    cost: free
-    status: known
-    notes: "Gratis con OAuth (100 req/min); tier gratuito es SOLO no comercial. Bueno para 'qué se discute' y para detectar artículos que se vuelven virales."
-
   - id: mastodon
     name: "Mastodon (Fediverso)"
     publisher: "Mastodon gGmbH (descentralizado)"
@@ -836,9 +820,9 @@ social:
   shuffle: true
   lenses:
     - { name: trend,    weight: 1, trend: true }
-    - { name: ia,       weight: 1, mastodon_tag: ai,       query: '"artificial intelligence" OR "machine learning"', reddit_subs: [artificial, MachineLearning], x_topic: ai }
-    - { name: medicina, weight: 1, mastodon_tag: medicine, query: '"clinical trial" OR "gene therapy"',             reddit_subs: [medicine, science],           x_topic: medicine }
-    - { name: chile,    weight: 1, mastodon_tag: chile,    query: 'Chile',                                          reddit_subs: [chile],                        x_topic: nacional }
+    - { name: ia,       weight: 1, mastodon_tag: ai,       query: '"artificial intelligence" OR "machine learning"', x_topic: ai }
+    - { name: medicina, weight: 1, mastodon_tag: medicine, query: '"clinical trial" OR "gene therapy"',             x_topic: medicine }
+    - { name: chile,    weight: 1, mastodon_tag: chile,    query: 'Chile',                                          x_topic: nacional }
   house_accounts:
     - { network: bluesky,  handle: sibylla.cl }
     - { network: mastodon, handle: "@sibylla@mastodon.social" }

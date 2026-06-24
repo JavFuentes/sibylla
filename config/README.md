@@ -36,7 +36,7 @@ La "temática" es solo configuración (tags de `topics` + consultas por tema). E
 
 - **Tier 1 — Primaria / autoridad.** Revistas peer-review (vía API), preprints, instituciones oficiales (NASA, NIH, WHO, ESA) y agencias de cable. Es lo que se puede afirmar con más seguridad.
 - **Tier 2 — Periodismo de calidad.** Medios con estándares editoriales (BBC, Guardian, MIT Tech Review, Nature News, SINC, El País…). Buen contexto y redacción.
-- **Tier 3 — Agregadores y discusión.** Google News, GDELT, Hacker News, Reddit, Mastodon, X. Sirven para **descubrir** y medir "qué se discute". **Regla:** nunca se afirma algo apoyándose solo en Tier 3; se corrobora y se enlaza a una fuente Tier 1/2.
+- **Tier 3 — Agregadores y discusión.** Google News, GDELT, Hacker News, Mastodon, X. Sirven para **descubrir** y medir "qué se discute". **Regla:** nunca se afirma algo apoyándose solo en Tier 3; se corrobora y se enlaza a una fuente Tier 1/2.
 
 > Idea para el ranking (cuando construyamos la ingesta): `score = peso_tier × frescura × corroboración_entre_fuentes`. Una noticia que aparece en varias fuentes Tier 1/2 sube; una que solo está en Tier 3 se marca como "rumor/discusión".
 
@@ -48,7 +48,7 @@ Tienes **$5 cargados** en X y la API es **pay-per-use**: **~$0.005 por post leí
 
 **Estrategia de capas (lo barato hace el trabajo pesado):**
 
-1. **Descubrimiento = 100% gratis.** Google News + GDELT + RSS/APIs detectan las noticias. Hacker News + Reddit + Mastodon cubren el "qué se discute". Esto ya da el ~90% del valor sin gastar nada.
+1. **Descubrimiento = 100% gratis.** Google News + GDELT + RSS/APIs detectan las noticias. Hacker News + Mastodon cubren el "qué se discute". Esto ya da el ~90% del valor sin gastar nada.
 2. **X solo para confirmar/enriquecer el top-N.** Una vez al día, tras rankear las historias, se permiten **unas pocas búsquedas dirigidas** en X (p. ej. el titular o el DOI) **solo para las 3–5 historias top**, para ver reacción de expertos.
 3. **Cap mensual duro en config.** `monthly_read_budget` en `sources.yaml` (arranca en **300 lecturas/mes ≈ $1.50**). El ingestor lleva un contador y **se detiene** al llegar al tope. $5 ⇒ ~3 meses de colchón.
 4. **Cuentas de alta señal, no búsquedas abiertas.** Cuando se use X, apuntar a una **lista curada** de cuentas fiables (revistas, agencias, científicos/periodistas), no a búsquedas amplias que devuelven ruido y multiplican lecturas.
@@ -60,7 +60,6 @@ Tienes **$5 cargados** en X y la API es **pay-per-use**: **~$0.005 por post leí
 | Canal social | Coste | Rol en Sibylla |
 |---|---|---|
 | Hacker News | Gratis | Discusión tech/IA/ciencia dura (sin auth) |
-| Reddit | Gratis (no comercial) | Comunidades temáticas; detectar virales |
 | Mastodon | Gratis | Científicos en el fediverso (fediscience.org, scholar.social) |
 | Bluesky | Gratis (auth) | Firehose abierto alternativo |
 | **X** | **Pay-per-use** | **Solo confirmar top-N; con cap mensual** |

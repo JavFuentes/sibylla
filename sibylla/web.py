@@ -42,14 +42,14 @@ OG_LOCALE: dict[str, str] = {"es": "es_CL", "en": "en_US", "it": "it_IT", "pt": 
 _RELATED_CAP = 3
 
 # Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
-SOCIAL_SOURCE_IDS: set[str] = {"x_twitter", "mastodon", "bluesky", "reddit"}
+SOCIAL_SOURCE_IDS: set[str] = {"x_twitter", "mastodon", "bluesky"}
 
 # Máximo de tarjetas sociales visibles.
 SOCIAL_MAX_TOTAL = 6
 
 
 def _is_social(item: NewsItem) -> bool:
-    """Indica si un ítem proviene de una red social (X, Reddit, Mastodon…)."""
+    """Indica si un ítem proviene de una red social (X, Mastodon…)."""
     return item.source_id in SOCIAL_SOURCE_IDS
 
 
@@ -59,13 +59,13 @@ def _select_social(organic: list[NewsItem],
                    seed_str: str) -> list[NewsItem]:
     """Produce exactamente SOCIAL_MAX_TOTAL tarjetas para 'Voces de la red'.
 
-    1. top‑1 por red (mastodon, bluesky, reddit, x_twitter) → hasta 4 slots.
+    1. top‑1 por red (mastodon, bluesky, x_twitter) → hasta 3 slots.
     2. house cards (mejores 2 de `fetch_house_posts`); si <2, rellena con pool orgánico.
     3. Rellena huecos de redes que no aportaron nada con pool orgánico restante.
     4. Baraja si `social.shuffle` (semilla por día → estable dentro del día).
     """
     TOTAL = SOCIAL_MAX_TOTAL
-    NETWORKS = ["mastodon", "bluesky", "reddit", "x_twitter"]
+    NETWORKS = ["mastodon", "bluesky", "x_twitter"]
 
     # Agrupar orgánico por source_id y rankear por _social_score
     by_net: dict[str, list[NewsItem]] = {n: [] for n in NETWORKS}
@@ -510,7 +510,7 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
 
     Si se pasa `translate_tracker`, se apendea el uso de tokens de cada llamada LLM.
 
-    Los ítems de redes sociales (X, Reddit…) se extraen de la lista principal
+    Los ítems de redes sociales (X, Mastodon, Bluesky…) se extraen de la lista principal
     y se muestran en su propia sección al pie de la página ("Voces de la red")."""
     _assert_min_items(items)
     SITE_DIR.mkdir(parents=True, exist_ok=True)

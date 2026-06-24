@@ -100,7 +100,7 @@ La sección social usa `data-steps="0,1,2"` (máx. 2 tarjetas). El valor inicial
 ### Sección "Voces de la red" (redes sociales) · v2.0
 
 Tras los temas principales, al pie de la página (`#voces`), se muestran **6 tarjetas
-con reglas de producto**: 4 plazas de red (Mastodon, Bluesky, Reddit, X) + 2 tarjetas
+con reglas de producto**: 3 plazas de red (Mastodon, Bluesky, X) + 2 tarjetas
 de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.py`,
 `fetchers.py` y `pipeline.py`.
 
@@ -108,8 +108,8 @@ de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.
 
 1. **Separación e ingesta** (`build_all_sites` → `fetch_source`):
    - Las fuentes en `SOCIAL_SOURCE_IDS` (`web.py`) se fetchean en el pipeline normal
-     (`run_pipeline` recorre `DEFAULT_FREE_SOURCES`, que ya incluye `mastodon`, `bluesky`,
-     `reddit`; X solo con `--with-x`). Cada una hace UNA llamada API, sin desglosar
+     (`run_pipeline` recorre `DEFAULT_FREE_SOURCES`, que ya incluye `mastodon`, `bluesky`;
+     X solo con `--with-x`). Cada una hace UNA llamada API, sin desglosar
      por tema, y devuelve ítems sin `topics` (no son tarjetas de tema).
    - `_is_social(item)` filtra por `source_id` para separar los ítems sociales de
      los temáticos antes de renderizar.
@@ -120,11 +120,11 @@ de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.
      (`weight`). Añadir una sección = añadir una entrada a `lenses`; las
      probabilidades se reparten parejo según el peso.
    - Cada lente tiene campos específicos por red: `mastodon_tag`, `query`,
-     `reddit_subs`, `x_topic`. Las búsquedas temáticas (no-`trend`) usan estos campos;
+     `x_topic`. Las búsquedas temáticas (no-`trend`) usan estos campos;
      la lente `trend` consulta el feed "caliente" de cada API.
 
 3. **Selección** (`_select_social` en `web.py`): algoritmo de slots con reglas fijas:
-   - **Fase 1** → top‑1 por red orgánica (por `_social_score`) → hasta 4 slots.
+   - **Fase 1** → top‑1 por red orgánica (por `_social_score`) → hasta 3 slots.
    - **Fase 2** → 2 house cards de `fetch_house_posts` (cuentas propias en
      `social.house_accounts`); si hay <2, rellena con pool orgánico restante.
    - **Fase 3** → rellena huecos de redes que no aportaron nada con el mejor pool
@@ -157,12 +157,11 @@ Cada uno devuelve `list[NewsItem]` con `extra` uniforme:
 |-----|---------|------|-----------|
 | Mastodon | `fetch_mastodon(source, lens, limit)` | Ninguno (instancia pública) | `trends/statuses` o `timelines/tag/{tag}`. Instancia configurable vía `MASTODON_INSTANCE` (def. `mastodon.social`). |
 | Bluesky | `fetch_bluesky(source, lens, limit)` | `BLUESKY_IDENTIFIER` + `BLUESKY_APP_PASSWORD` → `createSession` → `accessJwt` cacheado | `getFeed` (What's Hot) o `searchPosts` |
-| Reddit | `fetch_reddit(source, lens, limit)` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` → OAuth `client_credentials` → Bearer cacheado | `/r/all/hot` o `/r/{subs}/search` |
 | X | `fetch_x` (existente) | `X_BEARER_TOKEN` → Bearer, con tope mensual | `tweets/search/recent`. Su lente se mapea vía `x_topic` a keywords de `TOPIC_CONFIG`; fallback a `social_query` de `sources.yaml`. |
 
 **House posts** (`fetch_house_posts`): consulta el feed de las cuentas en
 `social.house_accounts` (incluyendo reposts): Mastodon vía `accounts/lookup` +
-`/statuses`, Bluesky vía `getAuthorFeed`, Reddit vía `/user/{name}/submitted`.
+`/statuses`, Bluesky vía `getAuthorFeed`.
 Marca `extra["house"]=True`.
 
 #### Configuración (`config/sources.yaml` · bloque `social:`)
@@ -172,9 +171,9 @@ social:
   shuffle: true
   lenses:                       # 25 % c/u con esta config; escalable
     - { name: trend,    weight: 1, trend: true }
-    - { name: ia,       weight: 1, mastodon_tag: ai,  query: …,   reddit_subs: […], x_topic: ai }
-    - { name: medicina, weight: 1, mastodon_tag: medicine, query: …, reddit_subs: […], x_topic: medicine }
-    - { name: chile,    weight: 1, mastodon_tag: chile, query: …, reddit_subs: […], x_topic: nacional }
+    - { name: ia,       weight: 1, mastodon_tag: ai,  query: …,   x_topic: ai }
+    - { name: medicina, weight: 1, mastodon_tag: medicine, query: …, x_topic: medicine }
+    - { name: chile,    weight: 1, mastodon_tag: chile, query: …, x_topic: nacional }
   house_accounts:
     - { network: bluesky,  handle: sibylla.cl }
     - { network: mastodon, handle: "@sibylla@mastodon.social" }
@@ -196,7 +195,7 @@ social:
 #### Cómo añadir una lente (sección temática nueva)
 
 1. Añade una entrada a `social.lenses` en `sources.yaml` con los campos por red
-   (`mastodon_tag`, `query`, `reddit_subs`, `x_topic`).
+   (`mastodon_tag`, `query`, `x_topic`).
 2. Las probabilidades se reparten automáticamente según `weight`. Si el `x_topic`
    no está en `TOPIC_CONFIG`, X cae a `social_query`.
 

@@ -127,7 +127,7 @@ Toda la configuración sensible vive en `.env` (que **no** se sube al repo). Cop
 - **X / Twitter (opcional, de pago):** `X_BEARER_TOKEN` (+ claves). El tope mensual de lecturas vive en `config/sources.yaml` (`x_twitter.monthly_read_budget`) y el uso se cuenta en `data/x_usage.json`.
 - **Idioma de salida:** `SIBYLLA_LANG` (`es`, `en`, `it`, `pt`). Si no se define, se usa `default_user_language` de `config/sources.yaml`. Fallback: `es`.
 - **Sitio público:** `SIBYLLA_SITE_URL` (base para `og:image`, `sitemap.xml`, etc.). Fallback: `https://sibylla.cl`.
-- **Otras (opcionales):** `NCBI_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`, `GUARDIAN_API_KEY`, `REDDIT_*`, `BLUESKY_*`.
+- **Otras (opcionales):** `NCBI_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`, `GUARDIAN_API_KEY`, `BLUESKY_*`.
 
 Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro curado por tiers).
 

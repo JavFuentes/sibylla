@@ -465,99 +465,6 @@ def fetch_bluesky(source: Source, lens: dict, limit: int) -> list[NewsItem]:
     return items
 
 
-# --- Reddit (gratis, OAuth app-only) -----------------------------------------
-_reddit_token: str | None = None
-
-
-def _reddit_auth() -> str | None:
-    """OAuth client_credentials → bearer token. Cacheado por corrida."""
-    global _reddit_token
-    if _reddit_token:
-        return _reddit_token
-    import os
-    client_id = os.getenv("REDDIT_CLIENT_ID")
-    secret = os.getenv("REDDIT_CLIENT_SECRET")
-    if not (client_id and secret):
-        log.warning("  reddit: falta REDDIT_CLIENT_ID o REDDIT_CLIENT_SECRET en .env")
-        return None
-    reddit_ua = os.getenv("REDDIT_USER_AGENT", UA)
-    try:
-        r = requests.post(
-            "https://www.reddit.com/api/v1/access_token",
-            data={"grant_type": "client_credentials"},
-            auth=(client_id, secret),
-            headers={"User-Agent": reddit_ua},
-            timeout=25,
-        )
-        r.raise_for_status()
-        _reddit_token = r.json().get("access_token")
-        return _reddit_token
-    except Exception as ex:
-        log.warning("  reddit: fallo OAuth: %s", ex)
-        return None
-
-
-def fetch_reddit(source: Source, lens: dict, limit: int) -> list[NewsItem]:
-    """Reddit: /r/all/hot o búsqueda en subs según la lente. OAuth app-only."""
-    import os
-    token = _reddit_auth()
-    if not token:
-        return []
-    reddit_ua = os.getenv("REDDIT_USER_AGENT", UA)
-    headers = {"Authorization": f"Bearer {token}", "User-Agent": reddit_ua}
-    base = "https://oauth.reddit.com"
-    try:
-        if lens.get("trend"):
-            url = f"{base}/r/all/hot"
-            params = {"limit": limit}
-            r = _get(url, params=params, timeout=25, headers=headers)
-            data = r.json()
-            raw_posts = data.get("data", {}).get("children", [])
-        else:
-            subs = lens.get("reddit_subs", [])
-            if not subs:
-                log.warning("  reddit: lente sin reddit_subs y sin trend; se omite")
-                return []
-            subreddit = "+".join(str(s).strip() for s in subs)
-            query = str(lens.get("query", "")).strip()
-            url = f"{base}/r/{subreddit}/search"
-            params = {"q": query, "sort": "hot", "limit": limit, "restrict_sr": "true"}
-            r = _get(url, params=params, timeout=25, headers=headers)
-            data = r.json()
-            raw_posts = data.get("data", {}).get("children", [])
-    except Exception as ex:
-        log.warning("  reddit: fallo API: %s", ex)
-        return []
-    items = []
-    for child in raw_posts[:limit]:
-        d = child.get("data", {}) if isinstance(child, dict) else {}
-        author = d.get("author", "")
-        pid = d.get("id", "")
-        permalink = d.get("permalink", "")
-        post_url = f"https://www.reddit.com{permalink}" if permalink else ""
-        title = d.get("title", "")
-        text = d.get("selftext", "") or ""
-        summary = text if text else title
-        created = d.get("created_utc")
-        items.append(NewsItem(
-            title=title or f"post {pid}",
-            url=post_url,
-            source_id=source.id,
-            source_name=f"{source.name} › u/{author}" if author else source.name,
-            tier=source.tier,
-            published=datetime.fromtimestamp(created, tz=timezone.utc) if created else None,
-            summary=summary,
-            extra={"kind": "post", "network": "reddit",
-                   "likes": d.get("score", 0),
-                   "reposts": 0,
-                   "author": author, "is_repost": False,
-                   "num_comments": d.get("num_comments", 0)},
-        ))
-    log.info("  %-16s [lente:%s] -> %d posts", source.id,
-             lens.get("name", "?"), len(items))
-    return items
-
-
 # --- House posts: cuentas propias de Sibylla ---------------------------------
 def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
     """Feed de una cuenta Mastodon (incluye reposts/blogs)."""
@@ -650,55 +557,6 @@ def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
     return items
 
 
-def _fetch_house_reddit(handle: str) -> list[NewsItem]:
-    """Historial de posts de una cuenta Reddit."""
-    import os
-    token = _reddit_auth()
-    if not token:
-        return []
-    reddit_ua = os.getenv("REDDIT_USER_AGENT", UA)
-    headers = {"Authorization": f"Bearer {token}", "User-Agent": reddit_ua}
-    name = handle.lstrip("u/").strip().lstrip("/")
-    try:
-        r = _get(
-            f"https://oauth.reddit.com/user/{name}/submitted",
-            params={"sort": "new", "limit": 10},
-            headers=headers,
-            timeout=25,
-        )
-        data = r.json()
-        raw_posts = data.get("data", {}).get("children", [])
-    except Exception as ex:
-        log.warning("  house/reddit: falló para %s: %s", handle, ex)
-        return []
-    items = []
-    for child in raw_posts[:10]:
-        d = child.get("data", {}) if isinstance(child, dict) else {}
-        author = d.get("author", "")
-        pid = d.get("id", "")
-        permalink = d.get("permalink", "")
-        post_url = f"https://www.reddit.com{permalink}" if permalink else ""
-        title = d.get("title", "")
-        text = d.get("selftext", "") or ""
-        summary = text if text else title
-        created = d.get("created_utc")
-        items.append(NewsItem(
-            title=title or f"post {pid}",
-            url=post_url,
-            source_id="reddit",
-            source_name=f"Reddit › u/{author}",
-            tier=3,
-            published=datetime.fromtimestamp(created, tz=timezone.utc) if created else None,
-            summary=summary,
-            extra={"kind": "post", "network": "reddit", "house": True,
-                   "likes": d.get("score", 0),
-                   "reposts": 0,
-                   "author": author, "is_repost": False,
-                   "num_comments": d.get("num_comments", 0)},
-        ))
-    return items
-
-
 def fetch_house_posts(accounts: list[dict]) -> list[NewsItem]:
     """Consulta el feed de cada cuenta propia, incluyendo reposts.
 
@@ -716,8 +574,6 @@ def fetch_house_posts(accounts: list[dict]) -> list[NewsItem]:
                 items.extend(_fetch_house_mastodon(handle))
             elif net == "bluesky":
                 items.extend(_fetch_house_bluesky(handle))
-            elif net == "reddit":
-                items.extend(_fetch_house_reddit(handle))
             elif net == "x" or net == "x_twitter":
                 # X house solo con --with-x (la fuente en sí no se fetchea sin él);
                 # si se quiere, se implementa aparte. Por ahora, omitir sin error.
@@ -850,7 +706,7 @@ QUERY_SOURCES = {"arxiv_api", "pubmed_eutils", "hacker_news", "google_news_rss"}
 
 # Fuentes que alimentan "Voces de la red" (cada una se consulta con UNA lente,
 # no por tema). Los ítems van sin `topics` y se seleccionan en `_select_social`.
-SOCIAL_API_SOURCES = {"mastodon", "bluesky", "reddit"}
+SOCIAL_API_SOURCES = {"mastodon", "bluesky"}
 
 
 def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int) -> list[NewsItem]:
@@ -897,7 +753,7 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
         return items
 
     if source.id in SOCIAL_API_SOURCES:
-        # Mastodon, Bluesky, Reddit: una lente al azar por red (estable en el día),
+        # Mastodon, Bluesky: una lente al azar por red (estable en el día),
         # una sola consulta. Ítems SIN topic (van solo a "Voces de la red").
         try:
             sc = load_social_config()
@@ -911,8 +767,6 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
                 items.extend(fetch_mastodon(source, lens, limit))
             elif source.id == "bluesky":
                 items.extend(fetch_bluesky(source, lens, limit))
-            elif source.id == "reddit":
-                items.extend(fetch_reddit(source, lens, limit))
         except Exception as ex:  # noqa: BLE001
             log.warning("  %-16s FALLÓ: %s", source.id, ex)
         return items
