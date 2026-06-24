@@ -45,6 +45,11 @@
   <div class="fuente"><span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span> {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
   {% if c.snippet %}<p class="resumen">{{ c.snippet }}</p>{% endif %}
   {% if c.related %}<p class="tambien">{{ also_in }}: {% for r in c.related %}<a href="{{ r.url }}">{{ r.source_name }}</a>{% if not loop.last %} <span class="sep">·</span> {% endif %}{% endfor %}{% if c.related_extra %} <span class="sep">·</span> +{{ c.related_extra }}{% endif %}</p>{% endif %}
+  <div class="carta-acciones">
+    {% if c.has_resumen %}<button type="button" class="btn-mini btn-resumen" aria-expanded="false">{{ t.btn_resumen }}</button>{% endif %}
+    <a class="btn-mini btn-original" href="{{ c.url }}" target="_blank" rel="noopener">{{ t.btn_original }}</a>
+  </div>
+  {% if c.has_resumen %}<div class="resumen-panel" hidden>{{ c.resumen }}</div>{% endif %}
 </article>
 {%- endmacro %}
 <!-- ARCHIVO GENERADO por sibylla/web.py — NO editar a mano. El diseño vive en sibylla/templates/index.html.j2 -->
@@ -307,6 +312,24 @@
   .carta .tambien a{ color:var(--marfil-2); text-decoration:none; border-bottom:1px solid transparent;
     transition:color .2s, border-color .2s; }
   .carta .tambien a:hover{ color:var(--cian); border-bottom-color:rgba(94,230,224,.4); }
+
+  /* ---- Botones Resumen / Original + panel desplegable ---- */
+  .carta-acciones{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .btn-mini{ font-family:'Inter',sans-serif; font-size:.72rem; letter-spacing:.06em;
+    text-transform:uppercase; padding:7px 14px; border-radius:8px; cursor:pointer;
+    text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+    border:1px solid rgba(217,184,95,.32); background:transparent; color:var(--marfil-2);
+    transition:color .2s, border-color .2s, background .2s; }
+  .btn-mini:hover{ border-color:var(--oro-claro); color:var(--oro-claro); }
+  .btn-resumen::after{ content:'\25BE'; font-size:.6rem; transition:transform .25s; opacity:.8; }
+  .carta.resumen-open .btn-resumen{ color:#1a1305; background:linear-gradient(180deg,#F2DD93,#D9B85F);
+    border-color:#F2DD93; }
+  .carta.resumen-open .btn-resumen::after{ transform:rotate(180deg); }
+  .resumen-panel{ margin-top:12px; padding:14px 16px; border-radius:10px; font-size:.92rem;
+    line-height:1.65; color:var(--marfil);
+    background:linear-gradient(180deg, rgba(217,184,95,.08), rgba(94,230,224,.04));
+    border:1px solid var(--panel-borde); }
+  .resumen-panel[hidden]{ display:none; }
 
   .sello{ width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center;
     font-family:'Cinzel',serif; font-size:.72rem; }
@@ -595,6 +618,21 @@
   /* Vincular botones */
   document.querySelectorAll('.card-ctrl-btn').forEach(function(btn){
     btn.addEventListener('click',function(){ step(this, parseInt(this.dataset.dir)); });
+  });
+})();
+/* Acordeón "Resumen": despliega/oculta el panel dentro de la tarjeta. */
+(function(){
+  document.querySelectorAll('.btn-resumen').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var carta = btn.closest('.carta');
+      if (!carta) return;
+      var panel = carta.querySelector('.resumen-panel');
+      if (!panel) return;
+      var open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      panel.hidden = open;
+      carta.classList.toggle('resumen-open', !open);
+    });
   });
 })();
 </script>

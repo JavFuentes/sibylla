@@ -194,6 +194,37 @@ def test_tarjeta_image_none_cuando_no_hay():
 
 
 # ---------------------------------------------------------------------------
+# _tarjeta (resumen y fallback de snippet)
+# ---------------------------------------------------------------------------
+def test_tarjeta_sin_resumen():
+    it = _item()
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES)
+    assert card["resumen"] is None
+    assert card["has_resumen"] is False
+
+
+def test_tarjeta_propaga_resumen():
+    it = _item()
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES, resumenes={it.dedup_key: "Un resumen en ES."})
+    assert card["resumen"] == "Un resumen en ES."
+    assert card["has_resumen"] is True
+
+
+def test_tarjeta_snippet_cae_al_resumen_si_no_hay_fuente():
+    """Ítem sin summary y sin traducción: el snippet es un recorte del resumen."""
+    it = _item(summary="")
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES, resumenes={it.dedup_key: "Resumen completo."})
+    assert card["snippet"] == "Resumen completo."
+
+
+def test_tarjeta_snippet_prefiere_fuente_sobre_resumen():
+    """Si hay snippet de la fuente, no se pisa con el resumen."""
+    it = _item(summary="Snippet de la fuente.")
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES, resumenes={it.dedup_key: "Resumen completo."})
+    assert card["snippet"] == "Snippet de la fuente."
+
+
+# ---------------------------------------------------------------------------
 # _assert_min_items
 # ---------------------------------------------------------------------------
 def test_assert_min_items_levanta_cuando_pocos():

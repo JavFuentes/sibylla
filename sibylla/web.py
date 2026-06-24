@@ -152,16 +152,22 @@ def _label(topic: str, topic_labels: dict[str, str]) -> str:
 
 
 def _tarjeta(it: NewsItem, months: list[str], no_date: str,
-             translations: dict | None = None) -> dict:
+             translations: dict | None = None,
+             resumenes: dict | None = None) -> dict:
     """Aplana un NewsItem a las claves que consume la plantilla.
 
     Si `translations` trae una entrada para este ítem (por `dedup_key`), usa el
     título y snippet traducidos; si no, cae al texto original.
+    `resumenes` lleva (opcional) el resumen en español generado por LLM; si la
+    tarjeta no tiene snippet de la fuente, cae a un recorte de ese resumen.
     """
     roman, clase, color = _SEAL.get(it.tier, _SEAL[3])
     tr = (translations or {}).get(it.dedup_key)
     title = tr["title"] if tr else it.title
-    snippet = tr["snippet"] if tr else _snippet(it.summary)
+    resumen = (resumenes or {}).get(it.dedup_key)
+    snippet = (tr.get("snippet", "") if tr else "") or _snippet(it.summary)
+    if not snippet and resumen:
+        snippet = _snippet(resumen)
     # Otros medios con la misma historia (capados a 3; el resto, "+N").
     rel = it.related or []
     network = it.extra.get("network", "")
@@ -178,6 +184,8 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         "seal_color": color,
         "snippet": snippet,
         "image": it.image,
+        "resumen": resumen,
+        "has_resumen": bool(resumen),
         "related": [{"source_name": r["source_name"], "url": r["url"]} for r in rel[:_RELATED_CAP]],
         "related_extra": max(0, len(rel) - _RELATED_CAP),
         "network": network,
@@ -223,7 +231,8 @@ def _rendered_items(items: list[NewsItem], topics: list[str],
 def _agrupar(items: list[NewsItem], topics: list[str],
              max_por_tema: int, topic_labels: dict[str, str],
              months: list[str], no_date: str,
-             translations: dict | None = None) -> list[dict]:
+             translations: dict | None = None,
+             resumenes: dict | None = None) -> list[dict]:
     """Agrupa los ítems por su tema principal, en el orden pedido en `topics`.
 
     Los temas que aparezcan en los ítems pero no en `topics` (p. ej. 'otros')
@@ -231,7 +240,7 @@ def _agrupar(items: list[NewsItem], topics: list[str],
     """
     grupos: list[dict] = []
     for t in _orden_temas(items, topics):
-        cartas = [_tarjeta(it, months, no_date, translations)
+        cartas = [_tarjeta(it, months, no_date, translations, resumenes)
                   for it in items if _primario(it) == t][:max_por_tema]
         if cartas:
             grupos.append({"id": t, "label": _label(t, topic_labels), "cards": cartas})
@@ -288,7 +297,8 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    lang: str = "es", max_por_tema: int = 6,
                    is_landing: bool = False,
                    translations: dict | None = None,
-                   social_items: list[NewsItem] | None = None) -> dict:
+                   social_items: list[NewsItem] | None = None,
+                   resumenes: dict | None = None) -> dict:
     """Construye el contexto que recibe la plantilla.
 
     `items` son los ítems normales (temáticos). `social_items` son los ítems
@@ -307,7 +317,8 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     n_fuentes = len(all_source_ids)
     total_all = len(items) + len(social_items) if social_items else len(items)
 
-    grupos = _agrupar(items, topics, max_por_tema, topic_labels, months, no_date, translations)
+    grupos = _agrupar(items, topics, max_por_tema, topic_labels, months, no_date,
+                      translations, resumenes)
     observa = t(tr, "web.voice", count=total_all, sources=n_fuentes)
     ts = _instante(ahora, months)
     hero_ts = t(tr, "web.hero_timestamp", date=ts, count=total_all, sources=n_fuentes)
@@ -315,7 +326,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     # Tarjetas sociales.
     social_cards: list[dict] = []
     if social_items:
-        social_cards = [_tarjeta(it, months, no_date, translations) for it in social_items]
+        social_cards = [_tarjeta(it, months, no_date, translations, resumenes) for it in social_items]
 
     # Datos para el selector de idioma.
     lang_label = LANG_LABELS.get(lang, lang.upper())
@@ -366,7 +377,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 lang: str = "es", max_por_tema: int = 6,
                 is_landing: bool = False,
                 translations: dict | None = None,
-                social_items: list[NewsItem] | None = None) -> str:
+                social_items: list[NewsItem] | None = None,
+                resumenes: dict | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -375,7 +387,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     )
     tmpl = env.get_template("index.html.j2")
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
-                                       is_landing, translations, social_items))
+                                       is_landing, translations, social_items,
+                                       resumenes))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -538,11 +551,17 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                                       tracker=translate_tracker,
                                       social_items=social_top)
 
+    # Resúmenes en español de las tarjetas renderizadas (botón "Resumen" + acordeón).
+    # Se generan una sola vez (agnósticos al idioma de la página: siempre en ES).
+    from .resumen import build_resumenes
+    rendered_for_resumen = _rendered_items(normal_items, topics, max_por_tema, social_top)
+    resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
+
     # Páginas por idioma (sin auto-detección).
     for lang in ALL_LANGS:
         html = render_html(normal_items, topics, meta, lang=lang, max_por_tema=max_por_tema,
                            is_landing=False, translations=by_lang.get(lang),
-                           social_items=social_top)
+                           social_items=social_top, resumenes=resumenes)
         out = SITE_DIR / f"{lang}.html"
         out.write_text(html, encoding="utf-8")
         paths.append(out)
@@ -550,7 +569,7 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # Página de aterrizaje (español + JS de auto-detección).
     html_landing = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
                                 is_landing=True, translations=by_lang.get("es"),
-                                social_items=social_top)
+                                social_items=social_top, resumenes=resumenes)
     out_landing = SITE_DIR / "index.html"
     out_landing.write_text(html_landing, encoding="utf-8")
     paths.append(out_landing)
