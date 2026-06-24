@@ -212,3 +212,50 @@ def test_translate_cards_reintento_acotado_a_uno(monkeypatch):
     out = translate_cards(cards, "pt", {})
     assert out == {"u:1": {"title": "TA", "snippet": "sa"}}  # u:2 no está -> original
     assert fake.calls == 2  # 1 lote + 1 reintento, y se detiene
+
+
+# ---------------------------------------------------------------------------
+# translate_cards — troceado en lotes y truncamiento (proveedor falso, sin red)
+# ---------------------------------------------------------------------------
+class _TruncFakeProvider:
+    """Proveedor que simula truncamiento: output pega max_tokens y el JSON queda cortado."""
+    name = "fake"
+    model = "fake-1"
+
+    def __init__(self):
+        self.calls = 0
+
+    def complete(self, system, user, **kwargs):
+        self.calls += 1
+        mt = kwargs.get("max_tokens", 6000)
+        # JSON a medias (sin cerrar) + output == tope -> senal de truncamiento.
+        return LLMResponse(text='[{"id": "u:1", "title": "Cor',
+                           usage={"input": 100, "output": mt})
+
+
+def test_translate_cards_trocea_en_lotes(monkeypatch):
+    """Muchas tarjetas se traducen en una llamada por chunk; todas quedan traducidas."""
+    monkeypatch.setattr("sibylla.translate._CHUNK_SIZE", 2)
+    cards = [{"id": f"u:{i}", "title": f"T{i}", "snippet": f"s{i}"} for i in range(1, 5)]
+    resp1 = json.dumps([{"id": "u:1", "title": "X1", "snippet": "y1"},
+                        {"id": "u:2", "title": "X2", "snippet": "y2"}])  # chunk 1
+    resp2 = json.dumps([{"id": "u:3", "title": "X3", "snippet": "y3"},
+                        {"id": "u:4", "title": "X4", "snippet": "y4"}])  # chunk 2
+    fake = _FakeProvider([resp1, resp2])
+    monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
+    out = translate_cards(cards, "pt", {})
+    assert out == {"u:1": {"title": "X1", "snippet": "y1"},
+                   "u:2": {"title": "X2", "snippet": "y2"},
+                   "u:3": {"title": "X3", "snippet": "y3"},
+                   "u:4": {"title": "X4", "snippet": "y4"}}
+    assert fake.calls == 2  # 2 chunks -> 2 llamadas, sin reintentos
+
+
+def test_translate_cards_truncamiento_no_reintenta(monkeypatch):
+    """Si el output pega max_tokens (JSON cortado), no se reintenta el lote: 1 sola llamada."""
+    cards = [{"id": "u:1", "title": "A", "snippet": "a"},
+             {"id": "u:2", "title": "B", "snippet": "b"}]
+    fake = _TruncFakeProvider()
+    monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
+    out = translate_cards(cards, "pt", {}, max_tokens=6000)
+    assert out == {} and fake.calls == 1  # truncó -> break, sin reintento

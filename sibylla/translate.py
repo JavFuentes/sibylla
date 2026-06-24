@@ -39,6 +39,12 @@ CACHE_PATH = ROOT / "data" / "translations.json"
 # faltando cae al idioma original y se reintenta en la próxima corrida.
 _MAX_ATTEMPTS = 2
 
+# Tarjetas por llamada al LLM. Mantiene el output de cada respuesta holgado
+# (lejos del tope de tokens) para que el JSON nunca se trunque. Un lote único
+# con todo el sitio (nacional+ia+medicina+redes ≈ 24 tarjetas) excede `max_tokens`
+# y se corta a mitad del array → 0 traducciones recuperadas.
+_CHUNK_SIZE = 8
+
 
 # ---------------------------------------------------------------------------
 # Cache
@@ -125,8 +131,12 @@ def _parse_response(raw: str, valid_ids: set[str]) -> dict[str, dict]:
 # Llamada al LLM (una por idioma; batch de todas las cards faltantes)
 # ---------------------------------------------------------------------------
 def _translate_batch(cards: list[dict], lang: str, provider, *,
-                     max_tokens: int, tracker: list[dict] | None = None) -> dict[str, dict]:
+                     max_tokens: int, tracker: list[dict] | None = None) -> tuple[dict[str, dict], bool]:
     """Traduce en una sola llamada title+snippet de cada card a `lang`.
+
+    Devuelve ``(traducciones, hit_cap)``. ``hit_cap`` es True cuando el output
+    pegó el tope de ``max_tokens``: señal de que el JSON quedó cortado y conviene
+    NO reintentar el mismo lote (se truncaría igual).
 
     Si se pasa un `tracker` (lista mutable), apendea {purpose, model, input, output}
     con el consumo de tokens de esta llamada.
@@ -151,11 +161,14 @@ def _translate_batch(cards: list[dict], lang: str, provider, *,
             "input": usg.get("input", 0),
             "output": usg.get("output", 0),
         })
-    return _parse_response(resp.text, valid_ids={c["id"] for c in cards})
+    parsed = _parse_response(resp.text, valid_ids={c["id"] for c in cards})
+    # Truncamiento por longitud: el output llegó al tope -> JSON a medias.
+    hit_cap = max_tokens > 0 and usg.get("output", 0) >= max_tokens
+    return parsed, hit_cap
 
 
 def translate_cards(cards: list[dict], lang: str, cache: dict, *,
-                    max_tokens: int = 4000,
+                    max_tokens: int = 6000,
                     tracker: list[dict] | None = None) -> dict[str, dict]:
     """Traduce las cards a `lang`. Devuelve {id: {title, snippet}}.
 
@@ -163,8 +176,13 @@ def translate_cards(cards: list[dict], lang: str, cache: dict, *,
     Usa y ACTUALIZA `cache` in place. Sin LLM configurado o ante error, devuelve
     solo los aciertos del cache (el resto cae al original aguas arriba).
 
-    Si el modelo omite ítems en el lote, reintenta UNA vez solo los que falten
-    (ver `_MAX_ATTEMPTS`); lo que siga faltando cae al original.
+    Trocea las misses en lotes de ``_CHUNK_SIZE`` y traduce cada lote por separado
+    (con su propio reintento): así cada respuesta queda lejos del tope de tokens y
+    el JSON nunca se trunca. Si un lote truncase aún así (``hit_cap``) no se
+    reintenta (se cortaría igual) y solo esas tarjetas caen al idioma original.
+
+    Si el modelo omite ítems de un lote (no truncamiento), reintenta UNA vez solo
+    los que falten (ver ``_MAX_ATTEMPTS``); lo que siga faltando cae al original.
 
     Si se pasa un `tracker` (lista mutable), se apendea el uso de tokens de
     cada llamada exitosa al LLM.
@@ -184,23 +202,31 @@ def translate_cards(cards: list[dict], lang: str, cache: dict, *,
     if provider is None:
         return hits
 
-    # Traduce en lote; si el modelo no devuelve algún id, reintenta SOLO los que
-    # falten. Una traducción fallida nunca rompe el build (se cae al original).
     fresh: dict[str, dict] = {}
-    pendientes = misses
-    for intento in range(_MAX_ATTEMPTS):
-        try:
-            got = _translate_batch(pendientes, lang, provider, max_tokens=max_tokens, tracker=tracker)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("Fallo al traducir a %s (%s). Las restantes quedan en idioma original.", lang, exc)
-            break
-        fresh.update(got)
-        pendientes = [c for c in pendientes if c["id"] not in fresh]
-        if not pendientes:
-            break
-        if intento + 1 < _MAX_ATTEMPTS:
-            log.info("Reintentando %d tarjeta(s) que %s no devolvió para %s…",
-                     len(pendientes), provider.name, lang)
+    # Trocear en lotes pequeños para que el output nunca pegue el tope de tokens.
+    # El reintento opera POR LOTE: un lote problemático no condena a los demás.
+    for inicio in range(0, len(misses), _CHUNK_SIZE):
+        chunk = misses[inicio:inicio + _CHUNK_SIZE]
+        pendientes = chunk
+        for intento in range(_MAX_ATTEMPTS):
+            try:
+                got, hit_cap = _translate_batch(pendientes, lang, provider,
+                                                max_tokens=max_tokens, tracker=tracker)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Fallo al traducir a %s (%s). Las restantes quedan en idioma original.", lang, exc)
+                break
+            fresh.update(got)
+            pendientes = [c for c in pendientes if c["id"] not in fresh]
+            if not pendientes:
+                break
+            # Si el lote truncó, reintentarlo no ayuda (volverá a cortarse).
+            if hit_cap:
+                log.warning("Lote de traducción a %s truncado (output=%d tokens, %d tarjetas); "
+                            "%d quedan en idioma original.", lang, max_tokens, len(chunk), len(pendientes))
+                break
+            if intento + 1 < _MAX_ATTEMPTS:
+                log.info("Reintentando %d tarjeta(s) que %s no devolvió para %s…",
+                         len(pendientes), provider.name, lang)
 
     # Persistir las nuevas traducciones en el cache (con src_title para invalidar).
     lang_cache = cache.setdefault(lang, {})
