@@ -119,7 +119,7 @@ de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.
      día). Las lentes se definen en `config/sources.yaml` → `social.lenses` con peso
      (`weight`). Añadir una sección = añadir una entrada a `lenses`; las
      probabilidades se reparten parejo según el peso.
-   - Cada lente tiene campos específicos por red: `mastodon_tag`, `bluesky_query`,
+   - Cada lente tiene campos específicos por red: `mastodon_tag`, `query`,
      `reddit_subs`, `x_topic`. Las búsquedas temáticas (no-`trend`) usan estos campos;
      la lente `trend` consulta el feed "caliente" de cada API.
 
@@ -172,9 +172,9 @@ social:
   shuffle: true
   lenses:                       # 25 % c/u con esta config; escalable
     - { name: trend,    weight: 1, trend: true }
-    - { name: ia,       weight: 1, mastodon_tag: ai,  bluesky_query: …,   reddit_subs: […], x_topic: ai }
-    - { name: medicina, weight: 1, mastodon_tag: medicine, bluesky_query: …, reddit_subs: […], x_topic: medicine }
-    - { name: chile,    weight: 1, mastodon_tag: chile, bluesky_query: …, reddit_subs: […], x_topic: nacional }
+    - { name: ia,       weight: 1, mastodon_tag: ai,  query: …,   reddit_subs: […], x_topic: ai }
+    - { name: medicina, weight: 1, mastodon_tag: medicine, query: …, reddit_subs: […], x_topic: medicine }
+    - { name: chile,    weight: 1, mastodon_tag: chile, query: …, reddit_subs: […], x_topic: nacional }
   house_accounts:
     - { network: bluesky,  handle: sibylla.cl }
     - { network: mastodon, handle: "@sibylla@mastodon.social" }
@@ -196,7 +196,7 @@ social:
 #### Cómo añadir una lente (sección temática nueva)
 
 1. Añade una entrada a `social.lenses` en `sources.yaml` con los campos por red
-   (`mastodon_tag`, `bluesky_query`, `reddit_subs`, `x_topic`).
+   (`mastodon_tag`, `query`, `reddit_subs`, `x_topic`).
 2. Las probabilidades se reparten automáticamente según `weight`. Si el `x_topic`
    no está en `TOPIC_CONFIG`, X cae a `social_query`.
 

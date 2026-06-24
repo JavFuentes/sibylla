@@ -423,9 +423,9 @@ def fetch_bluesky(source: Source, lens: dict, limit: int) -> list[NewsItem]:
                 "limit": limit,
             }
         else:
-            query = str(lens.get("bluesky_query", "")).strip()
+            query = str(lens.get("query", "")).strip()
             if not query:
-                log.warning("  bluesky: lente sin bluesky_query y sin trend; se omite")
+                log.warning("  bluesky: lente sin query y sin trend; se omite")
                 return []
             # searchPosts requiere el appview autenticado (api.bsky.app, no el público).
             url = "https://api.bsky.app/xrpc/app.bsky.feed.searchPosts"
@@ -519,7 +519,7 @@ def fetch_reddit(source: Source, lens: dict, limit: int) -> list[NewsItem]:
                 log.warning("  reddit: lente sin reddit_subs y sin trend; se omite")
                 return []
             subreddit = "+".join(str(s).strip() for s in subs)
-            query = str(lens.get("bluesky_query", "")).strip()
+            query = str(lens.get("query", "")).strip()
             url = f"{base}/r/{subreddit}/search"
             params = {"q": query, "sort": "hot", "limit": limit, "restrict_sr": "true"}
             r = _get(url, params=params, timeout=25, headers=headers)
