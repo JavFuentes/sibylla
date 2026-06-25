@@ -245,6 +245,20 @@ Claves comunes a ambas capas:
   placeholders `{lang}` / `{items_json}`, para no romper `str.format` de `i18n.t`).
 - **CLI:** `--translate auto` (defecto) procesa si hay LLM; `--translate off` deja el original.
 
+### Placeholders de fuente (imagen de la tarjeta)
+
+Cuando un ítem no trae imagen propia (`NewsItem.image` es `None`), `_tarjeta()` en
+`web.py` asigna `placeholder-{source_id}.png`. Los archivos viven en `static/` y se
+copian a `web/` automáticamente en cada build (`_copy_static_assets`). El atributo
+`onerror` del `<img>` en el template degrada al gradiente CSS `.ph` si el archivo
+no existe, así que un placeholder faltante no rompe nada.
+
+Para añadir un placeholder nuevo: crear `static/placeholder-{id}.png` (16:9, ej.
+640×360). Sin tocar código. Si el `source_id` tiene un nombre poco amigable (ej.
+`pubmed_eutils`), se puede nombrar distinto y añadir un mapeo explícito al dict
+`SOURCE_PLACEHOLDERS` en `web.py`; pero la convención directa cubre la mayoría de
+los casos.
+
 ### Despliegue y automatización
 
 `web/` es estático e ignorado por git: desplegar = **regenerar** y **subir** su contenido a la raíz
