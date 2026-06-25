@@ -1,7 +1,7 @@
 # Sibylla — dependencias del ingestor (prototipo)
 feedparser>=6.0.11        # RSS/Atom (arXiv, Google News, medios)
 requests>=2.32.0          # HTTP para APIs (PubMed, Hacker News, X)
-PyYAML>=6.0.2             # cargar config/sources.yaml
+PyYAML>=6.0.3             # cargar config/sources.yaml
 python-dotenv>=1.0.1      # cargar claves desde .env
 python-dateutil>=2.9.0    # parseo robusto de fechas
 Jinja2>=3.1.0             # plantillas de la web estática (sibylla/web.py)
