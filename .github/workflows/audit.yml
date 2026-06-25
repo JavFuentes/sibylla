@@ -1,0 +1,46 @@
+# Auditoría de seguridad de dependencias (pip-audit).
+#
+# Escanea requirements.txt contra la base OSV/PyPI y reporta CVEs conocidos en
+# las dependencias (requests, Jinja2, feedparser, trafilatura, PyYAML, ...).
+#
+# Es un workflow **separado** del deploy (regenerate.yml): un CVE detectado NO
+# bloquea la publicación del sitio, solo hace fallar este job y abre una alerta
+# en la pestaña Actions (visible además como check en los PRs).
+#
+# Se ejecuta:
+#   - cada semana (lunes),
+#   - en cada PR que toque dependencias o CI,
+#   - a mano desde Actions.
+name: Auditoría de dependencias
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"   # lunes 08:00 UTC
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "requirements.txt"
+      - ".github/workflows/audit.yml"
+      - ".github/dependabot.yml"
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias del proyecto
+        run: pip install -r requirements.txt
+
+      - name: pip-audit (escaneo de CVEs)
+        uses: pypa/gh-action-pip-audit@v1
+        with:
+          # Solo auditamos el árbol instalado (lo que realmente se ejecuta en CI
+          # y en producción). Ignoramos CVEs sin versión parcheada conocida.
+          ignore-vulns: ""

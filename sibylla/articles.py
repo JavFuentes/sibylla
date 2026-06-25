@@ -19,8 +19,9 @@ import logging
 from typing import Optional
 
 from .config import ROOT
-from .fetchers import _get, resolve_google_news_url
+from .fetchers import resolve_google_news_url
 from .models import NewsItem, canonicalize_url
+from .net import UnsafeURL, fetch_safe
 
 log = logging.getLogger("sibylla")
 
@@ -69,8 +70,10 @@ def fetch_article_text(url: str, *, timeout: int = 20) -> Optional[str]:
 
     Resuelve la URL de Google News (best-effort), descarga el HTML y extrae el
     cuerpo. Devuelve None ante cualquier problema (timeout, HTTP >= 400, bloqueo,
-    paywall, contenido trivial). Solo se cachean los éxitos (los fallos se
-    reintentan en la próxima corrida). Recorta a _MAX_CHARS para el LLM.
+    paywall, contenido trivial, destino no ruteable bloqueado por SSRF). La
+    descarga va por ``fetch_safe`` (host validado, redirects re-chequeados, tope
+    de ~2 MB). Solo se cachean los éxitos (los fallos se reintentan en la
+    próxima corrida). Recorta a _MAX_CHARS para el LLM.
     """
     if not url:
         return None
@@ -84,8 +87,13 @@ def fetch_article_text(url: str, *, timeout: int = 20) -> Optional[str]:
         return cache[key]
 
     try:
-        resp = _get(url, timeout=timeout)
-        html_bytes = resp.content
+        # fetch_safe aplica el guarda SSRF (host ruteable, redirects
+        # re-validados) y un tope de bytes: las URLs vienen de feeds externos
+        # que no controlamos. Un destino bloqueado degrada a "sin resumen".
+        html_bytes = fetch_safe(url, timeout=timeout)
+    except UnsafeURL as ex:
+        log.info("URL bloqueada por guarda SSRF (%s): %s", url, ex)
+        return None
     except Exception as ex:  # noqa: BLE001  (timeout, 4xx/5xx, DNS...)
         log.debug("fetch artículo falló (%s): %s", url, ex)
         return None

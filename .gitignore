@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# --- Documentación de seguridad (solo local; NO se commitea) ----------------
+# Contiene análisis interno del modelo de amenazas y runbooks de respuesta.
+# Si llegara a subirse por error, no exponería claves (no las hay aquí), pero
+# sí detalles de defensa que preferimos mantener privados.
+.security/
+
 # --- Datos locales / salida / caché de ingesta -----------------------------
 data/
 output/

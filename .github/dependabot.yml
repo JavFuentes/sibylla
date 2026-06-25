@@ -1,0 +1,35 @@
+# Dependabot — mantiene dependencias y acciones de CI al día.
+#
+# - pip: revisa requirements.txt (semana) y abre PRs de actualización. El repo
+#   usa pins flotantes (>=), así que Dependabot propone subir a la última
+#   compatible; revisa el CHANGELOG antes de mergear.
+# - github-actions: mantiene los actions/checkout, actions/setup-python, etc.
+#
+# Documentación: https://docs.github.com/code-security/dependabot
+version: 2
+updates:
+  # Dependencias Python (requirements.txt)
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+    commit-message:
+      prefix: "deps(pip)"
+
+  # Acciones de GitHub usadas en .github/workflows/*
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "deps(ci)"
