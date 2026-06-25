@@ -186,11 +186,11 @@ def test_tarjeta_propaga_image():
     assert card["image"] == "https://cdn.example.com/x.jpg"
 
 
-def test_tarjeta_image_none_cuando_no_hay():
+def test_tarjeta_image_placeholder_cuando_no_hay():
     it = _item()
     assert it.image is None
     card = _tarjeta(it, MESES_ES, NO_DATE_ES)
-    assert card["image"] is None
+    assert card["image"] == "placeholder-test.png"
 
 
 # ---------------------------------------------------------------------------
