@@ -565,7 +565,7 @@ def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
         return []
     try:
         r = _get(f"{base}/accounts/{acc_id}/statuses",
-                 params={"limit": 10, "exclude_replies": "true"})
+                 params={"limit": 10, "exclude_replies": "false"})
         posts = r.json()
     except Exception as ex:
         log.warning("  house/mastodon: statuses falló para %s: %s", handle, ex)
