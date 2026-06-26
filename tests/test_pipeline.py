@@ -6,7 +6,7 @@ Cubre:
   - rank        (orden descendente por score)
   - diversify   (límite de ítems por fuente+tema)
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -82,7 +82,11 @@ def test_dedupe(items, exp_len, exp_tier, exp_topics, _desc):
 
 # --- _score -----------------------------------------------------------------
 
-NOW = datetime(2026, 6, 21, 12, 0, tzinfo=timezone.utc)
+# Relativo al reloj real: `_score` mide la frescura contra `datetime.now()`
+# (vía `age_hours`), así que una fecha fija se "añeja" con el tiempo y, pasada
+# ~1 vida media, la frescura del ítem "reciente" cae hasta la penalización de
+# "sin fecha" e invierte el test. Anclar a ahora lo mantiene determinista.
+NOW = datetime.now(timezone.utc)
 
 
 def test_score_tier_weight():
@@ -113,7 +117,7 @@ def test_score_unknown_tier_defaults():
 def test_score_older_lower():
     """A mayor antigüedad, menor score (mismo tier)."""
     recent = _it(published=NOW)
-    older = _it(published=datetime(2026, 6, 19, 12, 0, tzinfo=timezone.utc))
+    older = _it(published=NOW - timedelta(days=2))
     assert _score(recent) > _score(older)
 
 

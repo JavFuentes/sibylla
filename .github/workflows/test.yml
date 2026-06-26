@@ -1,0 +1,35 @@
+# Corre la suite de tests (pytest) en cada push y PR.
+#
+# Es la red de seguridad que faltaba: el deploy (regenerate.yml) y la auditoría
+# (audit.yml) no ejecutan los tests, así que sin este workflow la lógica de
+# dominio (canonicalización, relevancia bilingüe, ranking, dedupe/cluster…)
+# solo se validaba a mano. Aquí se valida en automático y queda como check en
+# los PRs. Los tests son puros y sin red, así que la corrida es de segundos.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  workflow_dispatch: {}
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: pytest
+        run: python -m pytest tests/ -q

@@ -8,7 +8,7 @@
 
 [![Estado](https://img.shields.io/badge/estado-prototipo%20funcional-2ea44f)](#estado)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#instalación)
-[![Idiomas](https://img.shields.io/badge/web-es%20·%20en%20·%20it%20·%20pt-7d5fff)](#uso)
+[![Web](https://img.shields.io/badge/web-español%20(monolingüe)-7d5fff)](#uso)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-blue)](LICENSE)
 [![Sitio](https://img.shields.io/badge/en%20vivo-sibylla.cl-d4a017)](https://sibylla.cl)
 
@@ -19,7 +19,7 @@
 Sibylla revisa cada cierto tiempo los temas que te interesan (**ciencia y tecnología**, más una **sección Nacional de Chile**) y te entrega un resumen ordenado. No republica el contenido: **detecta la noticia y enlaza a una fuente fiable**. El diseño es agnóstico de tema (se escala por configuración) y agnóstico de proveedor de IA (conectas la API que quieras, o ninguna).
 
 <a name="estado"></a>
-> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La **web estática multilingüe (4 idiomas)** está operativa y desplegada en **[sibylla.cl](https://sibylla.cl)**, con el contenido de las tarjetas traducido por IA al idioma de cada página. La **sección Nacional (Chile)** usa un juez LLM con corroboración cruzada y cuota regional. El despliegue y la automatización periódica están documentados ([DEPLOY.md](DEPLOY.md)); la entrega por email sigue en el roadmap.
+> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La **web estática monolingüe (español)** está operativa y desplegada en **[sibylla.cl](https://sibylla.cl)**, con el título y el snippet de cada tarjeta traducidos por IA al español. La **sección Nacional (Chile)** usa un juez LLM con corroboración cruzada y cuota regional. El despliegue y la automatización periódica están documentados ([DEPLOY.md](DEPLOY.md)); la entrega por email sigue en el roadmap.
 
 ## Tabla de contenidos
 
@@ -102,20 +102,20 @@ python -m sibylla.cli --topics space --sources google_news_rss,arxiv_api
 python -m sibylla.cli --topics ai --summarize off
 python -m sibylla.cli --topics ai --with-x
 
-# Generar también la web estática (4 idiomas; tarjetas traducidas por IA si hay LLM)
+# Generar también la web estática (español; tarjetas traducidas por IA si hay LLM)
 python -m sibylla.cli --topics nacional,ai,medicine --html
 
 # Dejar las tarjetas en el idioma original de la fuente (sin traducir contenido)
 python -m sibylla.cli --topics ai,medicine --html --translate off
 
-# Web + resumen Markdown en inglés
-python -m sibylla.cli --topics space --lang en --html
+# El resumen Markdown sí admite otros idiomas (la web siempre se genera en español)
+python -m sibylla.cli --topics space --lang en
 
 # Dashboard local de métricas (historial de ejecuciones + costo de tokens)
 python -m sibylla.cli --dashboard
 ```
 
-El resumen se escribe en `output/digest-AAAAMMDD-HHMM.md`. La web se genera en `web/{index,es,en,it,pt}.html`.
+El resumen se escribe en `output/digest-AAAAMMDD-HHMM.md`. La web se genera en `web/index.html` (página única en español).
 
 Temas disponibles: `nacional, ai, computing, space, physics, biotech, medicine, neuroscience, climate, energy, general_science, general_tech`.
 
@@ -139,7 +139,7 @@ Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro
 - [x] Agrupación de misma historia entre medios (near-dedup por título; "También en")
 - [x] Más fuentes (medios RSS + español + X con presupuesto)
 - [x] Sección Nacional (Chile): juez LLM + corroboración cruzada + cuota regional
-- [x] Web estática multilingüe (4 idiomas: es, en, it, pt) generada desde el pipeline
+- [x] Web estática monolingüe (español) generada desde el pipeline
 - [x] Despliegue en [sibylla.cl](https://sibylla.cl) + SEO (favicons, manifest, og:image, sitemap)
 - [x] Dashboard local de métricas (ejecuciones + costo de tokens)
 - [ ] Mejorar el near-dedup con una señal más fuerte (entidades / embeddings / LLM)
