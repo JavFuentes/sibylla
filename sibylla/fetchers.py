@@ -272,6 +272,40 @@ def fetch_arxiv(source: Source, category: str, limit: int) -> list[NewsItem]:
     return items
 
 
+def _fetch_pubmed_abstracts(ids: list[str], common: dict) -> dict[str, str]:
+    """Devuelve {pmid: abstract} vía efetch.fcgi (XML). {} si falla (degradación).
+
+    Un mismo PMID puede traer varios <AbstractText Label="..."> (BACKGROUND,
+    METHODS, ...); se concatenan prefijando la etiqueta para dar contexto al LLM.
+    Sin red en caso de fallo: el llamador deja summary="" (camino de antes).
+    """
+    import xml.etree.ElementTree as ET
+    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+    try:
+        xml_bytes = _get(f"{base}/efetch.fcgi", params={
+            **common, "id": ",".join(ids), "rettype": "abstract", "retmode": "xml",
+        }).content
+        root = ET.fromstring(xml_bytes)
+    except Exception as exc:  # noqa: BLE001  (timeout, 4xx/5xx, XML malformado...)
+        log.warning("efetch PubMed falló (%s); tarjetas sin abstract.", exc)
+        return {}
+    out: dict[str, str] = {}
+    for art in root.findall(".//PubmedArticle"):
+        pmid_el = art.find(".//PMID")
+        if pmid_el is None or not (pmid_el.text or "").strip():
+            continue
+        parts: list[str] = []
+        for el in art.findall(".//Abstract/AbstractText"):
+            txt = " ".join(el.itertext()).strip()
+            if not txt:
+                continue
+            label = el.get("Label")
+            parts.append(f"{label}: {txt}" if label else txt)
+        if parts:
+            out[pmid_el.text.strip()] = " ".join(parts)
+    return out
+
+
 def fetch_pubmed(source: Source, query: str, limit: int) -> list[NewsItem]:
     import os
     base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
@@ -287,6 +321,9 @@ def fetch_pubmed(source: Source, query: str, limit: int) -> list[NewsItem]:
     summ = _get(f"{base}/esummary.fcgi", params={
         **common, "id": ",".join(ids), "retmode": "json",
     }).json().get("result", {})
+    # abstract completos vía efetch: puebla summary para el camino "robusto" del
+    # resumen/snippet. Sin red o si falla -> {} y cada tarjeta queda sin abstract.
+    abstracts = _fetch_pubmed_abstracts(ids, common)
     items = []
     for pmid in summ.get("uids", []):
         d = summ.get(pmid, {})
@@ -298,7 +335,7 @@ def fetch_pubmed(source: Source, query: str, limit: int) -> list[NewsItem]:
             source_name=f"{source.name} › {journal}".strip(" ›"),
             tier=source.tier,
             published=_parse_date(d.get("sortpubdate") or d.get("pubdate", "")),
-            summary="",
+            summary=abstracts.get(pmid, ""),
             extra={"pmid": pmid, "journal": journal, "kind": "paper"},
         ))
     return items
