@@ -376,6 +376,19 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
 
 
 # --- Mastodon / Fediverso (gratis, sin auth en instancias públicas) ---------
+def _mastodon_effective(p: dict) -> dict:
+    """Status 'efectiva' para mostrar/enlazar.
+
+    Un boost/reblog de Mastodon es por fuera la actividad `Announce`: su
+    `content`, `media_attachments`, contadores y `url` propios están vacíos
+    (y su `uri` apunta al JSON ActivityStreams del Announce). El post original
+    boosteado vive anidado en `p['reblog']`. Deref-lo aquí para que la tarjeta
+    muestre y enlace la publicación original, no el repost.
+    """
+    reblog = p.get("reblog")
+    return reblog if isinstance(reblog, dict) and reblog else p
+
+
 def _mastodon_image(attachments: list) -> Optional[str]:
     """Primera imagen (type=image) de un post Mastodon. URL completa."""
     for a in attachments or []:
@@ -410,15 +423,16 @@ def fetch_mastodon(source: Source, lens: dict, limit: int) -> list[NewsItem]:
         return []
     items = []
     for p in posts[:limit]:
-        acc = p.get("account", {}) or {}
+        eff = _mastodon_effective(p)
+        acc = eff.get("account", {}) or {}
         username = acc.get("acct") or acc.get("username", "")
         author_url = acc.get("url", "")
-        pid = p.get("id", "")
-        post_url = p.get("url") or p.get("uri") or (f"{author_url}/{pid}" if author_url else "")
-        text = _clean_text(p.get("content") or "")
+        pid = eff.get("id", "") or p.get("id", "")
+        post_url = eff.get("url") or eff.get("uri") or (f"{author_url}/{pid}" if author_url else "")
+        text = _clean_text(eff.get("content") or "")
         title = text[:90] + ("…" if len(text) > 90 else "") or f"post {pid}"
-        created = p.get("created_at", "")
-        is_repost = bool(p.get("reblog"))
+        created = eff.get("created_at", "")
+        is_repost = eff is not p
         items.append(NewsItem(
             title=title,
             url=post_url,
@@ -427,10 +441,10 @@ def fetch_mastodon(source: Source, lens: dict, limit: int) -> list[NewsItem]:
             tier=source.tier,
             published=_parse_date(created),
             summary=text,
-            image=_mastodon_image(p.get("media_attachments") or []),
+            image=_mastodon_image(eff.get("media_attachments") or []),
             extra={"kind": "post", "network": "mastodon",
-                   "likes": p.get("favourites_count", 0),
-                   "reposts": p.get("reblogs_count", 0),
+                   "likes": eff.get("favourites_count", 0),
+                   "reposts": eff.get("reblogs_count", 0),
                    "author": username, "is_repost": is_repost},
         ))
     log.info("  %-16s [lente:%s] -> %d posts", source.id,
@@ -572,13 +586,15 @@ def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
         return []
     items = []
     for p in posts[:10]:
-        username = acc.get("acct") or acc.get("username", "")
-        pid = p.get("id", "")
-        post_url = p.get("url") or p.get("uri") or ""
-        text = _clean_text(p.get("content") or "")
+        eff = _mastodon_effective(p)
+        acc = eff.get("account", {}) or {}
+        username = acc.get("acct") or acc.get("username", "") or acc.get("display_name", "")
+        pid = eff.get("id", "") or p.get("id", "")
+        post_url = eff.get("url") or eff.get("uri") or ""
+        text = _clean_text(eff.get("content") or "")
         title = text[:90] + ("…" if len(text) > 90 else "") or f"post {pid}"
-        created = p.get("created_at", "")
-        is_repost = bool(p.get("reblog"))
+        created = eff.get("created_at", "")
+        is_repost = eff is not p  # p traía reblog -> esta tarjeta muestra un boost
         items.append(NewsItem(
             title=title,
             url=post_url,
@@ -587,10 +603,10 @@ def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
             tier=3,
             published=_parse_date(created),
             summary=text,
-            image=_mastodon_image(p.get("media_attachments") or []),
+            image=_mastodon_image(eff.get("media_attachments") or []),
             extra={"kind": "post", "network": "mastodon", "house": True,
-                   "likes": p.get("favourites_count", 0),
-                   "reposts": p.get("reblogs_count", 0),
+                   "likes": eff.get("favourites_count", 0),
+                   "reposts": eff.get("reblogs_count", 0),
                    "author": username, "is_repost": is_repost},
         ))
     return items
@@ -623,6 +639,7 @@ def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
         text = (post.get("record", {}).get("text") if isinstance(post.get("record"), dict) else "") or ""
         title = text[:90] + ("…" if len(text) > 90 else "") or "post"
         created = post.get("record", {}).get("createdAt", "") if isinstance(post.get("record"), dict) else ""
+        is_repost = bool(isinstance(entry, dict) and entry.get("reason"))
         items.append(NewsItem(
             title=title,
             url=post_url,
@@ -635,7 +652,7 @@ def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
             extra={"kind": "post", "network": "bluesky", "house": True,
                    "likes": post.get("likeCount", 0),
                    "reposts": post.get("repostCount", 0),
-                   "author": h, "is_repost": False},
+                   "author": h, "is_repost": is_repost},
         ))
     return items
 

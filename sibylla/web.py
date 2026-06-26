@@ -179,7 +179,6 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     network = it.extra.get("network", "")
     if network == "x_twitter":
         network = "x"  # el locale usa la clave net_x (no net_x_twitter)
-    is_house = bool(it.extra.get("house"))
     return {
         "url": it.url,
         "title": title,
@@ -195,7 +194,10 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         "related": [{"source_name": r["source_name"], "url": r["url"]} for r in rel[:_RELATED_CAP]],
         "related_extra": max(0, len(rel) - _RELATED_CAP),
         "network": network,
-        "is_house": is_house,
+        # Las house cards se renderizan como orgánicas (pill de la red, no badge
+        # "Sibylla"): así son indistinguibles. `extra["house"]` sigue guiando la
+        # selección de slots en `_select_social`.
+        "is_house": False,
     }
 
 

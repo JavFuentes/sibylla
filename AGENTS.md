@@ -153,8 +153,11 @@ de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.
 
 4. **Renderizado**: el template recibe `social_cards` y genera:
    - Apunte neutro de Sibylla (`social_voice` / `social_voice_text` del locale).
-   - 6 tarjetas con badge de red (`.pill`): nombre de la red (`net_*` del locale)
-     o "Sibylla" (`social_house_badge`) para las house.
+   - 6 tarjetas con badge de red (`.pill`): nombre de la red (`net_*` del
+     locale). Las house cards se renderizan **idénticas a las orgánicas**
+     (pill de la red, contenido/enlace del post original boosteado, no del
+     repost). `extra["house"]` solo guía la selección de slots en `_select_social`,
+     no el render.
    - Selector de tarjetas (`data-steps="0,2,4,6"`, `data-default="6"`).
    - Sin posts sociales, la sección entera desaparece (`{% if social_cards %}`).
 
@@ -300,3 +303,4 @@ python -m pytest tests/ -v --cov=sibylla --cov-report=term-missing  # requiere p
 - **Relevancia bilingüe:** `is_relevant` quita tildes y compara stems ES/EN; las keywords cortas (≤3) usan límite de palabra (p. ej. `ai` no casa con `airport`).
 - **X recent search** exige `max_results ≥ 10`: si el presupuesto restante es < 10, se omite.
 - **Tope mensual de X en CI:** `x_usage.json` se **persiste en el host** (igual que `runs.json`): el workflow lo descarga antes de generar y lo sube después (best-effort, no aborta el deploy). Así el `monthly_read_budget` sí frena en CI. Es un contador de gasto, no historial: si se pierde, el mes solo reinicia a `reads=0` (no corrompe nada).
+- **Reblogs de Mastodon (boosts):** la API devuelve el `Announce` por fuera y el post original anidado en `reblog` (con `content`/`media_attachments`/contadores propios vacíos, y `uri` apuntando al JSON ActivityStreams). `_mastodon_effective(p)` desreferencia `reblog` para que la tarjeta enlace y muestre el post original (no el repost). Aplica tanto a `fetch_mastodon` como a las house cards. Bluesky ya viene desreferenciado por `getAuthorFeed` (`entry["post"]` = original).
