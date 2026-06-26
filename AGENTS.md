@@ -47,6 +47,7 @@ web/             # sitio estático generado — ignorado por git
 - **Sin SDKs de proveedor:** la capa LLM usa `requests` directo para no atarse a ninguno.
 - **Nada de secretos en el código:** las claves se leen de `.env` vía `os.getenv`.
 - **No commit ni push sin instrucción explícita:** editar archivos no implica commit ni push. Solo se commitea/pushea cuando el usuario lo pide con palabras como "commitea", "haz push", "sube" o equivalentes. Si un cambio requiere commit para surtir efecto (ej. CI/CD), preguntar primero.
+- **Autoría de commits:** cuando commitees o pushees, firma **siempre** como el modelo, `GLM-5.2 <noreply@z.ai>`, vía `git -c user.name="GLM-5.2" -c user.email="noreply@z.ai" commit ...` (sin tocar la config global/local del repo). Nunca uses la identidad del usuario ni de "opencode".
 
 ## Cómo extender
 
