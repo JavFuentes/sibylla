@@ -114,10 +114,15 @@ def _same_story(a_toks: frozenset[str], a_ents: frozenset[str],
 
 def _better_rep(a: NewsItem, b: NewsItem) -> bool:
     """True si `a` es mejor representante que `b`: menor tier (más fiable) y,
-    a igualdad de tier, más reciente."""
+    a igualdad de tier, más reciente. Determinista: cuando tier y fecha empatan
+    (p. ej. misma historia publicada al mismo minuto), NO desplaza al
+    representante actual, para que el tema primario (topics[0]) sea estable y
+    no dependa de la resolución del reloj (now())."""
     if a.tier != b.tier:
         return a.tier < b.tier
-    return a.age_hours < b.age_hours
+    ta = a.published.timestamp() if a.published else 0.0
+    tb = b.published.timestamp() if b.published else 0.0
+    return ta > tb
 
 
 def _within_window(a: NewsItem, b: NewsItem, days: int) -> bool:
