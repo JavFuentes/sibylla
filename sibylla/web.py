@@ -66,11 +66,13 @@ def _select_social(organic: list[NewsItem],
     """Produce exactamente SOCIAL_MAX_TOTAL tarjetas para 'Voces de la red'.
 
     1. top‑1 por red (mastodon, bluesky, x_twitter) → hasta 3 slots.
-    2. house cards (mejores 2 de `fetch_house_posts`); si <2, rellena con pool orgánico.
+    2. 2 house cards por RECENCIA (último post/repost), 1 por red distinta;
+       misma red solo si ninguna otra aportó. Ignora el engagement.
     3. Rellena huecos de redes que no aportaron nada con pool orgánico restante.
     4. Baraja si `social.shuffle` (semilla por día → estable dentro del día).
     """
     TOTAL = SOCIAL_MAX_TOTAL
+    HOUSE_SLOTS = 2
     NETWORKS = ["mastodon", "bluesky", "x_twitter"]
 
     # Agrupar orgánico por source_id y rankear por _social_score
@@ -92,14 +94,35 @@ def _select_social(organic: list[NewsItem],
                 used.add(id(it))
                 break  # solo 1 por red
 
-    # --- Fase 2: house cards (hasta 2) ---
-    house_ranked = sorted(house_items, key=_social_score, reverse=True)
-    for it in house_ranked:
-        if sum(1 for s in selected if s.extra.get("house")) >= 2:
-            break
-        if id(it) not in used:
-            selected.append(it)
-            used.add(id(it))
+    # --- Fase 2: 2 house cards, redes distintas, por recencia (sin engagement) ---
+    # A diferencia del orgánico (que rankea por buzz), las tarjetas de cuentas
+    # propias se eligen por la actividad MÁS RECIENTE (último post o repost),
+    # ignorando likes/reposts. Se exige diversidad de red: 1 por red distinta;
+    # misma red solo si ninguna otra aportó posts.
+    def _house_recency(it: NewsItem):
+        return (it.extra.get("feed_ts") or it.published
+                or datetime.min.replace(tzinfo=timezone.utc))
+
+    house_by_net: dict[str, list[NewsItem]] = {}
+    for it in house_items:
+        house_by_net.setdefault(it.extra.get("network", "?"), []).append(it)
+    for posts in house_by_net.values():
+        posts.sort(key=_house_recency, reverse=True)
+
+    # Redes ordenadas por su post más nuevo -> 1 tarjeta por red distinta.
+    nets_by_recency = sorted(
+        house_by_net, key=lambda n: _house_recency(house_by_net[n][0]), reverse=True)
+    house_pick = [house_by_net[n][0] for n in nets_by_recency[:HOUSE_SLOTS]]
+    # Menos redes que cupos -> rellenar con lo siguiente más reciente (misma red).
+    if len(house_pick) < HOUSE_SLOTS:
+        taken = {id(x) for x in house_pick}
+        rest = sorted(
+            (it for ps in house_by_net.values() for it in ps if id(it) not in taken),
+            key=_house_recency, reverse=True)
+        house_pick += rest[:HOUSE_SLOTS - len(house_pick)]
+    for it in house_pick:
+        selected.append(it)
+        used.add(id(it))
 
     # Si tras las fases 1+2 no llegamos a TOTAL, rellenar con orgánico restante
     if len(selected) < TOTAL:
@@ -487,7 +510,8 @@ def _write_sitemap(site_url: str, lastmod: str) -> Path:
 
 def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                      max_por_tema: int = 6, translate: bool = True,
-                     translate_tracker: list[dict] | None = None) -> list[Path]:
+                     translate_tracker: list[dict] | None = None,
+                     include_x: bool = False) -> list[Path]:
     """Genera un HTML por idioma + index.html de aterrizaje con auto-detección.
 
     Estructura generada (sitio monolingüe, español):
@@ -513,7 +537,7 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     from .fetchers import fetch_house_posts
     sc = load_social_config()
     house_accounts = sc.get("house_accounts", [])
-    house_items = fetch_house_posts(house_accounts)
+    house_items = fetch_house_posts(house_accounts, include_x=include_x)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     social_top = _select_social(social_raw, house_items, sc, today)
 

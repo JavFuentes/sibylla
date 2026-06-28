@@ -632,6 +632,10 @@ def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
         title = text[:90] + ("…" if len(text) > 90 else "") or f"post {pid}"
         created = eff.get("created_at", "")
         is_repost = eff is not p  # p traía reblog -> esta tarjeta muestra un boost
+        # feed_ts: hora de la actividad en la cuenta (el boost externo si es
+        # repost, el propio post si no). Ordena por recencia sin tocar la fecha
+        # visible (`published` sigue siendo la del post original).
+        feed_ts = _parse_date(p.get("created_at", "")) or _parse_date(created)
         items.append(NewsItem(
             title=title,
             url=post_url,
@@ -644,7 +648,8 @@ def _fetch_house_mastodon(handle: str) -> list[NewsItem]:
             extra={"kind": "post", "network": "mastodon", "house": True,
                    "likes": eff.get("favourites_count", 0),
                    "reposts": eff.get("reblogs_count", 0),
-                   "author": username, "is_repost": is_repost},
+                   "author": username, "is_repost": is_repost,
+                   "feed_ts": feed_ts},
         ))
     return items
 
@@ -676,7 +681,12 @@ def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
         text = (post.get("record", {}).get("text") if isinstance(post.get("record"), dict) else "") or ""
         title = text[:90] + ("…" if len(text) > 90 else "") or "post"
         created = post.get("record", {}).get("createdAt", "") if isinstance(post.get("record"), dict) else ""
-        is_repost = bool(isinstance(entry, dict) and entry.get("reason"))
+        reason = entry.get("reason") if isinstance(entry, dict) else None
+        is_repost = bool(reason)
+        # feed_ts: hora de la actividad en la cuenta (el repost si lo es, vía
+        # `reason.indexedAt`; el propio post si no). No altera la fecha visible.
+        feed_iso = (reason.get("indexedAt") if isinstance(reason, dict) else "") or created
+        feed_ts = _parse_date(feed_iso)
         items.append(NewsItem(
             title=title,
             url=post_url,
@@ -689,16 +699,180 @@ def _fetch_house_bluesky(handle: str) -> list[NewsItem]:
             extra={"kind": "post", "network": "bluesky", "house": True,
                    "likes": post.get("likeCount", 0),
                    "reposts": post.get("repostCount", 0),
-                   "author": h, "is_repost": is_repost},
+                   "author": h, "is_repost": is_repost,
+                   "feed_ts": feed_ts},
         ))
     return items
 
 
-def fetch_house_posts(accounts: list[dict]) -> list[NewsItem]:
+def _x_monthly_budget() -> int:
+    """Tope mensual de lecturas de X (x_twitter.monthly_read_budget; def. 300)."""
+    try:
+        from .config import load_registry, index_by_id
+        _, sources = load_registry()
+        x = index_by_id(sources).get("x_twitter")
+        if x:
+            return int(x.raw.get("monthly_read_budget", 300) or 300)
+    except Exception:  # noqa: BLE001
+        pass
+    return 300
+
+
+def _x_house_cache_path():
+    from .config import ROOT
+    return ROOT / "data" / "x_house.json"
+
+
+def _x_house_to_cache(it: NewsItem) -> dict:
+    """Serializa un house item de X a JSON (para data/x_house.json)."""
+    ft = it.extra.get("feed_ts")
+    return {
+        "title": it.title, "url": it.url, "source_name": it.source_name,
+        "published": it.published.isoformat() if it.published else None,
+        "summary": it.summary, "image": it.image,
+        "likes": it.extra.get("likes", 0), "reposts": it.extra.get("reposts", 0),
+        "is_repost": it.extra.get("is_repost", False),
+        "feed_ts": ft.isoformat() if ft else None,
+    }
+
+
+def _x_house_from_cache(d: dict, handle: str) -> NewsItem:
+    """Reconstruye un house item de X desde el JSON cacheado."""
+    return NewsItem(
+        title=d.get("title", ""), url=d.get("url", ""), source_id="x_twitter",
+        source_name=d.get("source_name", f"X › @{handle}"), tier=3,
+        published=_parse_date(d.get("published") or ""),
+        summary=d.get("summary", ""), image=d.get("image"),
+        extra={"kind": "post", "network": "x", "house": True,
+               "likes": d.get("likes", 0), "reposts": d.get("reposts", 0),
+               "author": handle, "is_repost": d.get("is_repost", False),
+               "feed_ts": _parse_date(d.get("feed_ts") or "")},
+    )
+
+
+def _fetch_house_x(handle: str, limit: int = 5) -> list[NewsItem]:
+    """Últimas publicaciones (incl. retweets) de la cuenta propia de X.
+
+    DE PAGO: el endpoint de timeline exige `max_results >= 5`, así que cada
+    lectura real cuesta 5 posts. Para no repetir el gasto en builds del mismo
+    día se cachea el resultado en `data/x_house.json` con TTL. Respeta el tope
+    mensual duro compartido (`data/x_usage.json`). Sin token o sin presupuesto
+    devuelve [] (degradación elegante).
+    """
+    import json
+    import os
+    handle_clean = handle.lstrip("@").strip()
+    TTL_HOURS = 6
+    cache_path = _x_house_cache_path()
+    # 1) Caché fresca -> 0 lecturas.
+    try:
+        c = json.loads(cache_path.read_text(encoding="utf-8"))
+        ts = _parse_date(c.get("fetched_at", ""))
+        if (c.get("handle") == handle_clean and ts and
+                (datetime.now(timezone.utc) - ts) < timedelta(hours=TTL_HOURS)):
+            return [_x_house_from_cache(d, handle_clean) for d in c.get("items", [])]
+    except Exception:  # noqa: BLE001
+        pass
+
+    bearer = os.getenv("X_BEARER_TOKEN")
+    if not bearer:
+        log.warning("  house/x: falta X_BEARER_TOKEN en .env; se omite")
+        return []
+    month, used = _x_load_usage()
+    budget = _x_monthly_budget()
+    if budget - used < limit:
+        log.warning("  house/x: presupuesto del mes agotado (%d/%d); se omite",
+                    used, budget)
+        return []
+    hdr = {"Authorization": f"Bearer {bearer}"}
+    # 2) id de la cuenta (un lookup; no devuelve posts, no cuenta como lectura).
+    try:
+        r = _get(f"https://api.twitter.com/2/users/by/username/{handle_clean}",
+                 headers=hdr)
+        uid = (r.json().get("data") or {}).get("id")
+        if not uid:
+            return []
+    except Exception as ex:  # noqa: BLE001
+        log.warning("  house/x: lookup falló para %s: %s", handle, ex)
+        return []
+    # 3) timeline (incluye retweets). max_results>=5 es el mínimo de la API.
+    params = {
+        "max_results": max(5, limit),
+        "tweet.fields": "created_at,public_metrics,referenced_tweets",
+        "expansions": ("referenced_tweets.id,attachments.media_keys,"
+                       "referenced_tweets.id.attachments.media_keys"),
+        "media.fields": "url,preview_image_url",
+    }
+    try:
+        r = _get(f"https://api.twitter.com/2/users/{uid}/tweets",
+                 params=params, headers=hdr)
+        payload = r.json()
+    except Exception as ex:  # noqa: BLE001
+        log.warning("  house/x: timeline falló para %s: %s", handle, ex)
+        return []
+    tweets = payload.get("data", []) or []
+    _x_save_usage(month, used + len(tweets))  # se cobra por post leído
+    incl = {t.get("id"): t for t in payload.get("includes", {}).get("tweets", []) or []}
+    media: dict[str, str] = {}
+    for m in payload.get("includes", {}).get("media", []) or []:
+        mk = m.get("media_key")
+        if mk:
+            url = _valid_image_url(m.get("url") or m.get("preview_image_url"))
+            if url:
+                media[mk] = url
+    items: list[NewsItem] = []
+    for tw in tweets[:limit]:
+        # feed_ts: hora de la actividad en la cuenta (del RT si es retweet).
+        feed_ts = _parse_date(tw.get("created_at", ""))
+        # Desreferenciar retweet -> tweet original (enlace/contenido/imagen).
+        ref = next((rt for rt in (tw.get("referenced_tweets") or [])
+                    if rt.get("type") == "retweeted"), None)
+        is_repost = ref is not None
+        eff = incl.get(ref.get("id")) if ref else None
+        eff = eff or tw
+        text = eff.get("text", "")
+        oid = eff.get("id", "") or tw.get("id", "")
+        img = None
+        for mk in (eff.get("attachments", {}) or {}).get("media_keys", []) or []:
+            if mk in media:
+                img = media[mk]
+                break
+        post_url = f"https://x.com/i/web/status/{oid}" if oid else ""
+        pm = eff.get("public_metrics", {}) or {}
+        items.append(NewsItem(
+            title=(text[:90] + ("…" if len(text) > 90 else "")) or f"post {oid}",
+            url=post_url,
+            source_id="x_twitter",
+            source_name=f"X › @{handle_clean}",
+            tier=3,
+            published=_parse_date(eff.get("created_at", "")),
+            summary=text,
+            image=img,
+            extra={"kind": "post", "network": "x", "house": True,
+                   "likes": pm.get("like_count", 0),
+                   "reposts": pm.get("retweet_count", 0),
+                   "author": handle_clean, "is_repost": is_repost,
+                   "feed_ts": feed_ts},
+        ))
+    # 4) Guardar caché (best-effort; no rompe si falla).
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps({
+            "handle": handle_clean,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "items": [_x_house_to_cache(it) for it in items],
+        }), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+    return items
+
+
+def fetch_house_posts(accounts: list[dict], include_x: bool = False) -> list[NewsItem]:
     """Consulta el feed de cada cuenta propia, incluyendo reposts.
 
     `accounts`: [{"network": "bluesky", "handle": "sibylla.cl"}, ...]
     Devuelve ítems con `extra["house"]=True`. Cada cuenta que falla se aísla.
+    X es DE PAGO: solo se consulta si `include_x` (lo cablea `--with-x`).
     """
     items: list[NewsItem] = []
     for acc in accounts:
@@ -712,9 +886,10 @@ def fetch_house_posts(accounts: list[dict]) -> list[NewsItem]:
             elif net == "bluesky":
                 items.extend(_fetch_house_bluesky(handle))
             elif net == "x" or net == "x_twitter":
-                # X house solo con --with-x (la fuente en sí no se fetchea sin él);
-                # si se quiere, se implementa aparte. Por ahora, omitir sin error.
-                pass
+                # X house solo con --with-x (X es de pago por uso). Sin él, se
+                # omite limpio y Mastodon+Bluesky cubren las 2 tarjetas.
+                if include_x:
+                    items.extend(_fetch_house_x(handle))
             else:
                 log.warning("  house: red desconocida '%s' para %s; se omite", net, handle)
         except Exception as ex:  # noqa: BLE001

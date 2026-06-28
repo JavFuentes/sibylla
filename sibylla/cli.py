@@ -152,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.html:
         from .web import build_all_sites
         paths = build_all_sites(items, topics, meta, translate=do_translate,
-                                translate_tracker=llm_calls)
+                                translate_tracker=llm_calls, include_x=args.with_x)
         print(f"\n🌐 Web estática generada:")
         for p in paths:
             print(f"  {p}")

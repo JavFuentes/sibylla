@@ -145,12 +145,16 @@ de cuentas propias de Sibylla ("house cards"). La lógica se reparte entre `web.
 3. **Selección** (`_select_social` en `web.py`): algoritmo de slots con reglas fijas:
    - **Fase 1** → top‑1 por red orgánica (por `_social_score`) → hasta 3 slots.
    - **Fase 2** → 2 house cards de `fetch_house_posts` (cuentas propias en
-     `social.house_accounts`); si hay <2, rellena con pool orgánico restante.
+     `social.house_accounts`), elegidas por **recencia** (último post/repost, vía
+     `extra["feed_ts"]`), **ignorando el engagement**, con **diversidad de red**:
+     1 por red distinta; misma red solo si ninguna otra aportó. Si hay <2 house,
+     rellena con pool orgánico restante.
    - **Fase 3** → rellena huecos de redes que no aportaron nada con el mejor pool
      orgánico hasta `SOCIAL_MAX_TOTAL = 6`.
    - **Fase 4** → baraja las 6 con `random.Random(seed_dia)` si `social.shuffle`.
-   - `_social_score` se reutiliza tal cual (engagement `likes + 2·reposts`, escala
-     log, con decaimiento por frescura y bonus a cuentas curadas).
+   - `_social_score` rankea **solo el pool orgánico** (Fases 1 y 3): engagement
+     `likes + 2·reposts` en escala log, con decaimiento por frescura y bonus a
+     cuentas curadas. Las **house cards (Fase 2) NO lo usan**: van por recencia.
 
 4. **Renderizado**: el template recibe `social_cards` y genera:
    - Apunte neutro de Sibylla (`social_voice` / `social_voice_text` del locale).
@@ -181,10 +185,16 @@ Cada uno devuelve `list[NewsItem]` con `extra` uniforme:
 | Bluesky | `fetch_bluesky(source, lens, limit)` | `BLUESKY_IDENTIFIER` + `BLUESKY_APP_PASSWORD` → `createSession` → `accessJwt` cacheado | `getFeed` (What's Hot) o `searchPosts` |
 | X | `fetch_x` (existente) | `X_BEARER_TOKEN` → Bearer, con tope mensual | `tweets/search/recent`. Su lente se mapea vía `x_topic` a keywords de `TOPIC_CONFIG`; fallback a `social_query` de `sources.yaml`. |
 
-**House posts** (`fetch_house_posts`): consulta el feed de las cuentas en
-`social.house_accounts` (incluyendo reposts): Mastodon vía `accounts/lookup` +
-`/statuses`, Bluesky vía `getAuthorFeed`.
-Marca `extra["house"]=True`.
+**House posts** (`fetch_house_posts(accounts, include_x)`): consulta el feed de
+las cuentas en `social.house_accounts` (incluyendo reposts): Mastodon vía
+`accounts/lookup` + `/statuses`, Bluesky vía `getAuthorFeed`, y X vía
+`users/by/username` + `users/:id/tweets` (**solo con `--with-x`**, es de pago).
+Cada ítem trae `extra["house"]=True` y `extra["feed_ts"]` (hora de la actividad
+en la cuenta: el repost/boost si lo es, el post si no; ordena la Fase 2 por
+recencia **sin** tocar la fecha visible, que sigue siendo la del post original).
+X house: el endpoint de timeline exige `max_results>=5` (piso de 5 lecturas),
+respeta el tope mensual (`data/x_usage.json`) y **cachea** el resultado en
+`data/x_house.json` con TTL (6 h) para no recobrar en builds del mismo día.
 
 #### Configuración (`config/sources.yaml` · bloque `social:`)
 
@@ -199,6 +209,7 @@ social:
   house_accounts:
     - { network: bluesky,  handle: sibylla.cl }
     - { network: mastodon, handle: "@sibylla@mastodon.social" }
+    - { network: x,        handle: SibyllaCl }   # solo con --with-x (de pago)
 ```
 
 #### Cómo añadir una red social nueva

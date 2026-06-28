@@ -9,7 +9,9 @@ from datetime import datetime, timezone
 import pytest
 
 from sibylla.models import NewsItem
-from sibylla.web import _agrupar, _assert_min_items, _fecha, _instante, _snippet, _tarjeta
+from sibylla.web import (
+    _agrupar, _assert_min_items, _fecha, _instante, _select_social, _snippet, _tarjeta,
+)
 
 # --- helpers ---------------------------------------------------------------
 
@@ -242,3 +244,52 @@ def test_assert_min_items_con_min_n_custom():
     items = [_item()]
     with pytest.raises(ValueError, match="al menos 3"):
         _assert_min_items(items, min_n=3)
+
+
+# ---------------------------------------------------------------------------
+# _select_social: Fase 2 (house cards por recencia + diversidad de red)
+# ---------------------------------------------------------------------------
+OLD = datetime(2026, 6, 20, tzinfo=timezone.utc)
+MID = datetime(2026, 6, 22, tzinfo=timezone.utc)
+NEW = datetime(2026, 6, 24, tzinfo=timezone.utc)
+
+
+def _house(network, feed_ts, likes=0, reposts=0, title="H"):
+    """House item mínimo para probar la selección (engagement irrelevante)."""
+    return NewsItem(
+        title=title, url=f"https://{network}.example/{title}",
+        source_id=network, source_name=network, tier=3, published=feed_ts,
+        extra={"kind": "post", "network": network, "house": True,
+               "feed_ts": feed_ts, "likes": likes, "reposts": reposts},
+    )
+
+
+def test_select_social_house_dos_redes_distintas():
+    """Con varias redes, las 2 house cards son de redes distintas (aunque la
+    2ª de una red sea más nueva y con más engagement que la de otra red)."""
+    house = [
+        _house("mastodon", NEW, likes=0),
+        _house("mastodon", MID, likes=999),   # 2º mastodon, alto engagement
+        _house("bluesky", OLD, likes=0),       # bluesky más viejo, sin likes
+    ]
+    sel = _select_social([], house, {"shuffle": False}, "seed")
+    assert {it.extra["network"] for it in sel} == {"mastodon", "bluesky"}
+
+
+def test_select_social_house_misma_red_si_no_hay_otra():
+    """Si solo una red aportó posts, las 2 tarjetas salen de esa misma red."""
+    house = [
+        _house("mastodon", NEW),
+        _house("mastodon", MID),
+        _house("mastodon", OLD),
+    ]
+    sel = _select_social([], house, {"shuffle": False}, "seed")
+    assert [it.extra["network"] for it in sel] == ["mastodon", "mastodon"]
+
+
+def test_select_social_house_recencia_ignora_engagement():
+    """El post más reciente gana al más antiguo aunque este sea viral."""
+    viejo_viral = _house("mastodon", OLD, likes=10000, reposts=10000, title="viral")
+    nuevo_sin_likes = _house("mastodon", NEW, likes=0, reposts=0, title="nuevo")
+    sel = _select_social([], [viejo_viral, nuevo_sin_likes], {"shuffle": False}, "seed")
+    assert sel[0].title == "nuevo"

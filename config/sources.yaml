@@ -826,3 +826,4 @@ social:
   house_accounts:
     - { network: bluesky,  handle: sibylla.cl }
     - { network: mastodon, handle: "@sibylla@mastodon.social" }
+    - { network: x,        handle: SibyllaCl }   # DE PAGO: solo con --with-x
