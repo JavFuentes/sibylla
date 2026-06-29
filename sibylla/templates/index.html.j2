@@ -201,11 +201,21 @@
   .boton.fantasma:hover{ border-color:var(--oro-claro); color:var(--oro-claro); }
   .marca-tiempo{ margin-top:26px; font-size:.8rem; letter-spacing:.06em; color:var(--tenue);
     display:flex; align-items:center; gap:10px; }
-  .card-ctrl{ display:flex; align-items:center; gap:2px; flex:none; }
-  .card-ctrl-btn{ background:none; border:none; color:var(--tenue); cursor:pointer;
-    font-size:.78rem; padding:0 3px; line-height:1; transition:color .2s; }
-  .card-ctrl-btn:hover{ color:var(--oro-claro); }
-  .card-ctrl-val{ color:var(--marfil-2); font-size:.72rem; min-width:1.2em; text-align:center; }
+  /* Selector de tarjetas: mismos círculos oro que los controles de sección. */
+  .card-ctrl{ display:inline-flex; align-items:center; gap:6px; flex:none; }
+  .card-ctrl-btn{ width:28px; height:28px; flex:none; display:grid; place-items:center; padding:0;
+    border-radius:50%; cursor:pointer; color:var(--marfil-2);
+    font-family:'Inter',sans-serif; font-size:1.05rem; font-weight:300; line-height:1;
+    background:rgba(217,184,95,.045); border:1px solid rgba(217,184,95,.24);
+    transition:color .2s, border-color .2s, background .2s, transform .2s, box-shadow .2s; }
+  .card-ctrl-btn:hover{ color:var(--oro-claro); border-color:rgba(242,221,147,.6);
+    background:rgba(217,184,95,.13); transform:translateY(-1px);
+    box-shadow:0 6px 16px -8px rgba(217,184,95,.7); }
+  .card-ctrl-btn:active{ transform:translateY(0); }
+  .card-ctrl-btn:focus-visible{ outline:2px solid rgba(94,230,224,.6); outline-offset:2px; }
+  .card-ctrl-val{ min-width:1.5em; text-align:center; font-family:'Cinzel',serif;
+    font-size:.82rem; color:var(--oro-claro); letter-spacing:.02em;
+    font-variant-numeric:tabular-nums; }
 
   /* ---- Controles de sección: subir / bajar / quitar ---- */
   .bloque{ scroll-margin-top:86px; }
@@ -425,7 +435,7 @@
     .tema{ margin:28px 0 14px; gap:8px 12px; flex-wrap:wrap; }
     .tema h3{ font-size:1rem; letter-spacing:.14em; }
     .tema-ctrls{ flex:0 0 100%; justify-content:flex-end; }
-    .sec-btn{ width:30px; height:30px; }
+    .sec-btn, .card-ctrl-btn{ width:30px; height:30px; }
     .restaurar{ right:14px; bottom:14px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
     .seccion-titulo{ margin:16px 0 4px; }
     .seccion-titulo p{ font-size:.95rem; }
