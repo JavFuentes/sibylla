@@ -17,6 +17,7 @@ import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import unquote, urljoin
 
 import feedparser
 import requests
@@ -248,6 +249,40 @@ def resolve_google_news_url(url: str) -> str:
     return url
 
 
+# --- reparación de <link> malformados (feeds Drupal p. ej. Interferencia) -----
+_ANCHOR_HREF_RE = re.compile(r"""<a\b[^>]*href=["']([^"']+)["']""", re.IGNORECASE)
+
+
+def _repair_link(link: str, base_url: str = "") -> str:
+    """Sana un <link> de feed cuando el CMS mete el ancla HTML dentro del enlace.
+
+    Caso real (Interferencia, Drupal): el feed sirve algo como
+        https://interferencia.cl/%3Ca%20href%3D%22/articulos/slug%22%3E...%3C/a%3E
+    en lugar de un permalink limpio. Aquí recuperamos la URL real desde el href
+    embebido. Si no hay HTML anómalo, devolvemos el link tal cual; si lo hay pero
+    no podemos extraer un href válido, devolvemos "" para que el llamador
+    descarte el ítem (mejor no mostrarlo que servir un enlace a una página vacía).
+    """
+    if not link:
+        return ""
+    raw = link.strip()
+    # Solo inspeccionamos si hay señales de HTML (crudo o URL-encodeado).
+    if "<" not in raw and "%3C" not in raw and "%3c" not in raw:
+        return raw
+    decoded = unquote(raw)
+    m = _ANCHOR_HREF_RE.search(decoded)
+    if not m:
+        return ""
+    path = m.group(1).strip()
+    if not path:
+        return ""
+    if path.lower().startswith(("http://", "https://")):
+        return path
+    if base_url:
+        return urljoin(base_url, path)
+    return ""
+
+
 # --- fetchers concretos -----------------------------------------------------
 def fetch_arxiv(source: Source, category: str, limit: int) -> list[NewsItem]:
     url = "https://export.arxiv.org/api/query"
@@ -399,9 +434,12 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
     feed = feedparser.parse(_get(source.url).content)
     items = []
     for pos, e in enumerate(feed.entries[:limit]):
+        url = _repair_link(e.get("link", ""), source.url)
+        if not url:
+            continue  # link irrecuperable: descartamos antes que ofrecer un enlace muerto
         items.append(NewsItem(
             title=e.get("title", ""),
-            url=e.get("link", ""),
+            url=url,
             source_id=source.id,
             source_name=source.name,
             tier=source.tier,
