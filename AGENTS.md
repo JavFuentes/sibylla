@@ -55,6 +55,14 @@ web/             # sitio estático generado — ignorado por git
 1. En `fetchers.py`, añade una entrada a `TOPIC_CONFIG` (consulta `news` para Google News, `hn` para Hacker News, `arxiv`/`pubmed` si aplica).
 2. Añade palabras clave **bilingües (ES/EN, sin tildes)** a `TOPIC_KEYWORDS` para el filtro de relevancia.
 
+### Añadir una fuente a la sección Astronomía
+1. En `config/sources.yaml`, añade la fuente con `topics: [astronomia]`.
+2. En `pipeline.py`, añade su `id` a `DEFAULT_FREE_SOURCES`.
+3. **Fuente chilena (ALMA/CATA/SOCHIAS):** añade su `id` a `ASTRO_PRIORITY_IDS` en `web.py`.
+   Tiene slot reservado (cede si >7 días sin contenido nuevo).
+4. **Agencia espacial:** añade su `id` a `ASTRO_AGENCY_IDS` en `web.py`.
+   Compite por las 3 tarjetas de agencia (máx. 1 por agencia, gana la más reciente).
+
 ### Añadir un medio (RSS/Atom)
 1. Añádelo en `config/sources.yaml` con `type: rss` (o `atom`) y su `url` de feed.
 2. Inclúyelo en `DEFAULT_FREE_SOURCES` (en `pipeline.py`) si quieres que entre por defecto.
@@ -115,6 +123,50 @@ Cada `.tema` tiene un control `− N +` que el usuario ajusta en el navegador. P
 
 Los valores por defecto son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
 La sección social usa `data-steps="0,1,2"` (máx. 2 tarjetas). El valor inicial se lee de `data-default`.
+
+### Sección "Astronomía" (agencias espaciales + observatorios)
+
+Tras los temas principales, antes de "Voces de la red", se muestra la sección
+**Astronomía** con **6 tarjetas curadas** siguiendo reglas de producto:
+
+#### Fuentes (definidas en `config/sources.yaml`, tema `astronomia`)
+
+| Bloque | Fuentes | Tier | Idioma | Lógica |
+|--------|---------|------|--------|--------|
+| **Chilena (prioritaria)** | ALMA, CATA, SOCHIAS | 1–2 | EN→traducir, ES, ES | 1 slot reservado por fuente; cede si >7 días sin novedad |
+| **Agencias** | NASA, ESA, JAXA, CNES, ASI, UKSA (+ futuras) | 1 | EN/FR/IT→traducir | Máx. 1 por agencia; ganan las más recientes |
+
+#### Algoritmo `_select_astronomia` (ver `web.py`)
+
+1. **Bloque chileno (3 cupos):** por cada fuente prioritaria, toma el ítem más
+   reciente (≤7 días). Si una fuente no tiene nada fresco, cede su cupo a las
+   otras chilenas (pueden mostrar >1 ítem).
+2. **Bloque agencias (3 cupos):** 1 representante por agencia (el más reciente).
+   Prefiere ≤7 días; con respaldo de más viejas si no hay suficientes; solo
+   repite agencia como último recurso.
+3. **Relleno cruzado:** si un bloque no llena sus 3, el otro toma los cupos
+   sobrantes para mantener siempre 6 tarjetas.
+4. **Orden:** tarjeta **1 = chilena más reciente**, tarjeta **2 = agencia más
+   reciente**, posiciones **3–6 aleatorias** (semilla por día → estable).
+
+#### Integración
+
+- `fetchers.py`: `TOPIC_CONFIG['astronomia'] = {}` (pass-through, como `nacional`).
+- `pipeline.py`: las 9 fuentes en `DEFAULT_FREE_SOURCES`; NASA y ESA también
+  sirven `space` y `general_science`.
+- `web.py`: `ASTRO_SOURCE_IDS`, `_is_astro`, `_select_astronomia`; los ítems
+  astro se separan de los temáticos normales en `build_all_sites`.
+- `cli.py`: `astronomia` en el default de `--topics`; excluido del digest
+  temático (como `nacional`).
+- Plantilla: sección `#astronomia` entre `#presente` y `#voces`.
+- Locales: claves `astro_heading`, `astro_subtitle`, `astro_voice`,
+  `astro_voice_text` y topic `astronomia` en los 4 idiomas.
+- Tests: `tests/test_astronomia.py` (14 casos del selector).
+
+#### Agencias sin feed (documentadas en `sources.yaml`)
+
+CNSA, Roscosmos, ISRO, DLR, CSA, KASA — no exponen RSS/Atom legible
+(probadas 2026-06-28). No entran hoy; reevaluar si publican un feed.
 
 ### Sección "Voces de la red" (redes sociales) · v2.0
 

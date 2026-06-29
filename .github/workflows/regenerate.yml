@@ -131,7 +131,7 @@ jobs:
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           BLUESKY_IDENTIFIER: ${{ secrets.BLUESKY_IDENTIFIER }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
-        run: python -m sibylla.cli --topics nacional,ai,medicine --with-x --html --translate auto
+        run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia --with-x --html --translate auto
 
       - name: Subir web/ y persistir historial en el host (scp)
         env:

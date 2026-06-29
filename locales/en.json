@@ -80,6 +80,10 @@
     "net_mastodon": "Mastodon",
     "net_bluesky": "Bluesky",
     "net_x": "X",
+    "astro_heading": "Astronomy",
+    "astro_subtitle": "News from Chile's observatories and the world's space agencies",
+    "astro_voice": "Sibylla looks up",
+    "astro_voice_text": "What Chile's observatories and major space agencies are publishing. Official sources, no middlemen.",
     "social_house_badge": "Sibylla",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "topics": {
@@ -94,7 +98,8 @@
       "climate": "Climate",
       "energy": "Energy",
       "general_science": "Science",
-      "general_tech": "Technology"
+      "general_tech": "Technology",
+      "astronomia": "Astronomy"
     }
   }
 }

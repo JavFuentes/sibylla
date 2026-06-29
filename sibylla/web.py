@@ -28,7 +28,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from .config import ROOT, get_google_verification, get_site_url, load_social_config
 from .i18n import load_translations, t
 from .models import NewsItem
-from .pipeline import _social_score
+from .pipeline import _score, _social_score
 from .translate import load_cache, save_cache, translate_cards
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -147,6 +147,188 @@ def _select_social(organic: list[NewsItem],
 
     return selected
 
+
+# =============================================================================
+# Sección Astronomía — selección curada con slots reservados
+# =============================================================================
+
+ASTRO_PRIORITY_IDS: set[str] = {"alma", "cata", "sochias"}
+ASTRO_AGENCY_IDS: set[str] = {"nasa", "esa", "jaxa", "cnes", "asi", "uksa"}
+ASTRO_SOURCE_IDS: set[str] = ASTRO_PRIORITY_IDS | ASTRO_AGENCY_IDS
+ASTRO_MAX_TOTAL = 6
+ASTRO_FRESH_DAYS = 7
+
+
+def _is_astro(item: NewsItem) -> bool:
+    return item.source_id in ASTRO_SOURCE_IDS
+
+
+def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
+    """Selecciona 6 tarjetas para la sección Astronomía.
+
+    Bloque chileno (3 cupos): ALMA / CATA / SOCHIAS. 1 reservada por fuente
+    si tiene contenido de ≤7 días; si no, cede su cupo a las otras chilenas.
+
+    Bloque agencias (3 cupos): la más reciente por agencia (≤7 días primero;
+    respaldo con más viejas; máx. 1 por agencia salvo imposible).
+
+    Relleno cruzado: si un bloque no llena 3, el otro toma los cupos sobrantes.
+
+    Orden: tarjeta 1 = chilena más reciente, tarjeta 2 = agencia más reciente,
+    posiciones 3–6 aleatorias (semilla por día).
+    """
+    from datetime import timedelta
+
+    TOTAL = ASTRO_MAX_TOTAL
+    BLOCK = TOTAL // 2  # 3 por bloque
+    cutoff = datetime.now(timezone.utc) - timedelta(days=ASTRO_FRESH_DAYS)
+
+    # Agrupar por fuente y ordenar por recencia
+    pri_by_src: dict[str, list[NewsItem]] = {}
+    ag_by_src: dict[str, list[NewsItem]] = {}
+    for it in items:
+        if it.source_id in ASTRO_PRIORITY_IDS:
+            pri_by_src.setdefault(it.source_id, []).append(it)
+        elif it.source_id in ASTRO_AGENCY_IDS:
+            ag_by_src.setdefault(it.source_id, []).append(it)
+    def _recency(it: NewsItem):
+        return it.published or datetime.min.replace(tzinfo=timezone.utc)
+    for lst in list(pri_by_src.values()) + list(ag_by_src.values()):
+        lst.sort(key=_recency, reverse=True)
+
+    used: set[int] = set()
+
+    # --- Bloque chileno: 1 reservada por fuente (fresca), cede si no ---
+    chilenas: list[NewsItem] = []
+    for sid in ("alma", "cata", "sochias"):
+        cands = pri_by_src.get(sid, [])
+        fresh = [it for it in cands if _recency(it) >= cutoff]
+        pick = fresh[0] if fresh else None
+        if pick:
+            chilenas.append(pick)
+            used.add(id(pick))
+
+    # Rellenar cupos chilenos con lo que sobre de las otras fuentes chilenas
+    if len(chilenas) < BLOCK:
+        pool = sorted(
+            [it for lst in pri_by_src.values() for it in lst
+             if id(it) not in used and _recency(it) >= cutoff],
+            key=_recency, reverse=True)
+        for it in pool:
+            if len(chilenas) >= BLOCK:
+                break
+            chilenas.append(it)
+            used.add(id(it))
+
+    # --- Bloque agencias: máx 1 por agencia, las más recientes ---
+    agencias: list[NewsItem] = []
+    # Primero las frescas (≤7 días)
+    fresh_ag: list[tuple[NewsItem, str]] = []
+    for sid, cands in ag_by_src.items():
+        for it in cands:
+            if _recency(it) >= cutoff and id(it) not in used:
+                fresh_ag.append((it, sid))
+                break
+    fresh_ag.sort(key=lambda x: _recency(x[0]), reverse=True)
+    used_agencies: set[str] = set()
+    for it, sid in fresh_ag:
+        if len(agencias) >= BLOCK:
+            break
+        if sid not in used_agencies:
+            agencias.append(it)
+            used.add(id(it))
+            used_agencies.add(sid)
+
+    # Respaldo: si faltan, tomar lo más reciente (sin límite de edad)
+    if len(agencias) < BLOCK:
+        backup: list[tuple[NewsItem, str]] = []
+        for sid, cands in ag_by_src.items():
+            if sid in used_agencies:
+                continue
+            for it in cands:
+                if id(it) not in used:
+                    backup.append((it, sid))
+                    break
+        backup.sort(key=lambda x: _recency(x[0]), reverse=True)
+        for it, sid in backup:
+            if len(agencias) >= BLOCK:
+                break
+            agencias.append(it)
+            used.add(id(it))
+            used_agencies.add(sid)
+
+    # Último recurso: repetir agencia si es imposible llenar de otro modo
+    if len(agencias) < BLOCK:
+        rest = sorted(
+            [it for lst in ag_by_src.values() for it in lst if id(it) not in used],
+            key=_recency, reverse=True)
+        for it in rest:
+            if len(agencias) >= BLOCK:
+                break
+            agencias.append(it)
+            used.add(id(it))
+
+    # --- Relleno cruzado: mantener siempre TOTAL tarjetas ---
+    total_got = len(chilenas) + len(agencias)
+    if total_got < TOTAL:
+        deficit = TOTAL - total_got
+        # Rellenar con agencias no usadas (máx 1 por agencia nueva)
+        extra_ag = sorted(
+            [it for lst in ag_by_src.values() for it in lst
+             if id(it) not in used and it.source_id not in used_agencies],
+            key=_recency, reverse=True)
+        for it in extra_ag:
+            if deficit <= 0:
+                break
+            agencias.append(it)
+            used.add(id(it))
+            used_agencies.add(it.source_id)
+            deficit -= 1
+        # Si aún faltan, rellenar con chilenas no usadas
+        if deficit > 0:
+            extra_cl = sorted(
+                [it for lst in pri_by_src.values() for it in lst if id(it) not in used],
+                key=_recency, reverse=True)
+            for it in extra_cl:
+                if deficit <= 0:
+                    break
+                chilenas.append(it)
+                used.add(id(it))
+                deficit -= 1
+        # Último recurso: repetir agencia ya usada
+        if deficit > 0:
+            extra_any = sorted(
+                [it for lst in ag_by_src.values() for it in lst if id(it) not in used],
+                key=_recency, reverse=True)
+            for it in extra_any:
+                if deficit <= 0:
+                    break
+                agencias.append(it)
+                used.add(id(it))
+                deficit -= 1
+
+    # --- Orden final ---
+    # Tarjeta 1 = chilena más reciente, tarjeta 2 = agencia más reciente
+    chilenas.sort(key=_recency, reverse=True)
+    agencias.sort(key=_recency, reverse=True)
+
+    slot1 = chilenas[0] if chilenas else (agencias[0] if agencias else None)
+    slot2 = agencias[0] if agencias else (chilenas[0] if chilenas else None)
+
+    rest_pool = [it for it in chilenas + agencias
+                 if slot1 and slot2 and id(it) != id(slot1) and id(it) != id(slot2)]
+    rng = _random.Random(seed_str + "|astro")
+    rng.shuffle(rest_pool)
+
+    selected: list[NewsItem] = []
+    if slot1:
+        selected.append(slot1)
+    if slot2 and (not slot1 or id(slot2) != id(slot1)):
+        selected.append(slot2)
+    selected.extend(rest_pool)
+    return selected[:TOTAL]
+
+
 # Tier -> (numeral romano, clase CSS del sello, color del acento de la tarjeta).
 _SEAL = {
     1: ("I", "t1", "#F2DD93"),
@@ -244,16 +426,20 @@ def _orden_temas(items: list[NewsItem], topics: list[str]) -> list[str]:
 
 def _rendered_items(items: list[NewsItem], topics: list[str],
                     max_por_tema: int,
-                    social_items: list[NewsItem] | None = None) -> list[NewsItem]:
+                    social_items: list[NewsItem] | None = None,
+                    astro_items: list[NewsItem] | None = None) -> list[NewsItem]:
     """Los NewsItem que se renderizarán como tarjetas (≤ max_por_tema por tema).
 
     Misma regla de selección que `_agrupar`, pero devuelve los ítems en vez de
     las tarjetas: lo usa la traducción para tocar solo lo visible (estrategia B+A).
 
-    Si se pasan `social_items`, también se incluyen (siempre se renderizan)."""
+    Si se pasan `social_items` o `astro_items`, también se incluyen (siempre
+    se renderizan)."""
     salida: list[NewsItem] = []
     for t in _orden_temas(items, topics):
         salida.extend([it for it in items if _primario(it) == t][:max_por_tema])
+    if astro_items:
+        salida.extend(astro_items)
     if social_items:
         salida.extend(social_items)
     return salida
@@ -329,11 +515,13 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    is_landing: bool = False,
                    translations: dict | None = None,
                    social_items: list[NewsItem] | None = None,
+                   astro_items: list[NewsItem] | None = None,
                    resumenes: dict | None = None) -> dict:
     """Construye el contexto que recibe la plantilla.
 
     `items` son los ítems normales (temáticos). `social_items` son los ítems
-    de redes sociales que van en su propia sección al pie de la página."""
+    de redes sociales, `astro_items` los de astronomía — ambos van en sus
+    propias secciones al pie de la página."""
     tr = load_translations(lang)
     tw = tr["web"]
     months: list[str] = tw["months"]
@@ -353,6 +541,11 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     observa = t(tr, "web.voice", count=total_all, sources=n_fuentes)
     ts = _instante(ahora, months)
     hero_ts = t(tr, "web.hero_timestamp", date=ts, count=total_all, sources=n_fuentes)
+
+    # Tarjetas de astronomía.
+    astro_cards: list[dict] = []
+    if astro_items:
+        astro_cards = [_tarjeta(it, months, no_date, translations, resumenes) for it in astro_items]
 
     # Tarjetas sociales.
     social_cards: list[dict] = []
@@ -390,6 +583,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "total": total_all,
         "n_fuentes": n_fuentes,
         "grupos": grupos,
+        "astro_cards": astro_cards,
         "social_cards": social_cards,
         "observa": observa,
         "t": tw,
@@ -407,6 +601,7 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 is_landing: bool = False,
                 translations: dict | None = None,
                 social_items: list[NewsItem] | None = None,
+                astro_items: list[NewsItem] | None = None,
                 resumenes: dict | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
@@ -417,7 +612,7 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     tmpl = env.get_template("index.html.j2")
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
                                        is_landing, translations, social_items,
-                                       resumenes))
+                                       astro_items, resumenes))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -433,7 +628,8 @@ def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
 def _build_translations(items: list[NewsItem], topics: list[str],
                         max_por_tema: int,
                         tracker: list[dict] | None = None,
-                        social_items: list[NewsItem] | None = None) -> dict[str, dict]:
+                        social_items: list[NewsItem] | None = None,
+                        astro_items: list[NewsItem] | None = None) -> dict[str, dict]:
     """Traduce las tarjetas RENDERIZADAS a cada idioma (estrategia B+A).
 
     Devuelve {lang: {dedup_key: {title, snippet}}}. Usa y actualiza el cache en
@@ -441,9 +637,8 @@ def _build_translations(items: list[NewsItem], topics: list[str],
     vacíos y las tarjetas caen a su idioma original aguas abajo.
 
     Si se pasa un `tracker`, se apendea el uso de tokens de cada llamada LLM.
-    `social_items` se incluyen siempre en el lote de traducción (se renderizan
-    todos, máximo 2)."""
-    rendered = _rendered_items(items, topics, max_por_tema, social_items)
+    `social_items` y `astro_items` se incluyen siempre en el lote de traducción."""
+    rendered = _rendered_items(items, topics, max_por_tema, social_items, astro_items)
     # Cards únicas por dedup_key (deduplica por si un ítem se contara dos veces).
     cards: list[dict] = []
     vistos: set[str] = set()
@@ -529,16 +724,20 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
-    # Separar ítems normales de los de redes sociales.
-    normal_items = [it for it in items if not _is_social(it)]
+    # Separar ítems: normales / astronomía / redes sociales.
+    normal_items = [it for it in items if not _is_social(it) and not _is_astro(it)]
+    astro_raw = [it for it in items if _is_astro(it)]
     social_raw = [it for it in items if _is_social(it)]
+
+    # Seleccionar 6 tarjetas de astronomía.
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    astro_top = _select_astronomia(astro_raw, today) if astro_raw else []
 
     # Fetch house posts (cuentas propias de Sibylla) y seleccionar 6 tarjetas.
     from .fetchers import fetch_house_posts
     sc = load_social_config()
     house_accounts = sc.get("house_accounts", [])
     house_items = fetch_house_posts(house_accounts, include_x=include_x)
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     social_top = _select_social(social_raw, house_items, sc, today)
 
     # Traducción de tarjetas (título + snippet) al español si hay LLM.
@@ -546,18 +745,21 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     if translate:
         by_lang = _build_translations(normal_items, topics, max_por_tema,
                                       tracker=translate_tracker,
-                                      social_items=social_top)
+                                      social_items=social_top,
+                                      astro_items=astro_top)
         translations = by_lang.get("es")
 
     # Resúmenes en español de las tarjetas renderizadas (botón "Resumen" + acordeón).
     from .resumen import build_resumenes
-    rendered_for_resumen = _rendered_items(normal_items, topics, max_por_tema, social_top)
+    rendered_for_resumen = _rendered_items(normal_items, topics, max_por_tema,
+                                          social_top, astro_top)
     resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
 
     # Única página del sitio (español).
     html = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
                        is_landing=False, translations=translations,
-                       social_items=social_top, resumenes=resumenes)
+                       social_items=social_top, astro_items=astro_top,
+                       resumenes=resumenes)
     out = SITE_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
     paths.append(out)

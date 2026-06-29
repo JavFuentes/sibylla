@@ -80,6 +80,10 @@
     "net_mastodon": "Mastodon",
     "net_bluesky": "Bluesky",
     "net_x": "X",
+    "astro_heading": "Astronomia",
+    "astro_subtitle": "Notícias dos observatórios chilenos e das agências espaciais do mundo",
+    "astro_voice": "Sibylla olha para o céu",
+    "astro_voice_text": "O que publicam os observatórios do Chile e as principais agências espaciais. Fonte oficial, sem intermediários.",
     "social_house_badge": "Sibylla",
     "months": ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"],
     "topics": {
@@ -94,7 +98,8 @@
       "climate": "Clima",
       "energy": "Energia",
       "general_science": "Ciência",
-      "general_tech": "Tecnologia"
+      "general_tech": "Tecnologia",
+      "astronomia": "Astronomia"
     }
   }
 }

@@ -23,6 +23,9 @@ DEFAULT_FREE_SOURCES = [
     "ciper", "interferencia", "diario_uchile", "fast_check_cl",
     "lavoz_pucon", "diario_aysen", "puranoticia", "mapuexpress",
     "google_news_nacional",
+    # Astronomía: 3 prioritarias (CL) + 6 agencias espaciales
+    "alma", "cata", "sochias",
+    "jaxa", "cnes", "asi", "uksa",
     # Social (gratis): una tarjeta por red en "Voces de la red"
     "mastodon", "bluesky",
 ]

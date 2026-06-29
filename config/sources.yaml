@@ -36,10 +36,11 @@ meta:
   status:
     verified_2026-06-20: "Probado en vivo el 2026-06-20 y funcionó."
     verified_2026-06-22: "Probado en vivo el 2026-06-22 (feeds de la sección Nacional)."
+    verified_2026-06-28: "Probado en vivo el 2026-06-28 (feeds de agencias espaciales, sección Astronomía)."
     known: "Fuente conocida/estándar; confirmar feed exacto al construir el ingestor."
 
-  topics: [nacional, general_science, general_tech, ai, computing, space, physics,
-           biotech, medicine, climate, energy, neuroscience]
+  topics: [nacional, general_science, general_tech, ai, computing, space, astronomia,
+           physics, biotech, medicine, climate, energy, neuroscience]
 
 # =============================================================================
 # TIER 1 — APIs científicas y preprints (la columna vertebral de "avances")
@@ -141,26 +142,162 @@ sources:
     tier: 1
     type: rss
     url: "https://www.nasa.gov/feed/"
-    topics: [space, general_science, climate]
+    topics: [astronomia, space, general_science, climate]
     lang: en
     license: "dominio público (obras del gobierno de EE. UU.)"
     access: open
     cost: free
-    status: verified_2026-06-20
-    notes: "Fuente primaria. Contenido reutilizable (dominio público)."
+    status: verified_2026-06-28
+    notes: "Agencia espacial de EE. UU. (sección Astronomía). Fuente primaria; contenido reutilizable (dominio público). Feed re-verificado en vivo 2026-06-28."
 
   - id: esa
     name: "ESA — European Space Agency"
     publisher: "ESA"
     tier: 1
     type: rss
-    url: "https://www.esa.int/rssfeed/Our_Activities"
-    topics: [space, general_science]
+    url: "https://www.esa.int/rssfeed/Our_Activities/Space_Science"
+    topics: [astronomia, space, general_science]
     lang: en
     license: "propietaria (uso editorial habitual)"
     access: open
     cost: free
-    status: known
+    status: verified_2026-06-28
+    notes: >
+      Agencia espacial europea (sección Astronomía). OJO: el feed genérico
+      (`/rssfeed/Our_Activities`, alias "Top News") está CONGELADO en enero 2026;
+      se usa el temático `Space_Science`, que sí está vivo (verificado 2026-06-28).
+      Feed alterno fresco: `/rssfeed/Our_Activities/Human_Spaceflight`.
+
+  - id: jaxa
+    name: "JAXA — Japan Aerospace Exploration Agency"
+    publisher: "JAXA"
+    tier: 1
+    type: rss
+    url: "https://global.jaxa.jp/rss/press.rdf"
+    topics: [astronomia, space]
+    lang: en
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Agencia espacial japonesa (sección Astronomía). Feed de notas de prensa en
+      inglés (RDF). Algunas notas vienen marcadas "Japanese Only"; el resto en
+      inglés. Los feeds `_e.rdf`/`global.../press_e.rdf` dan 404: el bueno es
+      `/rss/press.rdf`.
+
+  - id: cnes
+    name: "CNES — Centre National d'Études Spatiales"
+    publisher: "CNES"
+    tier: 1
+    type: rss
+    url: "https://cnes.fr/rss.xml"
+    topics: [astronomia, space]
+    lang: fr
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Agencia espacial francesa (sección Astronomía). Se ingiere el feed NATIVO
+      (francés), que está fresco; la versión en inglés (`/en/rss.xml`) va atrasada
+      (enero 2026). El pipeline traduce al español en build-time.
+
+  - id: asi
+    name: "ASI — Agenzia Spaziale Italiana"
+    publisher: "ASI"
+    tier: 1
+    type: rss
+    url: "https://www.asi.it/feed/"
+    topics: [astronomia, space]
+    lang: it
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Agencia espacial italiana (sección Astronomía). Se ingiere el feed NATIVO
+      (italiano), fresco y con buen volumen; la versión en inglés (`/en/feed/`)
+      va un poco atrasada. El pipeline traduce al español en build-time.
+
+  - id: uksa
+    name: "UKSA — UK Space Agency"
+    publisher: "UK Space Agency (GOV.UK)"
+    tier: 1
+    type: atom
+    url: "https://www.gov.uk/government/organisations/uk-space-agency.atom"
+    topics: [astronomia, space]
+    lang: en
+    license: "Open Government Licence (OGL) v3.0"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Agencia espacial británica (sección Astronomía). Feed Atom oficial servido
+      por GOV.UK (actividad de la organización: noticias, avisos, publicaciones).
+      Licencia abierta OGL.
+
+  # --- Agencias espaciales SIN feed oficial usable (probadas 2026-06-28) -------
+  # Documentadas para constancia: hoy NO entran a la sección Astronomía porque no
+  # exponen un cable RSS/Atom legible. Reevaluar si publican uno:
+  #   - CNSA (China):       solo HTML; sin RSS (cnsa.gov.cn).
+  #   - Roscosmos (Rusia):  403 Forbidden en todos los endpoints; cert SSL
+  #                         expirado en el subdominio `en`. Bloqueado.
+  #   - ISRO (India):       sin RSS; solo HTML (isro.gov.in/Press.html).
+  #   - DLR (Alemania):     sitio Plone 6; el endpoint `@@rss` responde vacío.
+  #   - CSA/ASC (Canadá):   sin RSS directo; la API de canada.ca devuelve vacío.
+  #   - KASA (Corea):       agencia nueva (2024); sin RSS, solo HTML.
+
+# --- Tier 1/2 — Astronomía chilena (fuentes prioritarias de la sección) ------
+
+  - id: alma
+    name: "ALMA Observatory"
+    publisher: "Joint ALMA Observatory (ESO/NAOJ/NRAO)"
+    tier: 1
+    type: rss
+    url: "https://www.almaobservatory.org/en/feed/"
+    topics: [astronomia]
+    lang: en
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Observatorio ALMA (Atacama, Chile). Feed en INGLÉS (el más fresco); el
+      pipeline traduce al español. El feed en español (`/es/feed/`) existe pero
+      va un poco más atrasado. WordPress.
+
+  - id: cata
+    name: "CATA — Centro de Astrofísica y Tecnologías Afines"
+    publisher: "CATA (U. de Chile + UC + UDEC + UDP + UNAB)"
+    tier: 2
+    type: rss
+    url: "https://cata.cl/feed/"
+    topics: [astronomia]
+    lang: es
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Centro de excelencia en astrofísica chileno. Feed en español nativo.
+      WordPress.
+
+  - id: sochias
+    name: "SOCHIAS — Sociedad Chilena de Astronomía"
+    publisher: "Sociedad Chilena de Astronomía"
+    tier: 2
+    type: rss
+    url: "https://sochias.cl/feed/"
+    topics: [astronomia]
+    lang: es
+    license: "propietaria (uso editorial habitual)"
+    access: open
+    cost: free
+    status: verified_2026-06-28
+    notes: >
+      Sociedad científica chilena sin fines de lucro. Feed en español nativo.
+      WordPress.
 
   - id: eurekalert
     name: "EurekAlert!"

@@ -54,6 +54,9 @@ TOPIC_CONFIG: dict[str, dict] = {
     # nacionales son RSS pass-through + google_news_nacional (consulta `site:`),
     # ambas atadas al tema vía `topics: [nacional]` en sources.yaml.
     "nacional":       {},
+    # Astronomía: como `nacional`, las fuentes oficiales (agencias, ALMA, CATA,
+    # SOCHIAS) publican solo contenido relevante. Config vacía = pass-through.
+    "astronomia":     {},
 }
 
 # Palabras clave por tema (bilingüe ES/EN, sin tildes) para filtrar el ruido de
