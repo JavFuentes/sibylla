@@ -10,7 +10,16 @@ import pytest
 
 from sibylla.models import NewsItem
 from sibylla.web import (
-    _agrupar, _assert_min_items, _fecha, _instante, _select_social, _snippet, _tarjeta,
+    STELLAR_NEWS_SCHEMA,
+    _agrupar,
+    _assert_min_items,
+    _card_id,
+    _fecha,
+    _instante,
+    _select_social,
+    _snippet,
+    _tarjeta,
+    build_stellar_news_payload,
 )
 
 # --- helpers ---------------------------------------------------------------
@@ -24,11 +33,11 @@ TOPIC_LABELS = {"ai": "Inteligencia artificial", "space": "Espacio",
 
 
 def _item(title="T", url="https://x.com", source_name="S", tier=2,
-          topics=None, published=FECHA, summary="", image=None):
+          topics=None, published=FECHA, summary="", image=None, source_id="test"):
     if topics is None:
         topics = ["ai"]
     return NewsItem(
-        title=title, url=url, source_id="test", source_name=source_name,
+        title=title, url=url, source_id=source_id, source_name=source_name,
         tier=tier, topics=topics, published=published,
         summary=summary, image=image,
     )
@@ -188,6 +197,13 @@ def test_tarjeta_propaga_image():
     assert card["image"] == "https://cdn.example.com/x.jpg"
 
 
+def test_tarjeta_incluye_id_estable():
+    it = _item(url="https://example.com/noticia")
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES)
+    assert card["id"] == _card_id(it)
+    assert card["id"].startswith("n-")
+
+
 def test_tarjeta_image_placeholder_cuando_no_hay():
     it = _item()
     assert it.image is None
@@ -244,6 +260,65 @@ def test_assert_min_items_con_min_n_custom():
     items = [_item()]
     with pytest.raises(ValueError, match="al menos 3"):
         _assert_min_items(items, min_n=3)
+
+
+# ---------------------------------------------------------------------------
+# Contrato Stellar-View
+# ---------------------------------------------------------------------------
+def test_stellar_news_payload_prefiere_noticia_con_imagen():
+    sin_imagen = _item(title="Sin imagen", url="https://example.com/a", image=None)
+    con_imagen = _item(
+        title="Con imagen",
+        url="https://example.com/b",
+        image="https://cdn.example.com/b.jpg",
+        source_id="nasa",
+        source_name="NASA",
+        tier=1,
+    )
+    payload = build_stellar_news_payload(
+        [sin_imagen, con_imagen],
+        site_url="https://sibylla.cl",
+        generated_at=FECHA,
+        translate=False,
+    )
+
+    assert payload["schema"] == STELLAR_NEWS_SCHEMA
+    assert payload["featured"]["original_url"] == "https://example.com/b"
+    assert payload["featured"]["image_url"] == "https://cdn.example.com/b.jpg"
+    assert payload["featured"]["has_real_image"] is True
+    assert payload["featured"]["sibylla_url"].startswith("https://sibylla.cl/index.html#n-")
+
+
+def test_stellar_news_payload_sin_imagen_publica_primera_y_marca_placeholder():
+    primero = _item(title="Primero", url="https://example.com/a", image=None)
+    segundo = _item(title="Segundo", url="https://example.com/b", image=None)
+    payload = build_stellar_news_payload(
+        [primero, segundo],
+        site_url="https://sibylla.cl",
+        generated_at=FECHA,
+        translate=False,
+    )
+
+    assert payload["featured"]["original_url"] == "https://example.com/a"
+    assert payload["featured"]["image_url"] is None
+    assert payload["featured"]["has_real_image"] is False
+
+
+def test_stellar_news_payload_expone_titulos_en_tres_idiomas():
+    it = _item(title="Original title", url="https://example.com/a")
+    payload = build_stellar_news_payload(
+        [it],
+        site_url="https://sibylla.cl",
+        generated_at=FECHA,
+        translations={it.dedup_key: {"title": "Titulo traducido"}},
+        translate=False,
+    )
+
+    assert payload["featured"]["title"] == {
+        "es": "Titulo traducido",
+        "en": "Original title",
+        "it": "Original title",
+    }
 
 
 # ---------------------------------------------------------------------------

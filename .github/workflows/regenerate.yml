@@ -152,6 +152,9 @@ jobs:
           PUBLICOS=(web/*.html)
           echo "→ Páginas públicas a subir: ${PUBLICOS[*]}"
 
+          JSONS=(web/*.json)
+          echo "→ JSON públicos a subir: ${JSONS[*]}"
+
           # Assets estáticos (favicons, iconos, manifest): se derivan de static/
           # para que añadir un archivo allí lo despliegue sin tocar este workflow.
           ASSETS=()
@@ -163,7 +166,7 @@ jobs:
           echo "→ Assets estáticos a subir: ${ASSETS[*]:-(ninguno)}"
 
           probar_ssh()     { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo 'SSH OK'"; }
-          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" "${ASSETS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
+          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" "${JSONS[@]}" "${ASSETS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
           crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
           subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }
           subir_xusage()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_usage.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json"; }

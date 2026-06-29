@@ -19,6 +19,8 @@ archivo de traducción del español (locales/es.json).
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import random as _random
 from datetime import datetime, timezone
 from pathlib import Path
@@ -46,6 +48,11 @@ OG_LOCALE: dict[str, str] = {"es": "es_CL", "en": "en_US", "it": "it_IT", "pt": 
 
 # Máximo de medios "También en" que se listan en una tarjeta; el resto se resume como "+N".
 _RELATED_CAP = 3
+
+# Archivo publico consumido por Stellar-View.
+STELLAR_NEWS_FILE = "stellar-news.json"
+STELLAR_NEWS_SCHEMA = "cl.sibylla.stellar_news.v1"
+STELLAR_NEWS_LANGS = ("es", "en", "it")
 
 # Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
 SOCIAL_SOURCE_IDS: set[str] = {"x_twitter", "mastodon", "bluesky"}
@@ -365,6 +372,20 @@ def _snippet(texto: str, limite: int = 220) -> str:
     return corte + "…"
 
 
+def _card_id(it: NewsItem) -> str:
+    """Id estable y seguro para anchors publicos por noticia."""
+    digest = hashlib.sha256(it.dedup_key.encode("utf-8")).hexdigest()[:12]
+    return f"n-{digest}"
+
+
+def _iso(dt: datetime | None) -> str | None:
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _label(topic: str, topic_labels: dict[str, str]) -> str:
     return topic_labels.get(topic, topic.replace("_", " ").capitalize())
 
@@ -392,6 +413,7 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     if network == "x_twitter":
         network = "x"  # el locale usa la clave net_x (no net_x_twitter)
     return {
+        "id": _card_id(it),
         "url": it.url,
         "title": title,
         "source_name": it.source_name,
@@ -515,6 +537,96 @@ def _render_jsonld(site_url: str, description: str,
         )
 
     return "\n".join(partes)
+
+
+def _build_stellar_titles(
+    it: NewsItem,
+    translations: dict | None,
+    *,
+    translate: bool,
+    tracker: list[dict] | None = None,
+) -> dict[str, str]:
+    """Titulos localizados para la tarjeta de Stellar-View.
+
+    Si no hay LLM/cache disponible, cada idioma cae al titulo original para que
+    el contrato JSON nunca quede incompleto.
+    """
+    titles = {lang: it.title for lang in STELLAR_NEWS_LANGS}
+    card = {"id": it.dedup_key, "title": it.title, "snippet": _snippet(it.summary)}
+
+    if translations and it.dedup_key in translations:
+        titles["es"] = translations[it.dedup_key].get("title") or it.title
+
+    if not translate:
+        return titles
+
+    cache = load_cache()
+    for lang in STELLAR_NEWS_LANGS:
+        if lang == "es" and translations and it.dedup_key in translations:
+            continue
+        translated = translate_cards([card], lang, cache, tracker=tracker).get(it.dedup_key)
+        if translated and translated.get("title"):
+            titles[lang] = translated["title"]
+    save_cache(cache)
+    return titles
+
+
+def build_stellar_news_payload(
+    astro_items: list[NewsItem],
+    *,
+    site_url: str,
+    generated_at: datetime,
+    translations: dict | None = None,
+    translate: bool = True,
+    tracker: list[dict] | None = None,
+) -> dict:
+    """Contrato publico que consume Stellar-View.
+
+    Selecciona primero una noticia de Astronomia con imagen real. Si ninguna la
+    trae, publica la primera y deja ``image_url`` en null para que la app use su
+    placeholder local.
+    """
+    featured = next((it for it in astro_items if it.image), None)
+    if featured is None and astro_items:
+        featured = astro_items[0]
+
+    payload = {
+        "schema": STELLAR_NEWS_SCHEMA,
+        "generated_at": _iso(generated_at),
+        "featured": None,
+    }
+    if featured is None:
+        return payload
+
+    anchor = _card_id(featured)
+    payload["featured"] = {
+        "id": anchor,
+        "section": "astronomia",
+        "title": _build_stellar_titles(
+            featured,
+            translations,
+            translate=translate,
+            tracker=tracker,
+        ),
+        "image_url": featured.image,
+        "has_real_image": bool(featured.image),
+        "sibylla_url": f"{site_url}/index.html#{anchor}",
+        "original_url": featured.url,
+        "canonical_url": featured.canonical_url,
+        "source": {
+            "id": featured.source_id,
+            "name": featured.source_name,
+            "tier": featured.tier,
+        },
+        "published_at": _iso(featured.published),
+    }
+    return payload
+
+
+def _write_stellar_news(payload: dict) -> Path:
+    out = SITE_DIR / STELLAR_NEWS_FILE
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return out
 
 
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
@@ -771,15 +883,24 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     out.write_text(html, encoding="utf-8")
     paths.append(out)
 
+    # JSON publico para Stellar-View: una noticia destacada de Astronomia.
+    ahora = datetime.now(timezone.utc)
+    site_url = get_site_url()
+    stellar_payload = build_stellar_news_payload(
+        astro_top,
+        site_url=site_url,
+        generated_at=ahora,
+        translations=translations,
+        translate=translate,
+        tracker=translate_tracker,
+    )
+    paths.append(_write_stellar_news(stellar_payload))
+
     # Assets estáticos (favicons, iconos, manifest) → se publican en la raíz.
     paths.extend(_copy_static_assets())
 
     # Archivos SEO auxiliares.
-    ahora = datetime.now(timezone.utc)
-    site_url = get_site_url()
     paths.append(_write_robots(site_url))
     paths.append(_write_sitemap(site_url, ahora.strftime("%Y-%m-%d")))
 
     return paths
-
-

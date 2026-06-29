@@ -43,7 +43,7 @@
 </span>
 {%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
-<article class="carta" style="--sello:{{ c.seal_color }};">
+<article id="{{ c.id }}" class="carta" style="--sello:{{ c.seal_color }};">
   {% if c.image %}<div class="carta-img"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();"></div>{% else %}<div class="carta-img ph" aria-hidden="true"></div>{% endif %}
   <h4>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
@@ -301,10 +301,13 @@
   article.carta{ position:relative; background:var(--panel); border:1px solid var(--panel-borde);
     border-radius:var(--radio); padding:22px 24px 20px; backdrop-filter:blur(6px);
     transition:.25s; overflow:hidden; }
+  article.carta{ scroll-margin-top:110px; }
   article.carta::before{ content:''; position:absolute; inset:0 auto 0 0; width:2px;
     background:linear-gradient(180deg, var(--sello,#D9B85F), transparent); opacity:.7; }
   article.carta:hover{ border-color:rgba(242,221,147,.5); transform:translateY(-3px);
     box-shadow:0 22px 50px -26px rgba(217,184,95,.45), inset 0 0 30px rgba(217,184,95,.05); }
+  article.carta:target{ border-color:var(--oro-claro);
+    box-shadow:0 0 0 1px rgba(242,221,147,.72), 0 24px 60px -20px rgba(217,184,95,.7); }
   article.carta.futura{ --sello:var(--cian); }
   article.carta.futura:hover{ border-color:rgba(94,230,224,.5);
     box-shadow:0 22px 50px -26px rgba(94,230,224,.5), inset 0 0 30px rgba(94,230,224,.05); }
@@ -682,6 +685,19 @@
     saveLayout(lay); applyLayout();
   }
 
+  /* Si se entra con #n-..., la tarjeta enlazada debe verse aunque el usuario
+     hubiera ocultado la seccion o reducido el numero de tarjetas. */
+  function revealHashTarget(){
+    var id=window.location.hash ? window.location.hash.slice(1) : '';
+    if(!id) return;
+    var card=document.getElementById(id);
+    if(!card || !card.classList.contains('carta')) return;
+    var bloque=card.closest('.bloque');
+    if(bloque) bloque.style.display='';
+    card.style.display='';
+    setTimeout(function(){ card.scrollIntoView({block:'center'}); }, 0);
+  }
+
   /* ---------- restaurar todo ---------- */
   var restore=document.getElementById('restaurar');
   function customized(){
@@ -712,6 +728,7 @@
   /* ---------- init + binds ---------- */
   applyLayout();
   blocks().forEach(function(b){ var tp=b.dataset.topic; applyCards(tp, cardCountFor(tp)); });
+  revealHashTarget();
 
   CONT.addEventListener('click', function(e){
     var btn=e.target.closest ? e.target.closest('button') : null;
@@ -724,6 +741,7 @@
     else if(btn.classList.contains('sec-del'))  removeBlock(topic);
   });
   if(restore) restore.addEventListener('click', restoreAll);
+  window.addEventListener('hashchange', revealHashTarget);
 })();
 /* Acordeón "Resumen": despliega/oculta el panel dentro de la tarjeta. */
 (function(){
