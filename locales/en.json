@@ -86,8 +86,6 @@
     "net_x": "X",
     "astro_heading": "Astronomy",
     "astro_subtitle": "News from Chile's observatories and the world's space agencies",
-    "astro_voice": "Sibylla looks up",
-    "astro_voice_text": "What Chile's observatories and major space agencies are publishing. Official sources, no middlemen.",
     "social_house_badge": "Sibylla",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "topics": {

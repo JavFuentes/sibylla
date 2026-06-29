@@ -184,10 +184,10 @@ Tras los temas principales, antes de "Voces de la red", se muestra la sección
   astro se separan de los temáticos normales en `build_all_sites`.
 - `cli.py`: `astronomia` en el default de `--topics`; excluido del digest
   temático (como `nacional`).
-- Plantilla: bloque `#astronomia` (con su apunte) dentro de `#secciones`,
+- Plantilla: bloque `#astronomia` dentro de `#secciones`,
   tras los temas y antes de `#voces` (reordenable/ocultable como los demás).
-- Locales: claves `astro_heading`, `astro_subtitle`, `astro_voice`,
-  `astro_voice_text` y topic `astronomia` en los 4 idiomas.
+- Locales: claves `astro_heading`, `astro_subtitle`
+  y topic `astronomia` en los 4 idiomas.
 - Tests: `tests/test_astronomia.py` (14 casos del selector).
 
 #### Agencias sin feed (documentadas en `sources.yaml`)
