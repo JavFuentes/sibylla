@@ -124,6 +124,30 @@ Cada `.tema` tiene un control `− N +` que el usuario ajusta en el navegador. P
 Los valores por defecto son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
 La sección social usa `data-steps="0,1,2"` (máx. 2 tarjetas). El valor inicial se lee de `data-default`.
 
+### Reordenar / ocultar secciones (cliente)
+
+Cada sección de noticias se renderiza dentro de un `.bloque[data-topic]` (temas,
+astronomía y "Voces de la red", todos hijos del contenedor `#secciones`). En el
+encabezado `.tema`, junto al selector de tarjetas, hay tres botones (`.sec-ctrl`):
+
+- **Subir / bajar** (`.sec-up` / `.sec-down`): mueven el bloque entre sus
+  vecinos **visibles**; las flechas del primero/último visible quedan `disabled`.
+- **Quitar** (`.sec-del`): oculta el bloque (no destructivo).
+
+El orden y la visibilidad persisten en `localStorage` como
+`sibylla_layout = {order:[topic...], hidden:[topic...]}` (separado de
+`sibylla_cards`). Todo es **client-side**: el HTML se sirve completo y el JS del
+pie reordena (`appendChild`) y oculta (`display:none`) sin recargar. El orden
+guardado es robusto a rebuilds: temas ausentes se ignoran y los nuevos se anexan
+al final (orden original como respaldo).
+
+El botón flotante **Restaurar** (`#restaurar`, abajo a la derecha) aparece solo
+cuando hay personalización (orden, ocultos o nº de tarjetas distinto al
+defecto) y, al pulsarlo, borra ambas claves y vuelve todo al estado original.
+
+Textos UI (los 4 locales, por el test de paridad): `sec_up`, `sec_down`,
+`sec_remove`, `sec_restore`.
+
 ### Sección "Astronomía" (agencias espaciales + observatorios)
 
 Tras los temas principales, antes de "Voces de la red", se muestra la sección
@@ -133,14 +157,16 @@ Tras los temas principales, antes de "Voces de la red", se muestra la sección
 
 | Bloque | Fuentes | Tier | Idioma | Lógica |
 |--------|---------|------|--------|--------|
-| **Chilena (prioritaria)** | ALMA, CATA, SOCHIAS | 1–2 | EN→traducir, ES, ES | 1 slot reservado por fuente; cede si >7 días sin novedad |
+| **Chilena (prioritaria)** | ALMA, CATA, SOCHIAS | 1–2 | EN→traducir, ES, ES | 1 slot reservado por fuente; cede si >30 días sin novedad |
 | **Agencias** | NASA, ESA, JAXA, CNES, ASI, UKSA (+ futuras) | 1 | EN/FR/IT→traducir | Máx. 1 por agencia; ganan las más recientes |
 
 #### Algoritmo `_select_astronomia` (ver `web.py`)
 
 1. **Bloque chileno (3 cupos):** por cada fuente prioritaria, toma el ítem más
-   reciente (≤7 días). Si una fuente no tiene nada fresco, cede su cupo a las
-   otras chilenas (pueden mostrar >1 ítem).
+   reciente (≤30 días — estas instituciones publican cada 2–4 semanas). Si una
+   fuente no tiene nada en ese rango, cede su cupo a las otras chilenas (pueden
+   mostrar >1 ítem). Ventanas en `web.py`: `ASTRO_PRIORITY_FRESH_DAYS = 30`
+   (chilenas) y `ASTRO_AGENCY_FRESH_DAYS = 7` (agencias).
 2. **Bloque agencias (3 cupos):** 1 representante por agencia (el más reciente).
    Prefiere ≤7 días; con respaldo de más viejas si no hay suficientes; solo
    repite agencia como último recurso.
@@ -158,7 +184,8 @@ Tras los temas principales, antes de "Voces de la red", se muestra la sección
   astro se separan de los temáticos normales en `build_all_sites`.
 - `cli.py`: `astronomia` en el default de `--topics`; excluido del digest
   temático (como `nacional`).
-- Plantilla: sección `#astronomia` entre `#presente` y `#voces`.
+- Plantilla: bloque `#astronomia` (con su apunte) dentro de `#secciones`,
+  tras los temas y antes de `#voces` (reordenable/ocultable como los demás).
 - Locales: claves `astro_heading`, `astro_subtitle`, `astro_voice`,
   `astro_voice_text` y topic `astronomia` en los 4 idiomas.
 - Tests: `tests/test_astronomia.py` (14 casos del selector).

@@ -33,6 +33,15 @@
   </div>
 </div>
 {%- endmacro %}
+{# Controles de sección: subir / bajar / quitar. La lógica vive en el <script>
+   del pie (orden y visibilidad persisten en localStorage, todo client-side). #}
+{% macro sec_ctrl() -%}
+<span class="sec-ctrl">
+  <button type="button" class="sec-btn sec-up" aria-label="{{ t.sec_up }}" title="{{ t.sec_up }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 10l4-4 4 4"/></svg></button>
+  <button type="button" class="sec-btn sec-down" aria-label="{{ t.sec_down }}" title="{{ t.sec_down }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></button>
+  <button type="button" class="sec-btn sec-del" aria-label="{{ t.sec_remove }}" title="{{ t.sec_remove }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
+</span>
+{%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
 <article class="carta" style="--sello:{{ c.seal_color }};">
   {% if c.image %}<div class="carta-img"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();"></div>{% else %}<div class="carta-img ph" aria-hidden="true"></div>{% endif %}
@@ -197,6 +206,49 @@
     font-size:.78rem; padding:0 3px; line-height:1; transition:color .2s; }
   .card-ctrl-btn:hover{ color:var(--oro-claro); }
   .card-ctrl-val{ color:var(--marfil-2); font-size:.72rem; min-width:1.2em; text-align:center; }
+
+  /* ---- Controles de sección: subir / bajar / quitar ---- */
+  .bloque{ scroll-margin-top:86px; }
+  .bloque-especial{ margin-top:30px; }
+  .tema-ctrls{ display:inline-flex; align-items:center; flex:none; }
+  .sec-ctrl{ display:inline-flex; align-items:center; gap:6px; flex:none;
+    margin-left:10px; padding-left:12px; border-left:1px solid rgba(217,184,95,.18); }
+  .sec-btn{ width:28px; height:28px; flex:none; display:grid; place-items:center; padding:0;
+    border-radius:50%; cursor:pointer; color:var(--marfil-2);
+    background:rgba(217,184,95,.045); border:1px solid rgba(217,184,95,.24);
+    transition:color .2s, border-color .2s, background .2s, transform .2s, box-shadow .2s; }
+  .sec-btn svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.7;
+    stroke-linecap:round; stroke-linejoin:round; display:block; }
+  .sec-btn:hover{ color:var(--oro-claro); border-color:rgba(242,221,147,.6);
+    background:rgba(217,184,95,.13); transform:translateY(-1px);
+    box-shadow:0 6px 16px -8px rgba(217,184,95,.7); }
+  .sec-btn:active{ transform:translateY(0); }
+  .sec-btn.sec-del:hover{ color:#E7A38F; border-color:rgba(224,140,122,.6);
+    background:rgba(224,140,122,.13); box-shadow:0 6px 16px -8px rgba(224,140,122,.6); }
+  .sec-btn[disabled]{ opacity:.22; cursor:default; pointer-events:none; box-shadow:none; transform:none; }
+  .sec-btn:focus-visible{ outline:2px solid rgba(94,230,224,.6); outline-offset:2px; }
+
+  /* ---- Botón flotante: restaurar las secciones a su estado original ---- */
+  .restaurar{ position:fixed; right:24px; bottom:24px; z-index:30;
+    display:inline-flex; align-items:center; gap:9px; padding:11px 18px;
+    font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--oro-claro); cursor:pointer; border-radius:999px;
+    background:rgba(13,19,34,.82); border:1px solid rgba(217,184,95,.4);
+    backdrop-filter:blur(10px);
+    box-shadow:0 12px 34px -12px rgba(0,0,0,.7), 0 0 26px -12px rgba(217,184,95,.5);
+    opacity:0; transform:translateY(10px) scale(.96); pointer-events:none;
+    transition:opacity .3s, transform .3s, border-color .2s, box-shadow .2s, color .2s; }
+  .restaurar svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7;
+    stroke-linecap:round; stroke-linejoin:round; }
+  .restaurar.is-on{ opacity:1; transform:none; pointer-events:auto; }
+  .restaurar:hover{ border-color:var(--oro-claro); color:#F7E9B8; transform:translateY(-2px);
+    box-shadow:0 16px 40px -12px rgba(0,0,0,.75), 0 0 34px -8px rgba(217,184,95,.7); }
+  .restaurar:focus-visible{ outline:2px solid rgba(94,230,224,.6); outline-offset:3px; }
+  @media (prefers-reduced-motion:reduce){
+    .restaurar{ transition:opacity .2s; transform:none; }
+    .restaurar.is-on{ transform:none; }
+    .sec-btn{ transition:color .2s, border-color .2s, background .2s; }
+  }
   .pulso{ width:8px; height:8px; border-radius:50%; background:var(--cian);
     box-shadow:0 0 0 0 rgba(94,230,224,.6); animation:latir 2.4s infinite; }
   @keyframes latir{ 0%{ box-shadow:0 0 0 0 rgba(94,230,224,.5);} 70%{ box-shadow:0 0 0 9px rgba(94,230,224,0);} 100%{ box-shadow:0 0 0 0 rgba(94,230,224,0);} }
@@ -370,8 +422,11 @@
     .carta-img{ margin:-18px -16px 12px; }
     .sello{ width:26px; height:26px; font-size:.66rem; }
     .rejilla{ gap:14px; }
-    .tema{ margin:28px 0 14px; gap:12px; }
+    .tema{ margin:28px 0 14px; gap:8px 12px; flex-wrap:wrap; }
     .tema h3{ font-size:1rem; letter-spacing:.14em; }
+    .tema-ctrls{ flex:0 0 100%; justify-content:flex-end; }
+    .sec-btn{ width:30px; height:30px; }
+    .restaurar{ right:14px; bottom:14px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
     .seccion-titulo{ margin:16px 0 4px; }
     .seccion-titulo p{ font-size:.95rem; }
     .apunte{ flex-direction:column; align-items:flex-start; gap:14px; padding:16px 16px; margin:22px 0; }
@@ -448,64 +503,57 @@
 
   <div class="meandro" aria-hidden="true" style="margin:8px 0;"></div>
 
-  <!-- ===================== PRESENTE ===================== -->
+  <!-- ===================== PRESENTE (secciones reordenables) ===================== -->
   <section id="presente">
 
     {{ apunte(t.observes, observa) }}
 
+    <div id="secciones">
     {% for g in grupos %}
-    <div class="tema" data-topic="{{ g.id }}"><h3>{{ g.label }}</h3><span class="raya"></span>
-    <span class="card-ctrl">
-      <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-      <span class="card-ctrl-val">6</span>
-      <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-    </span></div>
-    <div class="rejilla">
-      {% for c in g.cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
-    </div>
+      <div class="bloque" data-topic="{{ g.id }}">
+        <div class="tema" data-topic="{{ g.id }}"><h3>{{ g.label }}</h3><span class="raya"></span>
+        <span class="tema-ctrls"><span class="card-ctrl">
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+        </span>{{ sec_ctrl() }}</span></div>
+        <div class="rejilla">
+          {% for c in g.cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
+        </div>
+      </div>
     {% endfor %}
-  </section>
 
-  {% if astro_cards %}
-  <div class="meandro" aria-hidden="true" style="margin:20px 0;"></div>
-  <section id="astronomia">
-    {{ apunte(t.astro_voice, t.astro_voice_text, 'neutro') }}
-    <div class="tema" data-topic="astronomia">
-      <h3>{{ t.astro_heading }}</h3>
-      <span class="raya"></span>
-      <span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-        <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-        <span class="card-ctrl-val">6</span>
-        <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-      </span>
-    </div>
-    <div class="rejilla">
-      {% for c in astro_cards %}
-        {{ tarjeta(c, t.also_in) }}
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
+    {% if astro_cards %}
+      <div class="bloque bloque-especial" id="astronomia" data-topic="astronomia">
+        {{ apunte(t.astro_voice, t.astro_voice_text, 'neutro') }}
+        <div class="tema" data-topic="astronomia"><h3>{{ t.astro_heading }}</h3><span class="raya"></span>
+        <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+        </span>{{ sec_ctrl() }}</span></div>
+        <div class="rejilla">
+          {% for c in astro_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
 
-  {% if social_cards %}
-  <div class="meandro" aria-hidden="true" style="margin:20px 0;"></div>
-  <section id="voces">
-    <div class="tema" data-topic="social">
-      <h3>{{ t.social_topic_label }}</h3>
-      <span class="raya"></span>
-      <span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-        <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-        <span class="card-ctrl-val">6</span>
-        <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-      </span>
+    {% if social_cards %}
+      <div class="bloque bloque-especial" id="voces" data-topic="social">
+        <div class="tema" data-topic="social"><h3>{{ t.social_topic_label }}</h3><span class="raya"></span>
+        <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+        </span>{{ sec_ctrl() }}</span></div>
+        <div class="rejilla">
+          {% for c in social_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
     </div>
-    <div class="rejilla">
-      {% for c in social_cards %}
-        {{ tarjeta(c, t.also_in) }}
-      {% endfor %}
-    </div>
+
   </section>
-  {% endif %}
 
 </main>
 
@@ -521,63 +569,151 @@
     <p class="lema">{{ t.footer_motto }}</p>
   </div>
 </footer>
+
+<button type="button" id="restaurar" class="restaurar" aria-hidden="true" tabindex="-1" title="{{ t.sec_restore }}">
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 8a5.4 5.4 0 1 1-1.55-3.8"/><path d="M13.6 2.4V5H11"/></svg>
+  <span>{{ t.sec_restore }}</span>
+</button>
+
 <script>
-/* Selector de tarjetas por tema. Steps configurables vía data-steps="0,2,4,6"
-   (por defecto) o data-steps="0,1,2" para la sección social. */
+/* Controles de sección + selector de tarjetas. Todo client-side: el HTML se
+   sirve completo y este script lo reordena/oculta. Persistencia en localStorage:
+     sibylla_cards  -> { topic: nº de tarjetas visibles }
+     sibylla_layout -> { order:[topic...], hidden:[topic...] } */
 (function(){
+  var CONT=document.getElementById('secciones');
+  if(!CONT) return;
   var defaultSteps=[0,2,4,6];
+
+  /* ---------- almacenamiento ---------- */
+  function jget(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(_){ return null; } }
+  function jset(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(_){} }
+  function loadCards(){ return jget('sibylla_cards')||{}; }
+  function saveCards(o){ jset('sibylla_cards',o); }
+  function loadLayout(){ var l=jget('sibylla_layout')||{}; return {order:l.order||[], hidden:l.hidden||[]}; }
+  function saveLayout(l){ jset('sibylla_layout',l); }
+
+  /* ---------- bloques ---------- */
+  function blocks(){
+    return Array.prototype.filter.call(CONT.children, function(el){
+      return el.classList && el.classList.contains('bloque'); });
+  }
+  var ORIGINAL=blocks().map(function(b){ return b.dataset.topic; });
+
+  /* ---------- selector de tarjetas (por tema) ---------- */
+  function temaOf(topic){ return CONT.querySelector('.tema[data-topic="'+topic+'"]'); }
+  function ctrlOf(topic){ var t=temaOf(topic); return t?t.querySelector('.card-ctrl'):null; }
   function getSteps(ctrl){
-    var ds=ctrl.getAttribute('data-steps');
+    var ds=ctrl && ctrl.getAttribute('data-steps');
     return ds ? ds.split(',').map(function(v){return parseInt(v,10);}) : defaultSteps;
   }
-  function load(){ try{ return JSON.parse(localStorage.getItem('sibylla_cards')||'{}'); }catch(_){ return {}; } }
-  function save(o){ try{ localStorage.setItem('sibylla_cards',JSON.stringify(o)); }catch(_){} }
-  function apply(topic, n){
-    var rej=document.querySelector('.tema[data-topic="'+topic+'"]');
-    if(!rej)return;
-    rej=rej.nextElementSibling;
-    if(!rej||!rej.classList.contains('rejilla'))return;
+  function deft(ctrl, steps){
+    var d=ctrl?parseInt(ctrl.getAttribute('data-default'),10):NaN;
+    return isNaN(d) ? steps[steps.length-1] : d;
+  }
+  function applyCards(topic, n){
+    var t=temaOf(topic); if(!t) return;
+    var rej=t.nextElementSibling;
+    if(!rej||!rej.classList.contains('rejilla')) return;
     var cards=rej.querySelectorAll('.carta');
     for(var i=0;i<cards.length;i++) cards[i].style.display=i<n?'':'none';
+    var val=t.querySelector('.card-ctrl-val'); if(val) val.textContent=n;
   }
-  function updateVal(topic, n){
-    var tema=document.querySelector('.tema[data-topic="'+topic+'"]');
-    if(!tema)return;
-    var val=tema.querySelector('.card-ctrl-val');
-    if(val) val.textContent=n;
+  function cardCountFor(topic){
+    var ctrl=ctrlOf(topic); var steps=getSteps(ctrl);
+    var c=loadCards(); return c[topic]!==undefined ? c[topic] : deft(ctrl,steps);
   }
-  function step(btn, dir){
-    var tema=btn.closest('.tema');
-    if(!tema)return;
-    var ctrl=tema.querySelector('.card-ctrl');
-    var steps=ctrl ? getSteps(ctrl) : defaultSteps;
-    var topic=tema.dataset.topic;
-    var cur=load()[topic];
-    var deftDefault=ctrl ? parseInt(ctrl.getAttribute('data-default'),10) : 6;
-    if(isNaN(deftDefault)) deftDefault=steps[steps.length-1];
-    if(cur===undefined) cur=deftDefault;
-    var idx=steps.indexOf(cur);
-    if(idx<0) idx=steps.indexOf(deftDefault);
-    if(idx<0) idx=steps.length-1;
+  function stepCards(topic, dir){
+    var ctrl=ctrlOf(topic); var steps=getSteps(ctrl); var d=deft(ctrl,steps);
+    var cur=cardCountFor(topic);
+    var idx=steps.indexOf(cur); if(idx<0) idx=steps.indexOf(d); if(idx<0) idx=steps.length-1;
     var next=steps[Math.min(steps.length-1, Math.max(0, idx+dir))];
-    var o=load(); o[topic]=next; save(o);
-    apply(topic, next); updateVal(topic, next);
+    var c=loadCards(); c[topic]=next; saveCards(c);
+    applyCards(topic, next); reflectRestore();
   }
-  /* Inicializar */
-  var saved=load();
-  document.querySelectorAll('.tema[data-topic]').forEach(function(tema){
-    var topic=tema.dataset.topic;
-    var ctrl=tema.querySelector('.card-ctrl');
-    var steps=ctrl ? getSteps(ctrl) : defaultSteps;
-    var deftDefault=ctrl ? parseInt(ctrl.getAttribute('data-default'),10) : 6;
-    if(isNaN(deftDefault)) deftDefault=steps[steps.length-1];
-    var n=saved[topic]!==undefined?saved[topic]:deftDefault;
-    apply(topic, n); updateVal(topic, n);
+
+  /* ---------- orden / visibilidad ---------- */
+  function visibleBlocks(){ return blocks().filter(function(b){ return b.style.display!=='none'; }); }
+  function applyLayout(){
+    var lay=loadLayout();
+    var present=blocks(); var byTopic={};
+    present.forEach(function(b){ byTopic[b.dataset.topic]=b; });
+    var seq=[];
+    lay.order.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
+    ORIGINAL.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
+    present.forEach(function(b){ if(seq.indexOf(b.dataset.topic)<0) seq.push(b.dataset.topic); });
+    seq.forEach(function(tp){ CONT.appendChild(byTopic[tp]); });
+    present.forEach(function(b){ b.style.display = lay.hidden.indexOf(b.dataset.topic)>=0 ? 'none' : ''; });
+    updateArrows(); reflectRestore();
+  }
+  function updateArrows(){
+    blocks().forEach(function(b){
+      var up=b.querySelector('.sec-up'), dn=b.querySelector('.sec-down');
+      if(up) up.disabled=false; if(dn) dn.disabled=false;
+    });
+    var vis=visibleBlocks();
+    if(vis.length){
+      var up=vis[0].querySelector('.sec-up'); if(up) up.disabled=true;
+      var dn=vis[vis.length-1].querySelector('.sec-down'); if(dn) dn.disabled=true;
+    }
+  }
+  function moveBlock(topic, dir){
+    var ids=blocks().map(function(b){return b.dataset.topic;});
+    var vis=visibleBlocks().map(function(b){return b.dataset.topic;});
+    var vpos=vis.indexOf(topic); if(vpos<0) return;
+    var target=vis[vpos+dir]; if(target===undefined) return;
+    var i=ids.indexOf(topic), j=ids.indexOf(target);
+    ids[i]=target; ids[j]=topic;
+    var lay=loadLayout(); lay.order=ids; saveLayout(lay); applyLayout();
+  }
+  function removeBlock(topic){
+    var lay=loadLayout();
+    if(lay.hidden.indexOf(topic)<0) lay.hidden.push(topic);
+    saveLayout(lay); applyLayout();
+  }
+
+  /* ---------- restaurar todo ---------- */
+  var restore=document.getElementById('restaurar');
+  function customized(){
+    var lay=loadLayout();
+    if(lay.hidden.length) return true;
+    var ids=blocks().map(function(b){return b.dataset.topic;});
+    for(var i=0;i<ids.length;i++){ if(ids[i]!==ORIGINAL[i]) return true; }
+    var c=loadCards();
+    for(var k in c){ if(c.hasOwnProperty(k)){
+      var ctrl=ctrlOf(k); if(c[k]!==deft(ctrl,getSteps(ctrl))) return true;
+    }}
+    return false;
+  }
+  function reflectRestore(){
+    if(!restore) return;
+    var on=customized();
+    restore.classList.toggle('is-on', on);
+    restore.setAttribute('aria-hidden', on?'false':'true');
+    restore.tabIndex = on?0:-1;
+  }
+  function restoreAll(){
+    try{ localStorage.removeItem('sibylla_layout'); localStorage.removeItem('sibylla_cards'); }catch(_){}
+    applyLayout();
+    blocks().forEach(function(b){ var tp=b.dataset.topic; applyCards(tp, cardCountFor(tp)); });
+    reflectRestore();
+  }
+
+  /* ---------- init + binds ---------- */
+  applyLayout();
+  blocks().forEach(function(b){ var tp=b.dataset.topic; applyCards(tp, cardCountFor(tp)); });
+
+  CONT.addEventListener('click', function(e){
+    var btn=e.target.closest ? e.target.closest('button') : null;
+    if(!btn || !CONT.contains(btn)) return;
+    var bloque=btn.closest('.bloque'); if(!bloque) return;
+    var topic=bloque.dataset.topic;
+    if(btn.classList.contains('card-ctrl-btn')) stepCards(topic, parseInt(btn.dataset.dir,10));
+    else if(btn.classList.contains('sec-up'))  moveBlock(topic, -1);
+    else if(btn.classList.contains('sec-down')) moveBlock(topic, 1);
+    else if(btn.classList.contains('sec-del'))  removeBlock(topic);
   });
-  /* Vincular botones */
-  document.querySelectorAll('.card-ctrl-btn').forEach(function(btn){
-    btn.addEventListener('click',function(){ step(this, parseInt(this.dataset.dir)); });
-  });
+  if(restore) restore.addEventListener('click', restoreAll);
 })();
 /* Acordeón "Resumen": despliega/oculta el panel dentro de la tarjeta. */
 (function(){

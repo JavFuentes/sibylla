@@ -156,7 +156,12 @@ ASTRO_PRIORITY_IDS: set[str] = {"alma", "cata", "sochias"}
 ASTRO_AGENCY_IDS: set[str] = {"nasa", "esa", "jaxa", "cnes", "asi", "uksa"}
 ASTRO_SOURCE_IDS: set[str] = ASTRO_PRIORITY_IDS | ASTRO_AGENCY_IDS
 ASTRO_MAX_TOTAL = 6
-ASTRO_FRESH_DAYS = 7
+# Ventanas de frescura distintas por bloque: las fuentes chilenas (observatorios/
+# instituciones) publican mucho menos seguido que las agencias, así que su slot
+# reservado tolera contenido más viejo (30 días) antes de ceder. Las agencias
+# compiten por pocos cupos y se quiere lo más fresco (7 días).
+ASTRO_PRIORITY_FRESH_DAYS = 30
+ASTRO_AGENCY_FRESH_DAYS = 7
 
 
 def _is_astro(item: NewsItem) -> bool:
@@ -167,7 +172,7 @@ def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
     """Selecciona 6 tarjetas para la sección Astronomía.
 
     Bloque chileno (3 cupos): ALMA / CATA / SOCHIAS. 1 reservada por fuente
-    si tiene contenido de ≤7 días; si no, cede su cupo a las otras chilenas.
+    si tiene contenido de ≤30 días; si no, cede su cupo a las otras chilenas.
 
     Bloque agencias (3 cupos): la más reciente por agencia (≤7 días primero;
     respaldo con más viejas; máx. 1 por agencia salvo imposible).
@@ -181,7 +186,9 @@ def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
 
     TOTAL = ASTRO_MAX_TOTAL
     BLOCK = TOTAL // 2  # 3 por bloque
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ASTRO_FRESH_DAYS)
+    now = datetime.now(timezone.utc)
+    pri_cutoff = now - timedelta(days=ASTRO_PRIORITY_FRESH_DAYS)  # chilenas: 30 días
+    ag_cutoff = now - timedelta(days=ASTRO_AGENCY_FRESH_DAYS)     # agencias: 7 días
 
     # Agrupar por fuente y ordenar por recencia
     pri_by_src: dict[str, list[NewsItem]] = {}
@@ -198,11 +205,11 @@ def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
 
     used: set[int] = set()
 
-    # --- Bloque chileno: 1 reservada por fuente (fresca), cede si no ---
+    # --- Bloque chileno: 1 reservada por fuente (≤30 días), cede si no ---
     chilenas: list[NewsItem] = []
     for sid in ("alma", "cata", "sochias"):
         cands = pri_by_src.get(sid, [])
-        fresh = [it for it in cands if _recency(it) >= cutoff]
+        fresh = [it for it in cands if _recency(it) >= pri_cutoff]
         pick = fresh[0] if fresh else None
         if pick:
             chilenas.append(pick)
@@ -212,7 +219,7 @@ def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
     if len(chilenas) < BLOCK:
         pool = sorted(
             [it for lst in pri_by_src.values() for it in lst
-             if id(it) not in used and _recency(it) >= cutoff],
+             if id(it) not in used and _recency(it) >= pri_cutoff],
             key=_recency, reverse=True)
         for it in pool:
             if len(chilenas) >= BLOCK:
@@ -226,7 +233,7 @@ def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
     fresh_ag: list[tuple[NewsItem, str]] = []
     for sid, cands in ag_by_src.items():
         for it in cands:
-            if _recency(it) >= cutoff and id(it) not in used:
+            if _recency(it) >= ag_cutoff and id(it) not in used:
                 fresh_ag.append((it, sid))
                 break
     fresh_ag.sort(key=lambda x: _recency(x[0]), reverse=True)

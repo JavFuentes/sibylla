@@ -102,13 +102,13 @@ class TestSelectAstronomia:
         sel = _select_astronomia(items, _SEED)
         assert len(sel) == ASTRO_MAX_TOTAL
 
-    def test_stale_chilena_cedes_reserved_slot(self, _desc="fuente >7d no ocupa slot reservado"):
-        """Si una chilena no tiene nada de ≤7 días, no ocupa su slot reservado
+    def test_stale_chilena_cedes_reserved_slot(self, _desc="fuente >30d no ocupa slot reservado"):
+        """Si una chilena no tiene nada de ≤30 días, no ocupa su slot reservado
         en la fase principal; puede entrar como relleno si no hay alternativa."""
         items = [
             _item("alma", hours_ago=2),
             _item("cata", hours_ago=4),
-            _item("sochias", hours_ago=200),  # >7 días
+            _item("sochias", hours_ago=31 * 24),  # >30 días
             _item("nasa", hours_ago=1),
             _item("esa", hours_ago=3),
             _item("jaxa", hours_ago=5),
@@ -117,9 +117,30 @@ class TestSelectAstronomia:
         sel = _select_astronomia(items, _SEED)
         assert len(sel) == ASTRO_MAX_TOTAL
         sids = [it.source_id for it in sel]
-        assert "sochias" not in sids, "con suficientes agencias, sochias vieja no entra"
+        assert "sochias" not in sids, "con suficientes agencias, sochias vieja (>30d) no entra"
         # Slot 1 sigue siendo chilena (alma o cata, las frescas)
         assert sel[0].source_id in ASTRO_PRIORITY_IDS
+
+    def test_chilenas_within_30_days_appear(self, _desc="escenario real: chilenas a 13-24 días aparecen"):
+        """Regresión: con la ventana de 30 días, fuentes chilenas de 1-3 semanas
+        SÍ ocupan su slot reservado aunque las agencias tengan algo más fresco.
+        (Antes, con ventana de 7 días, las chilenas desaparecían por completo.)"""
+        items = [
+            _item("alma", hours_ago=24 * 24),     # 24 días
+            _item("cata", hours_ago=13 * 24),     # 13 días
+            _item("sochias", hours_ago=18 * 24),  # 18 días
+            _item("nasa", hours_ago=2),
+            _item("esa", hours_ago=3),
+            _item("jaxa", hours_ago=4),
+            _item("asi", hours_ago=5),
+            _item("uksa", hours_ago=6),
+        ]
+        sel = _select_astronomia(items, _SEED)
+        sids = [it.source_id for it in sel]
+        chilenas = [s for s in sids if s in ASTRO_PRIORITY_IDS]
+        assert len(chilenas) == 3, "las 3 chilenas (≤30d) ocupan sus slots reservados"
+        assert sel[0].source_id in ASTRO_PRIORITY_IDS, "slot 1 = chilena más reciente"
+        assert sel[0].source_id == "cata", "cata (13d) es la chilena más reciente"
 
     def test_crossfill_agencies_to_chilenas(self):
         """Si no hay suficientes chilenas frescas, las agencias rellenan."""
