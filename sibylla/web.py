@@ -571,24 +571,77 @@ def _build_stellar_titles(
     return titles
 
 
+def _build_stellar_summary(
+    it: NewsItem,
+    resumen_es: str | None,
+    *,
+    translate: bool,
+    tracker: list[dict] | None = None,
+) -> dict[str, str]:
+    """Resumen localizado (es/en/it) para la pantalla de Stellar-View.
+
+    El resumen base en español viene de ``resumen.py``; las traducciones a en/it
+    reutilizan ``translate_cards`` con el mismo cache compartido de traducciones.
+    El id ``{dedup_key}#sum`` evita colisionar con la entrada del titulo en cache.
+    Si no hay resumen base o falla la traduccion, ese idioma se omite y la app
+    degrada al español. Nunca rompe el build.
+    """
+    if not resumen_es:
+        return {}
+    summary: dict[str, str] = {"es": resumen_es}
+    if not translate:
+        return summary
+
+    cache = load_cache()
+    sum_id = f"{it.dedup_key}#sum"
+    for lang in STELLAR_NEWS_LANGS:
+        if lang == "es":
+            continue
+        # El resumen va en "title" porque _parse_response descarta filas sin el.
+        card = {"id": sum_id, "title": resumen_es, "snippet": ""}
+        got = translate_cards([card], lang, cache, tracker=tracker).get(sum_id)
+        if got and got.get("title"):
+            summary[lang] = got["title"]
+    save_cache(cache)
+    return summary
+
+
+def _select_stellar_featured(
+    astro_items: list[NewsItem],
+    resumenes: dict[str, str],
+) -> "NewsItem | None":
+    """Elige el item destacado para Stellar-View.
+
+    Prioridad: 1) tiene resumen, 2) tiene imagen, 3) orden original.
+    Garantiza que la pantalla de la app muestre resumen siempre que sea posible.
+    """
+    if not astro_items:
+        return None
+    return max(
+        astro_items,
+        key=lambda it: (it.dedup_key in resumenes, bool(it.image)),
+    )
+
+
 def build_stellar_news_payload(
     astro_items: list[NewsItem],
     *,
     site_url: str,
     generated_at: datetime,
     translations: dict | None = None,
+    resumenes: dict[str, str] | None = None,
     translate: bool = True,
     tracker: list[dict] | None = None,
 ) -> dict:
     """Contrato publico que consume Stellar-View.
 
-    Selecciona primero una noticia de Astronomia con imagen real. Si ninguna la
-    trae, publica la primera y deja ``image_url`` en null para que la app use su
-    placeholder local.
+    Selecciona la noticia destacada priorizando aquellas con resumen disponible
+    (luego imagen, luego orden original). El campo ``summary`` es un dict
+    es/en/it con el resumen traducido; puede ser ``{}`` si no hay resumen.
+    El campo es opcional/aditivo: versiones antiguas de la app lo ignoran.
     """
-    featured = next((it for it in astro_items if it.image), None)
-    if featured is None and astro_items:
-        featured = astro_items[0]
+    resumenes = resumenes or {}
+    featured = _select_stellar_featured(astro_items, resumenes)
 
     payload = {
         "schema": STELLAR_NEWS_SCHEMA,
@@ -599,12 +652,19 @@ def build_stellar_news_payload(
         return payload
 
     anchor = _card_id(featured)
+    resumen_es = resumenes.get(featured.dedup_key)
     payload["featured"] = {
         "id": anchor,
         "section": "astronomia",
         "title": _build_stellar_titles(
             featured,
             translations,
+            translate=translate,
+            tracker=tracker,
+        ),
+        "summary": _build_stellar_summary(
+            featured,
+            resumen_es,
             translate=translate,
             tracker=tracker,
         ),
@@ -891,6 +951,7 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
         site_url=site_url,
         generated_at=ahora,
         translations=translations,
+        resumenes=resumenes,
         translate=translate,
         tracker=translate_tracker,
     )
