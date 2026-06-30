@@ -32,6 +32,7 @@ tests/           # tests unitarios (pytest, sin red)
 .github/workflows/
   regenerate.yml # automatización: regenera y sube web/ por SSH (cron)
 DEPLOY.md        # guía genérica de despliegue + automatización (ver también)
+SECCIONES.md     # reglas por sección: fuentes, selección de las 6 tarjetas y orden
 .env(.example)   # claves (NO se sube .env); plantilla en .env.example
 data/            # estado local (x_usage.json, translations.json) — ignorado por git
 output/          # resúmenes generados — ignorado por git
@@ -95,6 +96,12 @@ correcto: preferimos no fusionar a fusionar de más. Subir de nivel requiere una
 (entidades / embeddings / el LLM, que ya agrupa en el modo resumen).
 
 ## Web (ver `web.py`)
+
+> 📑 **Reglas de cada sección en un solo lugar:** [SECCIONES.md](SECCIONES.md)
+> resume, por sección (Nacional, Frontera Digital, Medicina, Astronomía, RRSS),
+> **qué fuentes** la alimentan, **cómo se eligen las 6 tarjetas** y **en qué
+> orden**, con un apéndice de "dónde editar cada regla". Empieza por ahí si vas a
+> tocar la selección o el alcance de una sección.
 
 La web se renderiza desde `sibylla/templates/index.html.j2` (fuente de verdad). **Nunca edites `web/*.html` a mano**; se sobrescriben en cada corrida. Para cambiar diseño/textos:
 - **CSS/estructura** → `templates/index.html.j2`

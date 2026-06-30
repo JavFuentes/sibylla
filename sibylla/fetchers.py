@@ -39,7 +39,7 @@ _session.headers.update({"User-Agent": UA})
 # arxiv= categoría de arXiv (si aplica)
 # pubmed = True si el tema es biomédico (se consulta PubMed)
 TOPIC_CONFIG: dict[str, dict] = {
-    "ai":             {"news": '"artificial intelligence" OR "machine learning" OR "large language model"', "hn": "artificial intelligence", "arxiv": "cs.AI"},
+    "ai":             {"news": '"artificial intelligence" OR "machine learning" OR "large language model" OR "quantum computing" OR semiconductor OR cybersecurity OR ransomware', "hn": "artificial intelligence cybersecurity", "arxiv": "cs.AI"},
     "computing":      {"news": '"computer science" OR semiconductor OR "quantum computing" OR chip', "hn": "computing", "arxiv": "cs.AR"},
     "space":          {"news": 'NASA OR astronomy OR "space exploration" OR telescope', "hn": "space astronomy", "arxiv": "astro-ph.EP"},
     "physics":        {"news": 'physics OR quantum OR "particle physics"', "hn": "physics", "arxiv": "physics.gen-ph"},
@@ -67,7 +67,13 @@ TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "ai": ("ai", "artificial intelligence", "inteligencia artificial", "machine learning",
            "aprendizaje automatico", "deep learning", "neural", "neuronal", "llm",
            "language model", "modelo de lenguaje", "gpt", "chatbot", "openai", "anthropic",
-           "deepmind", "algorithm", "algoritmo", "model", "modelo", "generativ"),
+           "deepmind", "algorithm", "algoritmo", "model", "modelo", "generativ",
+           "semiconductor", "chip", "gpu", "processor", "procesador",
+           "quantum comput", "computacion cuantica", "hardware", "software",
+           "data center", "centro de datos",
+           "cybersecurity", "ciberseguridad", "seguridad informatica", "infosec",
+           "ransomware", "malware", "vulnerab", "exploit", "cve", "phishing",
+           "hacker", "breach", "brecha de datos"),
     "computing": ("computing", "comput", "semiconductor", "chip", "processor", "procesador",
                   "gpu", "quantum comput", "computacion cuantica", "software", "hardware",
                   "data center", "centro de datos"),
