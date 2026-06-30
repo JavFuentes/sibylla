@@ -37,11 +37,11 @@ meta:
     verified_2026-06-20: "Probado en vivo el 2026-06-20 y funcionó."
     verified_2026-06-22: "Probado en vivo el 2026-06-22 (feeds de la sección Nacional)."
     verified_2026-06-28: "Probado en vivo el 2026-06-28 (feeds de agencias espaciales, sección Astronomía)."
-    verified_2026-06-30: "Probado en vivo el 2026-06-30 (fuentes nuevas de Frontera Digital: Krebs, BleepingComputer, Xataka IA/cuántica, Hipertextual)."
+    verified_2026-06-30: "Probado en vivo el 2026-06-30 (fuentes nuevas de Frontera Digital y canales de Divulgación)."
     known: "Fuente conocida/estándar; confirmar feed exacto al construir el ingestor."
 
   topics: [nacional, general_science, general_tech, ai, computing, space, astronomia,
-           physics, biotech, medicine, climate, energy, neuroscience]
+           physics, biotech, medicine, climate, energy, neuroscience, divulgacion]
 
 # =============================================================================
 # TIER 1 — APIs científicas y preprints (la columna vertebral de "avances")
@@ -1024,6 +1024,530 @@ sources:
     notes: >
       Respaldo para los 6 regionales sin feed nativo. Caveat: los enlaces de Google News llevan token
       opaco (ver resolve_google_news_url) y solo dan titular + fuente, sin snippet propio.
+
+# =============================================================================
+# DIVULGACIÓN — canales de YouTube curados a mano. Cada canal es una fuente RSS
+# (feed Atom nativo de YouTube, gratis, sin key). Se muestran como tarjetas de
+# video en la sección homónima (1 por canal, 6 más recientes).
+# channel_id + feed verificados en vivo el 2026-06-30.
+# =============================================================================
+  - id: yt_jodisea
+    name: "Jodisea | El mundo de las Odiseas"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCz6Cf-gSFs6jDdCo5vctKHA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_radientnews
+    name: "Radient News"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCnfI40TiTcj0BNWJkw2y8Mg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_jefillysh
+    name: "jefillysh"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCTfQ65AxquXmih3r6rZmK-Q"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_elrobotdeplaton
+    name: "El Robot de Platón"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCaVPhFg-Ax873wvhbNitsrQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_jesusgmaestro
+    name: "Jesús G. Maestro"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCfWWjBMY6zpvvU6wAe5j_Eg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_quantumfracture
+    name: "QuantumFracture"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCbdSYaPD-lr1kW27UJuk8Pw"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_pildorasinformaticas
+    name: "pildorasinformaticas"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCdulIs-x_xrRd1ezwJZR9ww"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_exoplanetas
+    name: "EXOPLANETAS Noticias Ciencia y Tecnología"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC92-DgDvLQPM_r2oHbDr60w"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_robotitus
+    name: "Noticias Robotitus"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC5rJaxmE3UyVz59OGxbPdAg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_ecosdeunmundoestrellado
+    name: "Ecosdeunmundoestrellado"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCSoZXagwqt4OYBXjAYKbjpQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_fazttech
+    name: "Fazt"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCX9NJ471o7Wie1DQe94RVIg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_psicovlog
+    name: "Psico Vlog"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCKK25Prf-UD9Qak0W1d02KQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_lagatadeschrodinger
+    name: "La gata de Schrödinger"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCoXtmmnLCbXDiSo8GxsmOzA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_sizematters
+    name: "SizeMatters"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC6h-HID9dV2BAGSMy4_J84g"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_curiosamente
+    name: "CuriosaMente"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCX16cLWl6dCjlZMgUBxgGkA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_iftmadrid
+    name: "Instituto de Física Teórica IFT"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCk195x4zYdMx4LhqEwhcPng"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_novagea
+    name: "NovaGea"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCpRzJ0uX8ATOQkJfBfGS1uA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_astrumespanol
+    name: "Astrum Español"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC-2A6Z4k5-AJBLO_wDA-ZUg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_raqueldelamorenaoficial
+    name: "Raquel de la Morena"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC_0j0mtBAGTj1U7LD3J0dhQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_ter
+    name: "Ter"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCCNgRIfWQKZyPkNvHEzPh7Q"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_darinmex
+    name: "Darin McNabb"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC6GbAKHWYUJDWlkxY6HPldg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_candeliousfang
+    name: "Candeliousfang"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCJAsPjHqO0AHSd6Uasj7oVA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_jefidos
+    name: "Carolina Jefillysh"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCnN7Hrbc7dsvuDVkU6ro-SQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_midulive
+    name: "midulive"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC3aj05GEEyzdOqYM5FLSFeg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_matesmike
+    name: "Mates Mike"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC-_kZ3UZBsnCWJEVr8ysMww"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_pontebata
+    name: "Ponte Bata"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCmwwKS5em7UNZvghNcfugHg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_cienciadesofa
+    name: "CienciaDeSofa"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCMbQbVilo-nezMvwf1BZfAA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_bitboss
+    name: "BitBoss"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC51m1mQmjKJ10YZWtRr8tgA"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_cinematixfilms
+    name: "Cinematix"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCpuKDBw8IVIdKWPhiB2VDNQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_anatomiahumanaydiseccion
+    name: "Anatomía Humana y Disección"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCw-oldhkk_2ftVa_PL0eoSQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_iftwebinars
+    name: "IFT Webinars"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCcdmQRtxk_xdpt9iFATTDQQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_astrovlog
+    name: "astrovlog"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC-8DZ-sTOoohhzndLNl4w1A"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_lahiperactina
+    name: "La Hiperactina"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCV5G678sZwW5IcF3pCfRbHQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_alvamajo
+    name: "Alva Majo"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCmaEoq1zaakpdudbzgll-zw"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_javier_garcia
+    name: "Javier Garcia"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCYOv9HwOFwK0lY2dUQlZSpg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_antroporamadivulgacion
+    name: "Antroporama"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCGKzjVZGdJ0YmUqg42xfO5w"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+
+  - id: yt_deborahciencia
+    name: "deborahciencia"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCibUX4QoSrRwmBZf0Ig-OCg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
 
 # =============================================================================
 # Voces de la red — Configuración de lentes y cuentas propias

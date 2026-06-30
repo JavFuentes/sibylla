@@ -175,6 +175,40 @@ def _is_astro(item: NewsItem) -> bool:
     return item.source_id in ASTRO_SOURCE_IDS
 
 
+# =============================================================================
+# Sección Divulgación — videos de YouTube, 1 por canal
+# =============================================================================
+
+DIVULGACION_MAX_TOTAL = 6
+# Ventana amplia: algunos canales curados publican con frecuencia baja.
+DIVULGACION_FRESH_DAYS = 365
+
+
+def _is_divulgacion(item: NewsItem) -> bool:
+    """True si el ítem pertenece a la sección especial Divulgación."""
+    return "divulgacion" in item.topics and item.source_id.startswith("yt_")
+
+
+def _select_divulgacion(items: list[NewsItem]) -> list[NewsItem]:
+    """Selecciona hasta 6 videos: 1 por canal, más recientes primero."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=DIVULGACION_FRESH_DAYS)
+
+    def _recency(it: NewsItem):
+        return it.published or datetime.min.replace(tzinfo=timezone.utc)
+
+    best_by_channel: dict[str, NewsItem] = {}
+    for it in items:
+        if _recency(it) < cutoff:
+            continue
+        cur = best_by_channel.get(it.source_id)
+        if cur is None or _recency(it) > _recency(cur):
+            best_by_channel[it.source_id] = it
+
+    picks = sorted(best_by_channel.values(), key=_recency, reverse=True)
+    return picks[:DIVULGACION_MAX_TOTAL]
+
+
 def _select_astronomia(items: list[NewsItem], seed_str: str) -> list[NewsItem]:
     """Selecciona 6 tarjetas para la sección Astronomía.
 
@@ -392,7 +426,8 @@ def _label(topic: str, topic_labels: dict[str, str]) -> str:
 
 def _tarjeta(it: NewsItem, months: list[str], no_date: str,
              translations: dict | None = None,
-             resumenes: dict | None = None) -> dict:
+             resumenes: dict | None = None,
+             is_video: bool = False) -> dict:
     """Aplana un NewsItem a las claves que consume la plantilla.
 
     Si `translations` trae una entrada para este ítem (por `dedup_key`), usa el
@@ -412,7 +447,7 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     network = it.extra.get("network", "")
     if network == "x_twitter":
         network = "x"  # el locale usa la clave net_x (no net_x_twitter)
-    return {
+    card = {
         "id": _card_id(it),
         "url": it.url,
         "title": title,
@@ -432,7 +467,13 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         # "Sibylla"): así son indistinguibles. `extra["house"]` sigue guiando la
         # selección de slots en `_select_social`.
         "is_house": False,
+        "is_video": is_video,
     }
+    if is_video:
+        card["seal_color"] = "#5EE6E0"
+        card["has_resumen"] = False
+        card["resumen"] = None
+    return card
 
 
 # =============================================================================
@@ -774,6 +815,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    translations: dict | None = None,
                    social_items: list[NewsItem] | None = None,
                    astro_items: list[NewsItem] | None = None,
+                   divulgacion_items: list[NewsItem] | None = None,
                    resumenes: dict | None = None) -> dict:
     """Construye el contexto que recibe la plantilla.
 
@@ -804,6 +846,11 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     astro_cards: list[dict] = []
     if astro_items:
         astro_cards = [_tarjeta(it, months, no_date, translations, resumenes) for it in astro_items]
+
+    # Tarjetas de divulgación. No se traducen ni resumen: son videos en español.
+    divulgacion_cards: list[dict] = []
+    if divulgacion_items:
+        divulgacion_cards = [_tarjeta(it, months, no_date, is_video=True) for it in divulgacion_items]
 
     # Tarjetas sociales.
     social_cards: list[dict] = []
@@ -842,6 +889,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "n_fuentes": n_fuentes,
         "grupos": grupos,
         "astro_cards": astro_cards,
+        "divulgacion_cards": divulgacion_cards,
         "social_cards": social_cards,
         "observa": observa,
         "t": tw,
@@ -860,6 +908,7 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 translations: dict | None = None,
                 social_items: list[NewsItem] | None = None,
                 astro_items: list[NewsItem] | None = None,
+                divulgacion_items: list[NewsItem] | None = None,
                 resumenes: dict | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
@@ -869,8 +918,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     )
     tmpl = env.get_template("index.html.j2")
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
-                                       is_landing, translations, social_items,
-                                       astro_items, resumenes))
+                                        is_landing, translations, social_items,
+                                        astro_items, divulgacion_items, resumenes))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -982,14 +1031,17 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
 
-    # Separar ítems: normales / astronomía / redes sociales.
-    normal_items = [it for it in items if not _is_social(it) and not _is_astro(it)]
+    # Separar ítems: normales / astronomía / divulgación / redes sociales.
+    normal_items = [it for it in items
+                    if not _is_social(it) and not _is_astro(it) and not _is_divulgacion(it)]
     astro_raw = [it for it in items if _is_astro(it)]
+    divulgacion_raw = [it for it in items if _is_divulgacion(it)]
     social_raw = [it for it in items if _is_social(it)]
 
     # Seleccionar 6 tarjetas de astronomía.
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     astro_top = _select_astronomia(astro_raw, today) if astro_raw else []
+    divulgacion_top = _select_divulgacion(divulgacion_raw) if divulgacion_raw else []
 
     # Fetch house posts (cuentas propias de Sibylla) y seleccionar 6 tarjetas.
     from .fetchers import fetch_house_posts
@@ -1010,14 +1062,15 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # Resúmenes en español de las tarjetas renderizadas (botón "Resumen" + acordeón).
     from .resumen import build_resumenes
     rendered_for_resumen = _rendered_items(normal_items, topics, max_por_tema,
-                                          social_top, astro_top)
+                                           social_top, astro_top)
     resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
 
     # Única página del sitio (español).
     html = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
-                       is_landing=False, translations=translations,
-                       social_items=social_top, astro_items=astro_top,
-                       resumenes=resumenes)
+                        is_landing=False, translations=translations,
+                        social_items=social_top, astro_items=astro_top,
+                        divulgacion_items=divulgacion_top,
+                        resumenes=resumenes)
     out = SITE_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
     paths.append(out)

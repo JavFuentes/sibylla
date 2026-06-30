@@ -12,7 +12,7 @@ parámetro indica el archivo/constante donde vive.
 
 ## 0. Visión general
 
-### Las cinco secciones y su orden en la página
+### Las seis secciones y su orden en la página
 
 La portada (`sibylla/templates/index.html.j2`, contenedor `#secciones`) muestra,
 de arriba abajo:
@@ -23,17 +23,18 @@ de arriba abajo:
 | 2 | **Frontera Digital** | `ai` *(renombre pendiente)* | Motor temático (score → diversify → top 6) | `sibylla/pipeline.py` |
 | 3 | **Medicina** | `medicine` | Motor temático (score → diversify → top 6) | `sibylla/pipeline.py` |
 | 4 | **Astronomía** | `astronomia` | Selección curada con cupos reservados | `sibylla/web.py` |
-| 5 | **RRSS** ("Voces de la red") | — (redes) | Slots por red + house cards | `sibylla/web.py` |
+| 5 | **Divulgación** | `divulgacion` | 1 video por canal, 6 más recientes | `sibylla/web.py` |
+| 6 | **RRSS** ("Voces de la red") | — (redes) | Slots por red + house cards | `sibylla/web.py` |
 
 El orden de los temas temáticos (1–3) sigue el orden pedido en `--topics`
-(default `nacional,ai,medicine,astronomia` en `sibylla/cli.py`); Astronomía y
-RRSS son bloques especiales que van siempre al final, en ese orden. El usuario
-puede **reordenar u ocultar** secciones en el navegador (persiste en
+(default `nacional,ai,medicine,astronomia,divulgacion` en `sibylla/cli.py`);
+Astronomía, Divulgación y RRSS son bloques especiales que van siempre al final,
+en ese orden. El usuario puede **reordenar u ocultar** secciones en el navegador (persiste en
 `localStorage`); eso no cambia qué se elige, solo cómo se ve.
 
 ### Todas muestran 6 tarjetas
 
-Las cinco secciones se hornean con **6 tarjetas** (`max_por_tema = 6`, valor por
+Las seis secciones se hornean con **6 tarjetas** (`max_por_tema = 6`, valor por
 defecto en `build_all_sites` / `build_context` de `sibylla/web.py`).
 
 > ⚠️ **No confundir con `--max-per-source`** (default 10 en `cli.py`): ese límite
@@ -268,7 +269,30 @@ Cada fuente trae `scope: national | regional` (alimenta la cuota regional).
 
 ---
 
-## 5. RRSS — "Voces de la red"
+## 5. Divulgación
+
+> **Bloque especial** (`#divulgacion`). Lógica en `web._select_divulgacion`
+> (`sibylla/web.py`). Tests: `tests/test_divulgacion.py`.
+
+**Fuentes posibles:** 37 canales de YouTube curados, cada uno como fuente RSS Atom
+en `config/sources.yaml` con `type: rss`, `category: youtube` y
+`topics: [divulgacion]`. El feed nativo de YouTube no requiere API key.
+
+**Selección de las 6** (`DIVULGACION_MAX_TOTAL = 6`):
+
+1. Agrupa los ítems por canal (`source_id`).
+2. Toma el video más reciente de cada canal dentro de
+   `DIVULGACION_FRESH_DAYS = 365`.
+3. Ordena esos representantes por fecha descendente y corta a 6.
+
+**Orden de las tarjetas:** recencia pura, del video más nuevo al más viejo.
+
+**Render:** miniatura del video, overlay de reproducción y sello `▶`. No se
+traducen títulos/snippets ni se generan resúmenes LLM para esta sección.
+
+---
+
+## 6. RRSS — "Voces de la red"
 
 > **Bloque especial** (`#voces`). Lógica en `web._select_social`
 > (`sibylla/web.py`); config en el bloque `social:` de `config/sources.yaml`.
@@ -307,7 +331,7 @@ house cards se renderizan **idénticas** a las orgánicas (no llevan badge
 
 ---
 
-## 6. Apéndice — dónde editar cada regla
+## 7. Apéndice — dónde editar cada regla
 
 | Quiero cambiar… | Parámetro | Archivo |
 |-----------------|-----------|---------|
@@ -323,6 +347,8 @@ house cards se renderizan **idénticas** a las orgánicas (no llevan badge
 | Temas por defecto de la corrida | `--topics` (default) | `sibylla/cli.py` |
 | Etiquetas visibles de los temas | `web.topics.*` | `locales/*.json` |
 | Cupos / ventanas de Astronomía | `ASTRO_*` (`MAX_TOTAL`, `*_FRESH_DAYS`, `*_IDS`) | `sibylla/web.py` |
+| Nº y ventana de Divulgación | `DIVULGACION_MAX_TOTAL`, `DIVULGACION_FRESH_DAYS` | `sibylla/web.py` |
+| Canales de Divulgación | fuentes `yt_*` | `config/sources.yaml`, `sibylla/pipeline.py` |
 | Cuota de Nacional | `N_CARDS`, `MIN_REGIONAL`, `MAX_PER_OUTLET`, `SHORTLIST_N` | `sibylla/nacional.py` |
 | Nº y barajado de RRSS | `SOCIAL_MAX_TOTAL`, `social.shuffle` | `sibylla/web.py`, `config/sources.yaml` |
 | Lentes / cuentas house de RRSS | `social.lenses`, `social.house_accounts` | `config/sources.yaml` |

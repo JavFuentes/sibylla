@@ -86,6 +86,9 @@
     "net_x": "X",
     "astro_heading": "Astronomy",
     "astro_subtitle": "News from Chile's observatories and the world's space agencies",
+    "divulgacion_heading": "Outreach",
+    "divulgacion_subtitle": "The latest from your outreach channels",
+    "video_label": "Video",
     "social_house_badge": "Sibylla",
     "months": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "topics": {
@@ -101,7 +104,8 @@
       "energy": "Energy",
       "general_science": "Science",
       "general_tech": "Technology",
-      "astronomia": "Astronomy"
+      "astronomia": "Astronomy",
+      "divulgacion": "Outreach"
     }
   }
 }

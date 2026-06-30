@@ -87,6 +87,9 @@
     "net_x": "X",
     "astro_heading": "Astronomía",
     "astro_subtitle": "Noticias de los cielos chilenos y las agencias espaciales del mundo",
+    "divulgacion_heading": "Divulgación",
+    "divulgacion_subtitle": "Lo último de tus canales de divulgación",
+    "video_label": "Video",
     "social_house_badge": "Sibylla",
     "months": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
     "topics": {
@@ -102,7 +105,8 @@
       "energy": "Energía",
       "general_science": "Ciencia",
       "general_tech": "Tecnología",
-      "astronomia": "Astronomía"
+      "astronomia": "Astronomía",
+      "divulgacion": "Divulgación"
     }
   }
 }

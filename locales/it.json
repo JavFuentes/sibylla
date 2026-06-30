@@ -86,6 +86,9 @@
     "net_x": "X",
     "astro_heading": "Astronomia",
     "astro_subtitle": "Notizie dagli osservatori cileni e dalle agenzie spaziali del mondo",
+    "divulgacion_heading": "Divulgazione",
+    "divulgacion_subtitle": "Le ultime dai tuoi canali di divulgazione",
+    "video_label": "Video",
     "social_house_badge": "Sibylla",
     "months": ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"],
     "topics": {
@@ -101,7 +104,8 @@
       "energy": "Energia",
       "general_science": "Scienza",
       "general_tech": "Tecnologia",
-      "astronomia": "Astronomia"
+      "astronomia": "Astronomia",
+      "divulgacion": "Divulgazione"
     }
   }
 }

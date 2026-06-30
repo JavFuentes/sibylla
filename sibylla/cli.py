@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.perf_counter()
 
     parser = argparse.ArgumentParser(prog="sibylla", description="Ingestor de noticias de Sibylla")
-    parser.add_argument("--topics", default="nacional,ai,medicine,astronomia",
+    parser.add_argument("--topics", default="nacional,ai,medicine,astronomia,divulgacion",
                         help=f"temas separados por coma. Disponibles: {', '.join(TOPIC_CONFIG)}")
     parser.add_argument("--max-per-source", type=int, default=10,
                         help="máximo de ítems por fuente y tema (def. 10)")
@@ -109,18 +109,19 @@ def main(argv: list[str] | None = None) -> int:
     # Lo nacional también se excluye del resumen: ese digest es de ciencia y
     # tecnología, y mezclar noticia nacional chilena lo volvería incoherente.
     # (La sección Nacional vive solo en la web, ya seleccionada por select_nacional.)
-    from .web import _is_social, _is_astro
+    from .web import _is_social, _is_astro, _is_divulgacion
     items_topic = [it for it in items
-                   if not _is_social(it) and not is_nacional(it) and not _is_astro(it)]
-    # El digest es de ciencia/tecnología: excluye 'nacional' y 'astronomia'
-    # (ambas tienen su propia sección curada en la web).
-    topics_sci = [tp for tp in topics if tp not in ("nacional", "astronomia")]
+                   if not _is_social(it) and not is_nacional(it)
+                   and not _is_astro(it) and not _is_divulgacion(it)]
+    # El digest es de ciencia/tecnología: excluye secciones especiales que viven
+    # solo en la web.
+    topics_sci = [tp for tp in topics if tp not in ("nacional", "astronomia", "divulgacion")]
 
     # --- resumen (IA o determinista) ---
     llm_calls: list[dict] = list(nacional_calls)
     markdown = None
 
-    if args.summarize != "off":
+    if args.summarize != "off" and items_topic:
         try:
             result = summarize_digest(items_topic, topics_sci, lang=lang)
             if result is not None:

@@ -44,12 +44,12 @@
 {%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
 <article id="{{ c.id }}" class="carta" style="--sello:{{ c.seal_color }};">
-  {% if c.image %}<div class="carta-img"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();"></div>{% else %}<div class="carta-img ph" aria-hidden="true"></div>{% endif %}
+  {% if c.image %}<div class="carta-img"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</div>{% else %}<div class="carta-img ph" aria-hidden="true">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</div>{% endif %}
   <h4>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
     <a href="{{ c.url }}">{{ c.title }}</a>
   </h4>
-  <div class="fuente"><span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span> {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
+  <div class="fuente">{% if c.is_video %}<span class="sello sello-video" title="{{ t.video_label }}">▶</span>{% else %}<span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span>{% endif %} {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
   {% if c.snippet %}<p class="resumen">{{ c.snippet }}</p>{% endif %}
   {% if c.related %}<p class="tambien">{{ also_in }}: {% for r in c.related %}<a href="{{ r.url }}">{{ r.source_name }}</a>{% if not loop.last %} <span class="sep">·</span> {% endif %}{% endfor %}{% if c.related_extra %} <span class="sep">·</span> +{{ c.related_extra }}{% endif %}</p>{% endif %}
   <div class="carta-acciones">
@@ -331,6 +331,11 @@
       radial-gradient(1px 1px at 70% 30%, rgba(94,230,224,.30), transparent),
       radial-gradient(1px 1px at 20% 25%, rgba(217,184,95,.30), transparent);
     background-size:120px 90px; opacity:.6; }
+  .carta-img .play{ position:absolute; inset:0; margin:auto; width:52px; height:52px;
+    border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:rgba(8,11,20,.55); border:1px solid var(--oro);
+    box-shadow:0 2px 14px rgba(0,0,0,.4); pointer-events:none; }
+  .carta-img .play svg{ width:22px; height:22px; fill:var(--marfil); margin-left:3px; }
   .carta h4{ margin:0 0 12px; font-family:'Cormorant Garamond',serif; font-weight:600;
     font-size:clamp(1.15rem,2.5vw,1.35rem); line-height:1.28; }
   .carta h4 a{ color:var(--marfil); text-decoration:none; transition:color .2s; }
@@ -368,6 +373,7 @@
     box-shadow:0 0 14px -3px rgba(242,221,147,.7); }
   .sello.t2{ color:#1c2330; background:radial-gradient(circle at 40% 35%, #DCE3EE, #A9B3C4); }
   .sello.t3{ color:#0f2a23; background:radial-gradient(circle at 40% 35%, #A6D4C5, #6E9C8D); }
+  .sello.sello-video{ border:1px solid var(--cian); color:var(--cian); background:transparent; }
   .sep{ color:rgba(217,184,95,.4); }
   .pill{ display:inline-flex; align-items:center; gap:6px; font-size:.62rem; letter-spacing:.14em;
     text-transform:uppercase; padding:3px 10px; border-radius:20px; border:1px solid rgba(94,230,224,.45);
@@ -549,6 +555,20 @@
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in astro_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    {% if divulgacion_cards %}
+      <div class="bloque bloque-especial" id="divulgacion" data-topic="divulgacion">
+        <div class="tema" data-topic="divulgacion"><h3>{{ t.divulgacion_heading }}</h3><span class="raya"></span>
+        <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+        </span>{{ sec_ctrl() }}</span></div>
+        <div class="rejilla">
+          {% for c in divulgacion_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
         </div>
       </div>
     {% endif %}

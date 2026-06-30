@@ -58,6 +58,9 @@ TOPIC_CONFIG: dict[str, dict] = {
     # Astronomía: como `nacional`, las fuentes oficiales (agencias, ALMA, CATA,
     # SOCHIAS) publican solo contenido relevante. Config vacía = pass-through.
     "astronomia":     {},
+    # Divulgación: canales curados de YouTube. Cada feed ya es relevante para la
+    # sección; sin keywords = pass-through.
+    "divulgacion":   {},
 }
 
 # Palabras clave por tema (bilingüe ES/EN, sin tildes) para filtrar el ruido de

@@ -64,6 +64,15 @@ web/             # sitio estático generado — ignorado por git
 4. **Agencia espacial:** añade su `id` a `ASTRO_AGENCY_IDS` en `web.py`.
    Compite por las 3 tarjetas de agencia (máx. 1 por agencia, gana la más reciente).
 
+### Añadir un canal a Divulgación
+1. Resuelve el `channel_id` del canal de YouTube (`UC...`) y verifica que el feed
+   `https://www.youtube.com/feeds/videos.xml?channel_id=UC...` responda con entradas.
+2. En `config/sources.yaml`, añade una fuente `type: rss`, `category: youtube`,
+   `topics: [divulgacion]` y `lang: es`.
+3. En `pipeline.py`, añade su `id` a `DEFAULT_FREE_SOURCES`.
+4. No hay que tocar `web.py`: `_select_divulgacion` toma 1 video por canal y
+   muestra los 6 canales con video más reciente.
+
 ### Añadir un medio (RSS/Atom)
 1. Añádelo en `config/sources.yaml` con `type: rss` (o `atom`) y su `url` de feed.
 2. Inclúyelo en `DEFAULT_FREE_SOURCES` (en `pipeline.py`) si quieres que entre por defecto.
@@ -98,7 +107,8 @@ correcto: preferimos no fusionar a fusionar de más. Subir de nivel requiere una
 ## Web (ver `web.py`)
 
 > 📑 **Reglas de cada sección en un solo lugar:** [SECCIONES.md](SECCIONES.md)
-> resume, por sección (Nacional, Frontera Digital, Medicina, Astronomía, RRSS),
+> resume, por sección (Nacional, Frontera Digital, Medicina, Astronomía,
+> Divulgación, RRSS),
 > **qué fuentes** la alimentan, **cómo se eligen las 6 tarjetas** y **en qué
 > orden**, con un apéndice de "dónde editar cada regla". Empieza por ahí si vas a
 > tocar la selección o el alcance de una sección.
@@ -201,6 +211,25 @@ Tras los temas principales, antes de "Voces de la red", se muestra la sección
 
 CNSA, Roscosmos, ISRO, DLR, CSA, KASA — no exponen RSS/Atom legible
 (probadas 2026-06-28). No entran hoy; reevaluar si publican un feed.
+
+### Sección "Divulgación" (videos de YouTube)
+
+Tras Astronomía y antes de "Voces de la red", se muestra **Divulgación** con
+videos de canales de YouTube curados por el usuario. Cada canal es una fuente RSS
+Atom nativa (`https://www.youtube.com/feeds/videos.xml?channel_id=UC...`), sin API
+key ni fetcher propio.
+
+Reglas:
+- `fetchers.py`: `TOPIC_CONFIG['divulgacion'] = {}` (pass-through; los feeds ya
+  son curados).
+- `sources.yaml`: cada canal usa `topics: [divulgacion]` y `category: youtube`.
+- `web.py`: `_is_divulgacion` separa los ítems y `_select_divulgacion` elige hasta
+  6 tarjetas: **1 video por canal**, ordenadas por recencia pura.
+- No se traducen ni se resumen con LLM. La tarjeta muestra miniatura, sello de
+  video `▶`, título original y enlace a YouTube.
+- Plantilla: bloque `#divulgacion` dentro de `#secciones`, reordenable/ocultable
+  como las demás secciones.
+- Tests: `tests/test_divulgacion.py`.
 
 ### Sección "Voces de la red" (redes sociales) · v2.0
 
