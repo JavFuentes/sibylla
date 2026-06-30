@@ -73,6 +73,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#080B14">
+<meta name="x-build" content="{{ build_v }}">
 <title>{{ t.page_title }}</title>
 {% if meta_description %}<meta name="description" content="{{ meta_description }}">{% endif %}
 <meta name="robots" content="index, follow">
@@ -264,6 +265,30 @@
     .sec-btn{ transition:color .2s, border-color .2s, background .2s; }
     .bloque.is-moving .tema h3{ color:var(--marfil); }
   }
+  /* ---- Botón flotante: actualizar la página tras un redeploy ----
+     Aparece solo si el build vivo (web/build.json) es más nuevo que el build
+     embebido en este HTML (meta x-build). Color cian = "el futuro". Vive
+     apilado sobre .restaurar. La lógica de detección va en el <script> del pie. */
+  .actualizar{ position:fixed; right:24px; bottom:72px; z-index:30;
+    display:inline-flex; align-items:center; gap:9px; padding:11px 18px;
+    font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--cian-claro); cursor:pointer; border-radius:999px;
+    background:rgba(13,19,34,.82); border:1px solid rgba(94,230,224,.42);
+    backdrop-filter:blur(10px);
+    box-shadow:0 12px 34px -12px rgba(0,0,0,.7), 0 0 26px -12px rgba(94,230,224,.5);
+    opacity:0; transform:translateY(10px) scale(.96); pointer-events:none;
+    transition:opacity .3s, transform .3s, border-color .2s, box-shadow .2s, color .2s; }
+  .actualizar svg{ width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7;
+    stroke-linecap:round; stroke-linejoin:round; }
+  .actualizar.is-on{ opacity:1; transform:none; pointer-events:auto; }
+  .actualizar:hover{ border-color:var(--cian-claro); color:#D2FBF8; transform:translateY(-2px);
+    box-shadow:0 16px 40px -12px rgba(0,0,0,.75), 0 0 34px -8px rgba(94,230,224,.7); }
+  .actualizar:focus-visible{ outline:2px solid rgba(242,221,147,.6); outline-offset:3px; }
+  @media (prefers-reduced-motion:reduce){
+    .actualizar{ transition:opacity .2s; transform:none; }
+    .actualizar.is-on{ transform:none; }
+  }
+
   .pulso{ width:8px; height:8px; border-radius:50%; background:var(--cian);
     box-shadow:0 0 0 0 rgba(94,230,224,.6); animation:latir 2.4s infinite; }
   @keyframes latir{ 0%{ box-shadow:0 0 0 0 rgba(94,230,224,.5);} 70%{ box-shadow:0 0 0 9px rgba(94,230,224,0);} 100%{ box-shadow:0 0 0 0 rgba(94,230,224,0);} }
@@ -451,6 +476,7 @@
     .tema-ctrls{ flex:0 0 100%; justify-content:flex-end; }
     .sec-btn, .card-ctrl-btn{ width:30px; height:30px; }
     .restaurar{ right:14px; bottom:14px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
+    .actualizar{ right:14px; bottom:58px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
     .seccion-titulo{ margin:16px 0 4px; }
     .seccion-titulo p{ font-size:.95rem; }
     .apunte{ flex-direction:column; align-items:flex-start; gap:14px; padding:16px 16px; margin:22px 0; }
@@ -604,6 +630,11 @@
     <p class="lema">{{ t.footer_motto }}</p>
   </div>
 </footer>
+
+<button type="button" id="actualizar" class="actualizar" aria-hidden="true" aria-live="polite" tabindex="-1" title="{{ t.sec_update }}" disabled>
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 8a5.4 5.4 0 0 1 9.25-3.8"/><path d="M2.4 2.4V5H5"/><path d="M13.4 8a5.4 5.4 0 0 1-9.25 3.8"/><path d="M13.6 13.6V11H11"/></svg>
+  <span>{{ t.sec_update }}</span>
+</button>
 
 <button type="button" id="restaurar" class="restaurar" aria-hidden="true" tabindex="-1" title="{{ t.sec_restore }}">
   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.4 8a5.4 5.4 0 1 1-1.55-3.8"/><path d="M13.6 2.4V5H11"/></svg>
@@ -861,6 +892,34 @@
       carta.classList.toggle('resumen-open', !open);
     });
   });
+})();
+/* Botón "Actualizar": detecta un redeploy comparando el build embebido en el
+   HTML (meta x-build) con la marca viva (web/build.json). Si el vivo es más
+   nuevo, revela el botón; al pulsarlo recarga la página. Chequea al volver a
+   la pestaña y cada 30 min. Silencioso ante 404/sin red (nunca rompe el build). */
+(function(){
+  var meta=document.querySelector('meta[name="x-build"]');
+  var btn=document.getElementById('actualizar');
+  if(!meta || !btn) return;
+  var myBuild=parseInt(meta.content,10);
+  if(isNaN(myBuild)) return;
+  function reveal(){
+    btn.classList.add('is-on');
+    btn.setAttribute('aria-hidden','false');
+    btn.disabled=false; btn.tabIndex=0;
+  }
+  function check(){
+    fetch('build.json?cb='+Date.now(), {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(d && typeof d.v==='number' && d.v>myBuild) reveal();
+      })
+      .catch(function(){});
+  }
+  btn.addEventListener('click', function(){ if(btn.classList.contains('is-on')) location.reload(); });
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
+  setInterval(check, 30*60*1000);
+  setTimeout(check, 15000);
 })();
 </script>
 </body>

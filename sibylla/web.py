@@ -815,13 +815,19 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    translations: dict | None = None,
                    social_items: list[NewsItem] | None = None,
                    astro_items: list[NewsItem] | None = None,
-                   divulgacion_items: list[NewsItem] | None = None,
-                   resumenes: dict | None = None) -> dict:
+                    divulgacion_items: list[NewsItem] | None = None,
+                    resumenes: dict | None = None,
+                    build_v: int | None = None) -> dict:
     """Construye el contexto que recibe la plantilla.
 
     `items` son los ítems normales (temáticos). `social_items` son los ítems
     de redes sociales, `astro_items` los de astronomía — ambos van en sus
-    propias secciones al pie de la página."""
+    propias secciones al pie de la página.
+
+    `build_v` es la marca de versión del build (epoch UTC). Se planta en el
+    HTML (meta `x-build`) y se escribe aparte en `web/build.json`; el cliente
+    compara ambos para detectar un redeploy y mostrar el botón "Actualizar".
+    Si es None, se calcula aquí (modo de compatibilidad)."""
     tr = load_translations(lang)
     tw = tr["web"]
     months: list[str] = tw["months"]
@@ -829,6 +835,8 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     topic_labels: dict[str, str] = tw["topics"]
 
     ahora = datetime.now(timezone.utc)
+    if build_v is None:
+        build_v = int(ahora.timestamp())
     # Contar fuentes contando también las sociales.
     all_source_ids = {it.source_id for it in items}
     if social_items:
@@ -885,6 +893,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "lang_files": lang_files,
         "generado": ts,
         "hero_timestamp": hero_ts,
+        "build_v": build_v,
         "total": total_all,
         "n_fuentes": n_fuentes,
         "grupos": grupos,
@@ -909,7 +918,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 social_items: list[NewsItem] | None = None,
                 astro_items: list[NewsItem] | None = None,
                 divulgacion_items: list[NewsItem] | None = None,
-                resumenes: dict | None = None) -> str:
+                resumenes: dict | None = None,
+                build_v: int | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -919,7 +929,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     tmpl = env.get_template("index.html.j2")
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
                                         is_landing, translations, social_items,
-                                        astro_items, divulgacion_items, resumenes))
+                                        astro_items, divulgacion_items, resumenes,
+                                        build_v))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -1010,6 +1021,18 @@ def _write_sitemap(site_url: str, lastmod: str) -> Path:
     return out
 
 
+def _write_build_meta(build_v: int) -> Path:
+    """Escribe web/build.json con la marca de versión del build.
+
+    El cliente compara este `v` (vivo, cache-busteado por URL) con el `v`
+    embebido en index.html (meta `x-build`). Si difieren y el remoto es mayor,
+    se muestra el botón "Actualizar". Archivo minúsculo (~20 bytes)."""
+    out = SITE_DIR / "build.json"
+    out.write_text(json.dumps({"v": build_v}, separators=(",", ":")) + "\n",
+                   encoding="utf-8")
+    return out
+
+
 def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                      max_por_tema: int = 6, translate: bool = True,
                      translate_tracker: list[dict] | None = None,
@@ -1065,18 +1088,26 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                                            social_top, astro_top)
     resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
 
+    # Marca de build (única fuente de verdad): se planta en el HTML (meta
+    # x-build) y en web/build.json; el cliente compara ambas para detectar un
+    # redeploy y mostrar el botón "Actualizar".
+    ahora = datetime.now(timezone.utc)
+    build_v = int(ahora.timestamp())
+
     # Única página del sitio (español).
     html = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
                         is_landing=False, translations=translations,
                         social_items=social_top, astro_items=astro_top,
                         divulgacion_items=divulgacion_top,
-                        resumenes=resumenes)
+                        resumenes=resumenes, build_v=build_v)
     out = SITE_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
     paths.append(out)
 
+    # build.json: marca viva que consulta el cliente (se cache-bustea por URL).
+    paths.append(_write_build_meta(build_v))
+
     # JSON publico para Stellar-View: una noticia destacada de Astronomia.
-    ahora = datetime.now(timezone.utc)
     site_url = get_site_url()
     stellar_payload = build_stellar_news_payload(
         astro_top,
