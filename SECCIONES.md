@@ -58,8 +58,8 @@ visual posterior.
 ## Motor de selección temática (común a Frontera Digital y Medicina)
 
 Frontera Digital y Medicina son **temas temáticos**: usan exactamente el mismo
-motor. Lo que los diferencia son sus **fuentes y palabras clave** (abajo, una
-subsección por sección). El motor:
+motor de fetch/ranking. Lo que los diferencia son sus **fuentes y palabras
+clave** (abajo, una subsección por sección). El motor:
 
 1. **Fetch por tema** (`sibylla/fetchers.py` → `fetch_source`):
    - **Fuentes por consulta** (`QUERY_SOURCES` = `arxiv_api`, `pubmed_eutils`,
@@ -80,10 +80,42 @@ subsección por sección). El motor:
      (`related`), prominencia en el feed del medio (`feed_pos`).
 4. **Diversidad** (`pipeline.diversify`): **máx. `MAX_PER_SOURCE_TOPIC = 3`**
    ítems de una misma fuente dentro de un tema; el resto va al final (overflow).
-5. **Corte a 6** (`web._agrupar`): por cada tema se toman las **6 primeras**
-   tarjetas de la lista ya rankeada.
+   Esta etapa corre para **todos** los temas, pero en la práctica solo decide
+   el corte a 6 en los temas que NO están en `CURATED_TOPIC_IDS` (ver abajo).
+5. **Corte a 6** (`web._seleccionar_tema`, usada por `_agrupar`/`_rendered_items`):
+   - **Frontera Digital y Medicina** (`web.CURATED_TOPIC_IDS = {"ai", "medicine"}`):
+     usan el **selector curado** `web._select_curado` (ver siguiente subsección).
+   - **El resto de los temas**: corte simple, las **6 primeras** de la lista ya
+     rankeada/diversificada.
 
-**Orden de las tarjetas:** por `_score` descendente (la mejor primero).
+**Orden de las tarjetas (temas no curados):** por `_score` descendente.
+
+### Selector curado (`web._select_curado`) — Frontera Digital y Medicina
+
+Antes (hasta 2026-06-30), el corte simple dejaba la sección en manos de 1-2
+fuentes muy frescas y de alto volumen (p. ej. `techcrunch` + `arxiv_api`
+copaban las 6 de Frontera Digital, pese a que otras 8+ fuentes tenían ítems en
+el pool). `_select_curado` prioriza **1 tarjeta por fuente distinta**:
+
+1. **Ventana de frescura** (`web.CURATED_FRESH_HOURS = 48.0`, ~2 días): separa
+   el pool del tema en FRESCOS (≤48h) y VIEJOS (el resto).
+2. **Rondas por fuente** (dentro de cada grupo): ronda 0 toma el mejor ítem
+   (por `_score`) de cada fuente distinta; ronda 1 el segundo de cada fuente
+   que aún tenga uno; así sucesivamente. Se agotan fuentes nuevas antes de
+   repetir ninguna.
+3. **Relleno — frescura primero:** las 6 se llenan primero con rondas sobre
+   FRESCOS (repitiendo fuente si hace falta) y solo se recurre a VIEJOS si
+   FRESCOS no alcanza. Si **todo** el pool está a >48h, se repite la(s) misma(s)
+   fuente(s) las veces que sea necesario para llenar 6.
+4. **Portada por score puro:** las 6 elegidas se ordenan por `_score`
+   descendente — un preprint de arXiv (tier 1, recién publicado) puede ir de
+   primero aunque el resto sean medios tier 2.
+5. **Las 2 primeras de fuentes distintas:** si tras el orden por score las
+   tarjetas 1 y 2 quedan de la misma fuente, se intercambia la 2.ª por la
+   siguiente de fuente distinta — salvo que sea imposible (todo el pool es de
+   una sola fuente).
+
+Tests: `tests/test_curado.py`.
 
 ---
 
@@ -101,13 +133,17 @@ ciberseguridad + actualidad informática** (hardware, software, semiconductores)
 - Por consulta: `arxiv_api` (categoría `cs.AI`), `google_news_rss`,
   `hacker_news` — definidas en `TOPIC_CONFIG["ai"]` (`sibylla/fetchers.py`).
 - Medios RSS que declaran `topics: [ai]` y están en `DEFAULT_FREE_SOURCES`
-  (`sibylla/pipeline.py`): p. ej. `mit_tech_review`, `techcrunch`,
-  `ieee_spectrum`, `quanta`, `the_conversation`.
+  (`sibylla/pipeline.py`): `mit_tech_review`, `techcrunch`, `ieee_spectrum`,
+  `quanta`, `the_conversation`, `ars_technica`, `the_verge`, `wired`, y
+  (desde 2026-06-30, para variedad de fuentes) `krebs`, `bleepingcomputer`
+  (ciberseguridad) y `xataka_ia`, `xataka_cuantica`, `hipertextual`
+  (español nativo, sin coste de traducción).
 
 **Palabras clave:** `TOPIC_KEYWORDS["ai"]` (`fetchers.py`) — bilingüe ES/EN, sin
-tildes. Es el filtro que decide qué ítems de los medios entran al tema.
+tildes; ya incluye ciberseguridad (`cybersecurity`, `ransomware`, `cve`…) y
+cómputo cuántico. Es el filtro que decide qué ítems de los medios entran al tema.
 
-**Selección de las 6 y orden:** [motor temático](#motor-de-selección-temática-común-a-frontera-digital-y-medicina) — `_score` desc → `diversify` → top 6.
+**Selección de las 6 y orden:** [selector curado](#selector-curado-web_select_curado--frontera-digital-y-medicina) `web._select_curado` — 1 tarjeta por fuente, ventana de frescura de 2 días, portada por score puro.
 
 <a id="pendiente-frontera-digital"></a>
 ### ⏳ Pendiente: renombre y ampliación de alcance
@@ -148,7 +184,7 @@ producto; **aún no implementado**), los puntos a tocar serán:
 **Palabras clave:** `TOPIC_KEYWORDS["medicine"]` (`fetchers.py`); ya incluye
 términos clínicos, oncológicos, `neuro` y parte de terapia génica.
 
-**Selección de las 6 y orden:** [motor temático](#motor-de-selección-temática-común-a-frontera-digital-y-medicina) — idéntico a Frontera Digital.
+**Selección de las 6 y orden:** [selector curado](#selector-curado-web_select_curado--frontera-digital-y-medicina) `web._select_curado` — idéntico a Frontera Digital (1 tarjeta por fuente, ventana de 2 días, portada por score puro).
 
 > 💡 **Para cubrir mejor fisiología / edición genética:** se pueden ampliar las
 > keywords de `medicine`, o sumar los temas que **ya existen** `biotech`
@@ -278,7 +314,9 @@ house cards se renderizan **idénticas** a las orgánicas (no llevan badge
 | Nº de tarjetas por sección temática | `max_por_tema` (default 6) | `sibylla/web.py` |
 | Peso por tier en el ranking | `TIER_WEIGHT` | `sibylla/pipeline.py` |
 | Cuánto "dura" la frescura | `RECENCY_HALFLIFE_H` | `sibylla/pipeline.py` |
-| Máx. por fuente dentro de un tema | `MAX_PER_SOURCE_TOPIC` | `sibylla/pipeline.py` |
+| Máx. por fuente dentro de un tema (temas NO curados) | `MAX_PER_SOURCE_TOPIC` | `sibylla/pipeline.py` |
+| Qué temas usan el selector curado (1 por fuente) | `CURATED_TOPIC_IDS` | `sibylla/web.py` |
+| Ventana de frescura del selector curado | `CURATED_FRESH_HOURS` | `sibylla/web.py` |
 | Qué fuentes entran por defecto | `DEFAULT_FREE_SOURCES` | `sibylla/pipeline.py` |
 | Consulta/categoría de un tema | `TOPIC_CONFIG` | `sibylla/fetchers.py` |
 | Palabras clave de relevancia | `TOPIC_KEYWORDS` | `sibylla/fetchers.py` |

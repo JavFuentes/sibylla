@@ -22,7 +22,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random as _random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -435,6 +435,73 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     }
 
 
+# =============================================================================
+# Selección curada de temas (Frontera Digital, Medicina) — 1 tarjeta por fuente
+# =============================================================================
+
+# Temas que usan `_select_curado` en vez del corte simple por score. El motor
+# temático genérico (rank + diversify, cap 3 por fuente) tiende a dejar las 6
+# tarjetas en manos de 1-2 fuentes muy frescas y de alto volumen (ver
+# análisis: techcrunch+arxiv copaban Frontera Digital). Aquí se prioriza 1
+# fuente distinta por tarjeta antes de repetir ninguna.
+CURATED_TOPIC_IDS: set[str] = {"ai", "medicine"}
+# Ventana de "fresco" para el relleno: ≤48h (~2 días).
+CURATED_FRESH_HOURS = 48.0
+
+
+def _select_curado(items: list[NewsItem], max_n: int = 6) -> list[NewsItem]:
+    """Selecciona `max_n` tarjetas priorizando 1 por fuente distinta.
+
+    1. Separa en FRESCOS (≤ `CURATED_FRESH_HOURS`) y VIEJOS (el resto).
+    2. Dentro de cada grupo, arma "rondas": ronda 0 toma el mejor ítem (por
+       `_score`) de cada fuente distinta; ronda 1 el segundo de cada fuente,
+       etc. Así se agotan las fuentes nuevas antes de repetir ninguna, y solo
+       se repite fuente dentro de FRESCOS si hace falta. Si FRESCOS no llega
+       a `max_n`, se completa con rondas de VIEJOS (mismo agotamiento por
+       fuente) — ahí sí se permite repetir fuente cuanto sea necesario.
+    3. Las `max_n` elegidas se ordenan por `_score` puro (portada = importancia
+       bruta: un preprint de arXiv puede ir de primero si puntúa más).
+    4. Si las 2 primeras tarjetas quedan de la misma fuente, se intercambia la
+       segunda por la siguiente de fuente distinta (si existe alguna)."""
+    if not items:
+        return []
+
+    def _por_fuente_en_rondas(pool: list[NewsItem]) -> list[NewsItem]:
+        by_src: dict[str, list[NewsItem]] = {}
+        for it in pool:
+            by_src.setdefault(it.source_id, []).append(it)
+        for lst in by_src.values():
+            lst.sort(key=_score, reverse=True)
+        out: list[NewsItem] = []
+        depth = 0
+        while True:
+            fila = [lst[depth] for lst in by_src.values() if depth < len(lst)]
+            if not fila:
+                break
+            fila.sort(key=_score, reverse=True)
+            out.extend(fila)
+            depth += 1
+        return out
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=CURATED_FRESH_HOURS)
+    frescos = [it for it in items if it.published and it.published >= cutoff]
+    fresco_ids = {id(it) for it in frescos}
+    viejos = [it for it in items if id(it) not in fresco_ids]
+
+    pool = _por_fuente_en_rondas(frescos) + _por_fuente_en_rondas(viejos)
+    seleccion = pool[:max_n]
+    seleccion.sort(key=_score, reverse=True)
+
+    if len(seleccion) >= 2 and seleccion[0].source_id == seleccion[1].source_id:
+        for i in range(2, len(seleccion)):
+            if seleccion[i].source_id != seleccion[0].source_id:
+                seleccion[1], seleccion[i] = seleccion[i], seleccion[1]
+                break
+
+    return seleccion
+
+
 def _primario(it: NewsItem) -> str:
     """Tema principal del ítem ('otros' si no tiene)."""
     return it.topics[0] if it.topics else "otros"
@@ -453,6 +520,18 @@ def _orden_temas(items: list[NewsItem], topics: list[str]) -> list[str]:
     return salida
 
 
+def _seleccionar_tema(items: list[NewsItem], t: str, max_por_tema: int) -> list[NewsItem]:
+    """Ítems de un tema que se muestran como tarjetas (≤ max_por_tema).
+
+    Frontera Digital y Medicina (`CURATED_TOPIC_IDS`) usan `_select_curado`
+    (1 tarjeta por fuente, ventana de frescura). Los demás temas usan el corte
+    simple: las primeras `max_por_tema`, ya vienen rankeadas por el pipeline."""
+    del_tema = [it for it in items if _primario(it) == t]
+    if t in CURATED_TOPIC_IDS:
+        return _select_curado(del_tema, max_por_tema)
+    return del_tema[:max_por_tema]
+
+
 def _rendered_items(items: list[NewsItem], topics: list[str],
                     max_por_tema: int,
                     social_items: list[NewsItem] | None = None,
@@ -466,7 +545,7 @@ def _rendered_items(items: list[NewsItem], topics: list[str],
     se renderizan)."""
     salida: list[NewsItem] = []
     for t in _orden_temas(items, topics):
-        salida.extend([it for it in items if _primario(it) == t][:max_por_tema])
+        salida.extend(_seleccionar_tema(items, t, max_por_tema))
     if astro_items:
         salida.extend(astro_items)
     if social_items:
@@ -486,8 +565,8 @@ def _agrupar(items: list[NewsItem], topics: list[str],
     """
     grupos: list[dict] = []
     for t in _orden_temas(items, topics):
-        cartas = [_tarjeta(it, months, no_date, translations, resumenes)
-                  for it in items if _primario(it) == t][:max_por_tema]
+        seleccion = _seleccionar_tema(items, t, max_por_tema)
+        cartas = [_tarjeta(it, months, no_date, translations, resumenes) for it in seleccion]
         if cartas:
             grupos.append({"id": t, "label": _label(t, topic_labels), "cards": cartas})
     return grupos

@@ -19,6 +19,8 @@ DEFAULT_FREE_SOURCES = [
     "nature_news", "bbc_science", "mit_tech_review", "phys_org", "sciencedaily",
     "the_conversation", "techcrunch", "scientific_american", "quanta",
     "ieee_spectrum", "agencia_sinc", "ars_technica", "the_verge", "wired",
+    # Frontera Digital: ciberseguridad + español nativo (variedad de fuentes)
+    "krebs", "bleepingcomputer", "xataka_ia", "xataka_cuantica", "hipertextual",
     # Sección Nacional (Chile): 8 medios por RSS nativo + 1 agregador `site:` GN.
     "ciper", "interferencia", "diario_uchile", "fast_check_cl",
     "lavoz_pucon", "diario_aysen", "puranoticia", "mapuexpress",

@@ -37,6 +37,7 @@ meta:
     verified_2026-06-20: "Probado en vivo el 2026-06-20 y funcionó."
     verified_2026-06-22: "Probado en vivo el 2026-06-22 (feeds de la sección Nacional)."
     verified_2026-06-28: "Probado en vivo el 2026-06-28 (feeds de agencias espaciales, sección Astronomía)."
+    verified_2026-06-30: "Probado en vivo el 2026-06-30 (fuentes nuevas de Frontera Digital: Krebs, BleepingComputer, Xataka IA/cuántica, Hipertextual)."
     known: "Fuente conocida/estándar; confirmar feed exacto al construir el ingestor."
 
   topics: [nacional, general_science, general_tech, ai, computing, space, astronomia,
@@ -512,6 +513,34 @@ sources:
     cost: free
     status: known
 
+  - id: krebs
+    name: "Krebs on Security"
+    publisher: "Brian Krebs"
+    tier: 2
+    type: rss
+    url: "https://krebsonsecurity.com/feed/"
+    topics: [ai]
+    lang: en
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+    notes: "Referencia en investigación de ciberseguridad (brechas, fraude, malware). Suma variedad a Frontera Digital, hoy dominada por techcrunch+arxiv."
+
+  - id: bleepingcomputer
+    name: "BleepingComputer"
+    publisher: "BleepingComputer LLC"
+    tier: 2
+    type: rss
+    url: "https://www.bleepingcomputer.com/feed/"
+    topics: [ai]
+    lang: en
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+    notes: "Alto volumen en ciberseguridad/vulnerabilidades (ransomware, CVE, brechas). Buen pulso diario, complementa a Krebs."
+
   - id: quanta
     name: "Quanta Magazine"
     publisher: "Simons Foundation"
@@ -665,6 +694,52 @@ sources:
     cost: free
     status: known
     notes: "BBC en español; confirmar URL exacta del feed de ciencia/tecnología."
+
+  - id: xataka_ia
+    name: "Xataka — Inteligencia Artificial"
+    publisher: "Webedia"
+    tier: 2
+    type: rss
+    url: "https://www.xataka.com/tag/inteligencia-artificial/rss2.xml"
+    topics: [ai]
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+    notes: >
+      Feed filtrado por etiqueta (no el general): solo notas de IA, en español
+      nativo (sin coste de traducción). El feed genérico `/tag/feeds/rss2.xml`
+      está vacío ("Magazine - feeds"); el patrón correcto es
+      `/tag/{etiqueta}/rss2.xml`, verificado con contenido real del día.
+
+  - id: xataka_cuantica
+    name: "Xataka — Computación Cuántica"
+    publisher: "Webedia"
+    tier: 2
+    type: rss
+    url: "https://www.xataka.com/tag/computacion-cuantica/rss2.xml"
+    topics: [ai]
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+    notes: "Mismo patrón de feed por etiqueta que xataka_ia. Cubre el hueco de cuántica en Frontera Digital, en español nativo."
+
+  - id: hipertextual
+    name: "Hipertextual"
+    publisher: "Hipertextual"
+    tier: 3
+    type: rss
+    url: "https://hipertextual.com/feed"
+    topics: [ai]
+    lang: es
+    license: "propietaria (uso editorial)"
+    access: open
+    cost: free
+    status: verified_2026-06-30
+    notes: "Tech/ciencia en español (LatAm). Feed general clasificado por relevancia (TOPIC_KEYWORDS), como el resto de medios RSS."
 
 # =============================================================================
 # TIER 3 — Agregadores (descubrimiento amplio y multilingüe)
