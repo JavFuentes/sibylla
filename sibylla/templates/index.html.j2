@@ -219,6 +219,10 @@
 
   /* ---- Controles de sección: subir / bajar / quitar ---- */
   .bloque{ scroll-margin-top:86px; }
+  #secciones.is-reordering .sec-btn,
+  #secciones.is-reordering .card-ctrl-btn{ pointer-events:none; }
+  .bloque.is-moving{ z-index:2; position:relative; }
+  .bloque.is-moving .tema h3{ color:var(--oro-claro); }
   .bloque-especial{ margin-top:30px; }
   .tema-ctrls{ display:inline-flex; align-items:center; flex:none; }
   .sec-ctrl{ display:inline-flex; align-items:center; gap:6px; flex:none;
@@ -258,6 +262,7 @@
     .restaurar{ transition:opacity .2s; transform:none; }
     .restaurar.is-on{ transform:none; }
     .sec-btn{ transition:color .2s, border-color .2s, background .2s; }
+    .bloque.is-moving .tema h3{ color:var(--marfil); }
   }
   .pulso{ width:8px; height:8px; border-radius:50%; background:var(--cian);
     box-shadow:0 0 0 0 rgba(94,230,224,.6); animation:latir 2.4s infinite; }
@@ -474,8 +479,6 @@
     </label>
     <nav class="menu">
       <a href="#presente">{{ t.nav_present }}</a>
-      {% if astro_cards %}<a href="#astronomia">{{ t.astro_heading }}</a>{% endif %}
-      {% if social_cards %}<a href="#voces">{{ t.social_heading }}</a>{% endif %}
       <a href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.nav_github }}</a>
       <a href="#">{{ t.nav_about }}</a>
     </nav>
@@ -645,7 +648,25 @@
   }
 
   /* ---------- orden / visibilidad ---------- */
+  var REORDERING=false;
   function visibleBlocks(){ return blocks().filter(function(b){ return b.style.display!=='none'; }); }
+  function blockOf(topic){
+    var bs=blocks();
+    for(var i=0;i<bs.length;i++){ if(bs[i].dataset.topic===topic) return bs[i]; }
+    return null;
+  }
+  function measureVisibleBlocks(){
+    var rects={};
+    visibleBlocks().forEach(function(b){ rects[b.dataset.topic]=b.getBoundingClientRect(); });
+    return rects;
+  }
+  function prefersReducedMotion(){
+    return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+  function keepBlockInView(topic){
+    var b=blockOf(topic); if(!b) return;
+    try{ b.scrollIntoView({block:'nearest'}); }catch(_){ b.scrollIntoView(); }
+  }
   function applyLayout(){
     var lay=loadLayout();
     var present=blocks(); var byTopic={};
@@ -669,6 +690,67 @@
       var dn=vis[vis.length-1].querySelector('.sec-down'); if(dn) dn.disabled=true;
     }
   }
+  function animateLayoutChange(topic, change){
+    if(REORDERING) return;
+    if(prefersReducedMotion() || !window.requestAnimationFrame){
+      change(); keepBlockInView(topic); return;
+    }
+
+    var first=measureVisibleBlocks();
+    REORDERING=true;
+    CONT.classList.add('is-reordering');
+
+    change();
+
+    var moved=blockOf(topic);
+    if(moved) moved.classList.add('is-moving');
+
+    var last=measureVisibleBlocks();
+    var animated=[];
+    visibleBlocks().forEach(function(b){
+      var before=first[b.dataset.topic], after=last[b.dataset.topic];
+      if(!before || !after) return;
+      var dx=before.left-after.left, dy=before.top-after.top;
+      if(Math.abs(dx)<1 && Math.abs(dy)<1) return;
+      b.style.transition='none';
+      b.style.transform='translate3d('+dx+'px,'+dy+'px,0)';
+      b.style.willChange='transform';
+      animated.push(b);
+    });
+
+    function finish(){
+      if(!REORDERING) return;
+      clearTimeout(timer);
+      animated.forEach(function(b){
+        b.removeEventListener('transitionend', ended);
+        b.style.transition='';
+        b.style.transform='';
+        b.style.willChange='';
+      });
+      if(moved) moved.classList.remove('is-moving');
+      CONT.classList.remove('is-reordering');
+      REORDERING=false;
+      keepBlockInView(topic);
+    }
+    function ended(e){
+      if(e.target!==e.currentTarget || e.propertyName!=='transform') return;
+      e.currentTarget.removeEventListener('transitionend', ended);
+      remaining--;
+      if(remaining<=0) finish();
+    }
+
+    if(!animated.length){ finish(); return; }
+    var remaining=animated.length;
+    var timer=setTimeout(finish, 650);
+    animated.forEach(function(b){ b.addEventListener('transitionend', ended); });
+    CONT.offsetHeight; /* Fuerza el estado inicial antes de animar al nuevo orden. */
+    requestAnimationFrame(function(){
+      animated.forEach(function(b){
+        b.style.transition='transform .48s cubic-bezier(.22,.8,.28,1)';
+        b.style.transform='';
+      });
+    });
+  }
   function moveBlock(topic, dir){
     var ids=blocks().map(function(b){return b.dataset.topic;});
     var vis=visibleBlocks().map(function(b){return b.dataset.topic;});
@@ -676,7 +758,9 @@
     var target=vis[vpos+dir]; if(target===undefined) return;
     var i=ids.indexOf(topic), j=ids.indexOf(target);
     ids[i]=target; ids[j]=topic;
-    var lay=loadLayout(); lay.order=ids; saveLayout(lay); applyLayout();
+    animateLayoutChange(topic, function(){
+      var lay=loadLayout(); lay.order=ids; saveLayout(lay); applyLayout();
+    });
   }
   function removeBlock(topic){
     var lay=loadLayout();
@@ -732,6 +816,7 @@
   CONT.addEventListener('click', function(e){
     var btn=e.target.closest ? e.target.closest('button') : null;
     if(!btn || !CONT.contains(btn)) return;
+    if(REORDERING) return;
     var bloque=btn.closest('.bloque'); if(!bloque) return;
     var topic=bloque.dataset.topic;
     if(btn.classList.contains('card-ctrl-btn')) stepCards(topic, parseInt(btn.dataset.dir,10));
@@ -739,7 +824,7 @@
     else if(btn.classList.contains('sec-down')) moveBlock(topic, 1);
     else if(btn.classList.contains('sec-del'))  removeBlock(topic);
   });
-  if(restore) restore.addEventListener('click', restoreAll);
+  if(restore) restore.addEventListener('click', function(){ if(!REORDERING) restoreAll(); });
   window.addEventListener('hashchange', revealHashTarget);
 })();
 /* Acordeón "Resumen": despliega/oculta el panel dentro de la tarjeta. */
