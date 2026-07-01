@@ -19,13 +19,13 @@ import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from urllib.parse import unquote, urljoin
+from urllib.parse import parse_qs, unquote, urljoin, urlparse
 
 import feedparser
 import requests
 from dateutil import parser as dateparser
 
-from .config import ROOT, Source, load_social_config
+from .config import ROOT, Source, get_youtube_api_key, load_social_config
 from .models import NewsItem, clean_text as _clean_text
 
 log = logging.getLogger("sibylla")
@@ -478,6 +478,10 @@ _YT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 _YT_RETRY_CODES = {403, 404, 408, 425, 429, 500, 502, 503, 504}
 _YT_CACHE_PATH = ROOT / "data" / "youtube_cache.json"
 _YT_CACHE_TTL_DAYS = 30
+_YT_API_ENDPOINT = "https://www.googleapis.com/youtube/v3/playlistItems"
+# Títulos que YouTube pone en huecos de la playlist de subidas (videos que ya no
+# son públicos); no son tarjetas válidas.
+_YT_DEAD_TITLES = {"Private video", "Deleted video", "This video is private"}
 
 
 def _youtube_thumb(video_id: str) -> Optional[str]:
@@ -563,15 +567,91 @@ def _youtube_entries(source: Source, feed, limit: int) -> list[NewsItem]:
     return items
 
 
-def fetch_youtube(source: Source, limit: int, attempts: int = 4) -> list[NewsItem]:
-    """Videos recientes de un canal de YouTube (feed Atom).
+def _yt_channel_id(source: Source) -> str:
+    """channel_id (UC...) del canal. Se toma del campo `channel_id` del YAML si
+    existe; si no, se extrae del parámetro de la URL del feed Atom."""
+    cid = str(source.raw.get("channel_id") or "").strip()
+    if cid:
+        return cid
+    try:
+        return (parse_qs(urlparse(source.url or "").query).get("channel_id") or [""])[0].strip()
+    except Exception:  # noqa: BLE001
+        return ""
 
-    Reintenta el fetch (el endpoint es flaky) y, si no lo consigue, cae al caché
-    en disco de la última corrida buena. Nunca lanza: devuelve [] en el peor caso.
+
+def _youtube_api_fetch(source: Source, limit: int, api_key: str) -> list[NewsItem]:
+    """Últimos videos de un canal vía YouTube Data API v3 (robusta, sin throttling).
+
+    Trucode cuota: la playlist de 'subidas' de un canal es su channel_id con el
+    prefijo UC->UU (convención estable de YouTube), así se evita la llamada a
+    channels.list y basta 1 unidad de cuota por canal. Devuelve [] ante cualquier
+    fallo (clave inválida, cuota agotada, red, parseo) para que el caller caiga al
+    feed RSS + caché.
+    """
+    cid = _yt_channel_id(source)
+    if not cid.startswith("UC"):
+        return []
+    uploads = "UU" + cid[2:]
+    try:
+        r = requests.get(_YT_API_ENDPOINT, timeout=20, params={
+            "part": "snippet",
+            "playlistId": uploads,
+            "maxResults": min(max(limit, 1) + 3, 50),  # margen por huecos privados
+            "key": api_key,
+        })
+        if r.status_code == 403:
+            log.warning("  %-16s [youtube] API v3 403 (¿cuota agotada o clave inválida?); uso RSS+caché.", source.id)
+            return []
+        r.raise_for_status()
+        data = r.json()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("  %-16s [youtube] API v3 falló (%s); uso RSS+caché.", source.id, exc)
+        return []
+
+    items: list[NewsItem] = []
+    for entry in (data.get("items") or []):
+        snip = entry.get("snippet") or {}
+        vid = str((snip.get("resourceId") or {}).get("videoId") or "").strip()
+        title = str(snip.get("title") or "").strip()
+        if not vid or title in _YT_DEAD_TITLES:
+            continue
+        items.append(NewsItem(
+            title=title,
+            url=f"https://www.youtube.com/watch?v={vid}",
+            source_id=source.id,
+            source_name=source.name,
+            tier=source.tier,
+            published=_parse_date(str(snip.get("publishedAt") or "")),
+            summary=str(snip.get("description") or ""),
+            image=_youtube_thumb(vid),
+            extra={"kind": "video", "video_id": vid},
+        ))
+        if len(items) >= limit:
+            break
+    return items
+
+
+def fetch_youtube(source: Source, limit: int, attempts: int = 4) -> list[NewsItem]:
+    """Videos recientes de un canal de YouTube (sección Divulgación).
+
+    Vía preferente: la YouTube Data API v3 (si hay YOUTUBE_API_KEY), que es
+    robusta y no sufre el throttling del endpoint RSS. Sin clave o si la API
+    falla, cae al feed Atom con reintentos y, en último término, al caché en disco
+    de la última corrida buena. Nunca lanza: devuelve [] en el peor caso.
     """
     if not source.url:
         return []
-    # Throttle suave: recorrer ~37 canales de golpe dispara el rate-limit.
+
+    # 1) API oficial: evita los 404/500 engañosos que YouTube devuelve al feed RSS
+    #    desde IPs de datacenter (GitHub Actions). Al tener éxito, siembra el caché.
+    api_key = get_youtube_api_key()
+    if api_key:
+        api_items = _youtube_api_fetch(source, limit, api_key)
+        if api_items:
+            _yt_cache_put(source.id, api_items)
+            return api_items
+
+    # 2) Fallback RSS. Throttle suave: recorrer ~37 canales de golpe dispara el rate-limit.
     time.sleep(_random.uniform(0.2, 0.5))
     last = ""
     for i in range(attempts):

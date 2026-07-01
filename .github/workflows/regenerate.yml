@@ -138,6 +138,7 @@ jobs:
           SIBYLLA_GOOGLE_VERIFICATION: ${{ vars.SIBYLLA_GOOGLE_VERIFICATION }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
           NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           BLUESKY_IDENTIFIER: ${{ secrets.BLUESKY_IDENTIFIER }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
         run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --translate auto

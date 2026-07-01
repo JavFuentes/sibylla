@@ -134,6 +134,7 @@ Configura en *Settings → Secrets and variables → Actions* del repo:
 | `LLM_PROVIDER`, `LLM_MODEL` | Proveedor y modelo de IA (pueden ir como *Variables* en vez de *Secrets*). |
 | `LLM_API_KEY` | Clave del proveedor de IA. **Secret.** |
 | `X_BEARER_TOKEN` | Token Bearer de X para "Voces de la red" (solo si usas `--with-x`). **Secret.** |
+| `YOUTUBE_API_KEY` | Clave de la *YouTube Data API v3* para la sección Divulgación. Gratis (10.000 unidades/día; el build gasta ~40). Sin ella se cae al feed RSS, que YouTube throttlea desde las IPs de CI (404/500). **Secret.** |
 | `BLUESKY_IDENTIFIER` | Identificador de Bluesky (ej. `sibylla.bsky.social`) para la API de AT Protocol. |
 | `BLUESKY_APP_PASSWORD` | App password de Bluesky (desde Settings → App Passwords). **Secret.** |
 | `MASTODON_INSTANCE` | Instancia de Mastodon (opcional; por defecto `mastodon.social`). |

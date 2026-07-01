@@ -82,6 +82,14 @@ def get_nasa_api_key() -> str:
     return os.getenv("NASA_API_KEY", "DEMO_KEY").strip() or "DEMO_KEY"
 
 
+def get_youtube_api_key() -> str:
+    """Clave de la YouTube Data API v3 (sección Divulgación). Lee YOUTUBE_API_KEY
+    del .env; vacío si no se define. Con clave, fetch_youtube usa la API oficial
+    (robusta); sin clave, cae al feed RSS + caché (que YouTube throttlea desde IPs
+    de datacenter con 404/500 engañosos)."""
+    return os.getenv("YOUTUBE_API_KEY", "").strip()
+
+
 def get_google_verification() -> str:
     """Token de verificación de Google Search Console (método 'etiqueta HTML').
 
