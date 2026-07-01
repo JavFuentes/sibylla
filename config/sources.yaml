@@ -38,6 +38,7 @@ meta:
     verified_2026-06-22: "Probado en vivo el 2026-06-22 (feeds de la sección Nacional)."
     verified_2026-06-28: "Probado en vivo el 2026-06-28 (feeds de agencias espaciales, sección Astronomía)."
     verified_2026-06-30: "Probado en vivo el 2026-06-30 (fuentes nuevas de Frontera Digital y canales de Divulgación)."
+    verified_2026-07-01: "Canales de YouTube (Divulgación) revalidados el 2026-07-01. El feed es flaky por rate-limit; fetch_youtube reintenta y cachea."
     known: "Fuente conocida/estándar; confirmar feed exacto al construir el ingestor."
 
   topics: [nacional, general_science, general_tech, ai, computing, space, astronomia,
@@ -1060,8 +1061,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 404. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_jefillysh
     name: "jefillysh"
@@ -1106,8 +1107,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El feed Atom devuelve 404. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_quantumfracture
     name: "QuantumFracture"
@@ -1167,8 +1168,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_ecosdeunmundoestrellado
     name: "Ecosdeunmundoestrellado"
@@ -1333,8 +1334,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 404. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_darinmex
     name: "Darin McNabb"
@@ -1394,8 +1395,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_matesmike
     name: "Mates Mike"
@@ -1410,8 +1411,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_pontebata
     name: "Ponte Bata"
@@ -1471,8 +1472,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_anatomiahumanaydiseccion
     name: "Anatomía Humana y Disección"
@@ -1487,8 +1488,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El feed Atom devuelve 404. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_iftwebinars
     name: "IFT Webinars"
@@ -1533,8 +1534,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_alvamajo
     name: "Alva Majo"
@@ -1549,8 +1550,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_javier_garcia
     name: "Javier Garcia"
@@ -1580,8 +1581,8 @@ sources:
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: feed_unavailable_2026-07-01
-    notes: "El handle existe, pero el feed Atom devuelve 404. No se incluye por defecto."
+    status: verified_2026-07-01
+    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
 
   - id: yt_deborahciencia
     name: "deborahciencia"

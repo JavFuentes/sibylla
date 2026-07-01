@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import base64
 import calendar
+import json
 import logging
 import random as _random
 import re
+import time
 import unicodedata
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -23,7 +25,7 @@ import feedparser
 import requests
 from dateutil import parser as dateparser
 
-from .config import Source, load_social_config
+from .config import ROOT, Source, load_social_config
 from .models import NewsItem, clean_text as _clean_text
 
 log = logging.getLogger("sibylla")
@@ -460,6 +462,142 @@ def fetch_generic_rss(source: Source, limit: int) -> list[NewsItem]:
             extra={"feed_pos": pos},
         ))
     return items
+
+
+# --- YouTube (feeds Atom por canal; sección Divulgación) --------------------
+# El endpoint `feeds/videos.xml` de YouTube es FRÁGIL: devuelve 404/500/429 de
+# forma intermitente cuando se le hace polling, y las IPs de CI (GitHub Actions)
+# están especialmente penalizadas. Estrategia de robustez:
+#   1) reintentar con backoff exponencial + jitter;
+#   2) si aun así falla, caer al CACHÉ en disco de la última corrida buena.
+# Así la sección Divulgación se mantiene poblada aunque un feed falle en un
+# build puntual. La miniatura se construye desde el videoId (no del media:content
+# del feed, que apunta al player flash y rompía la imagen de la tarjeta).
+_YT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+          "(KHTML, like Gecko) Chrome/122.0 Safari/537.36")
+_YT_RETRY_CODES = {403, 404, 408, 425, 429, 500, 502, 503, 504}
+_YT_CACHE_PATH = ROOT / "data" / "youtube_cache.json"
+_YT_CACHE_TTL_DAYS = 30
+
+
+def _youtube_thumb(video_id: str) -> Optional[str]:
+    """Miniatura estable de un video. `hqdefault.jpg` existe para todo video
+    público y no depende de cómo feedparser exponga el <media:group>."""
+    return f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg" if video_id else None
+
+
+def _yt_cache_load() -> dict:
+    try:
+        return json.loads(_YT_CACHE_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+
+def _yt_cache_save(data: dict) -> None:
+    try:
+        _YT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _YT_CACHE_PATH.write_text(
+            json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError as exc:  # noqa: BLE001
+        log.warning("No se pudo guardar el caché de YouTube: %s", exc)
+
+
+def _yt_cache_put(source_id: str, items: list[NewsItem]) -> None:
+    data = _yt_cache_load()
+    data[source_id] = {
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+        "items": [{
+            "title": it.title,
+            "url": it.url,
+            "published": it.published.isoformat() if it.published else None,
+            "summary": it.summary,
+            "video_id": it.extra.get("video_id", ""),
+        } for it in items],
+    }
+    _yt_cache_save(data)
+
+
+def _yt_cache_get(source: Source, limit: int) -> list[NewsItem]:
+    entry = _yt_cache_load().get(source.id)
+    if not entry:
+        return []
+    ts = _parse_date(entry.get("fetched_at") or "")
+    if ts and (datetime.now(timezone.utc) - ts).days > _YT_CACHE_TTL_DAYS:
+        return []  # demasiado viejo: mejor sin tarjeta que un video rancio
+    out: list[NewsItem] = []
+    for d in (entry.get("items") or [])[:limit]:
+        if not d.get("url"):
+            continue
+        out.append(NewsItem(
+            title=d.get("title", ""),
+            url=d["url"],
+            source_id=source.id,
+            source_name=source.name,
+            tier=source.tier,
+            published=_parse_date(d.get("published") or ""),
+            summary=d.get("summary", ""),
+            image=_youtube_thumb(d.get("video_id", "")),
+            extra={"kind": "video", "video_id": d.get("video_id", ""), "from_cache": True},
+        ))
+    return out
+
+
+def _youtube_entries(source: Source, feed, limit: int) -> list[NewsItem]:
+    items: list[NewsItem] = []
+    for e in feed.entries[:limit]:
+        vid = e.get("yt_videoid") or ""
+        url = e.get("link") or (f"https://www.youtube.com/watch?v={vid}" if vid else "")
+        if not url:
+            continue
+        items.append(NewsItem(
+            title=e.get("title", ""),
+            url=url,
+            source_id=source.id,
+            source_name=source.name,
+            tier=source.tier,
+            published=_from_struct(e.get("published_parsed") or e.get("updated_parsed")),
+            summary=e.get("summary", ""),
+            image=_youtube_thumb(vid),
+            extra={"kind": "video", "video_id": vid},
+        ))
+    return items
+
+
+def fetch_youtube(source: Source, limit: int, attempts: int = 4) -> list[NewsItem]:
+    """Videos recientes de un canal de YouTube (feed Atom).
+
+    Reintenta el fetch (el endpoint es flaky) y, si no lo consigue, cae al caché
+    en disco de la última corrida buena. Nunca lanza: devuelve [] en el peor caso.
+    """
+    if not source.url:
+        return []
+    # Throttle suave: recorrer ~37 canales de golpe dispara el rate-limit.
+    time.sleep(_random.uniform(0.2, 0.5))
+    last = ""
+    for i in range(attempts):
+        try:
+            r = requests.get(source.url, timeout=25, headers={
+                "User-Agent": _YT_UA, "Accept-Language": "es-ES,es;q=0.9"})
+            if r.status_code in _YT_RETRY_CODES:
+                last = f"HTTP {r.status_code}"
+                raise requests.HTTPError(last)
+            r.raise_for_status()
+            items = _youtube_entries(source, feedparser.parse(r.content), limit)
+            if items:
+                _yt_cache_put(source.id, items)
+                return items
+            last = "feed 200 sin entradas"
+        except Exception as exc:  # noqa: BLE001
+            last = str(exc) or exc.__class__.__name__
+        if i < attempts - 1:
+            time.sleep((2 ** i) + _random.uniform(0, 0.6))  # 1s, 2s, 4s + jitter
+    cached = _yt_cache_get(source, limit)
+    if cached:
+        log.warning("  %-16s [youtube] feed falló (%s); caché: %d videos.",
+                    source.id, last, len(cached))
+    else:
+        log.warning("  %-16s [youtube] feed falló (%s) y sin caché.", source.id, last)
+    return cached
 
 
 # --- Mastodon / Fediverso (gratis, sin auth en instancias públicas) ---------
@@ -1168,6 +1306,21 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
                 log.info("  %-16s [nacional] -> %d ítems (site: GN)", source.id, len(got))
         except Exception as ex:  # noqa: BLE001
             log.warning("  %-16s [nacional] FALLÓ: %s", source.id, ex)
+        return items
+
+    if source.raw.get("category") == "youtube":
+        # Canal de YouTube -> sección Divulgación. Fetcher propio (reintentos +
+        # caché + miniatura por videoId). Solo se ingiere si se pidió el tema.
+        if "divulgacion" not in topics:
+            return items
+        try:
+            got = fetch_youtube(source, max(limit, 15))
+            for it in got:
+                it.topics = ["divulgacion"]
+            items.extend(got)
+            log.info("  %-16s [youtube] -> %d videos", source.id, len(got))
+        except Exception as ex:  # noqa: BLE001
+            log.warning("  %-16s [youtube] FALLÓ: %s", source.id, ex)
         return items
 
     if source.id in QUERY_SOURCES:

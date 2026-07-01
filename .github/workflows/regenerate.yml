@@ -44,12 +44,20 @@ jobs:
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      # Solo traducciones: son regenerables y cachearlas ahorra costo de LLM.
-      # El historial (runs.json) ya NO se cachea aquí; vive en el host.
-      - name: Restaurar cache de traducciones
+      # Cache regenerable (ahorra costo/robustez, no es historial):
+      #   - translations.json: traducciones de tarjetas (ahorra LLM).
+      #   - youtube_cache.json: última corrida buena de cada feed de YouTube.
+      #     El endpoint feeds/videos.xml es flaky desde las IPs de Actions; con el
+      #     caché, un canal que se bajó bien una vez sigue apareciendo aunque su
+      #     feed falle en el build siguiente. Se evicta a los 7 días sin uso, pero
+      #     el cron diario lo mantiene caliente.
+      # El historial (runs.json) NO se cachea aquí; vive en el host.
+      - name: Restaurar cache regenerable (traducciones + feeds de YouTube)
         uses: actions/cache@v4
         with:
-          path: data/translations.json
+          path: |
+            data/translations.json
+            data/youtube_cache.json
           key: data-cache-${{ github.run_id }}
           restore-keys: |
             data-cache-
@@ -134,12 +142,15 @@ jobs:
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
         run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --translate auto
 
-      - name: Verificar sección Divulgación
+      # Aviso NO bloqueante: si YouTube throttlea todos los feeds en un build de
+      # caché fría, la sección puede quedar vacía. NO debe abortar el deploy (el
+      # resto del sitio es válido y el principio del repo es "fallo aislado, sin
+      # romper la corrida"). El caché de feeds la repuebla en la siguiente corrida.
+      - name: Verificar sección Divulgación (aviso)
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if ! grep -q 'id="divulgacion"' web/index.html; then
-            echo "::error::La sección Divulgación no quedó renderizada en web/index.html. Revisa los logs de ingesta yt_* y el conteo 'Divulgación: ...'."
-            exit 1
+            echo "::warning::La sección Divulgación quedó vacía este build (¿YouTube throttleó todos los feeds con caché fría?). El deploy sigue; se repuebla desde el caché en la próxima corrida. Revisa el conteo 'Divulgación: ...' en los logs."
           fi
 
       - name: Subir web/ y persistir historial en el host (scp)

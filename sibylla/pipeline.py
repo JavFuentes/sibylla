@@ -28,14 +28,18 @@ DEFAULT_FREE_SOURCES = [
     # Astronomía: 3 prioritarias (CL) + 6 agencias espaciales
     "alma", "cata", "sochias",
     "jaxa", "cnes", "asi", "uksa",
-    # Divulgación: feeds Atom de YouTube verificados (1 tarjeta por canal).
-    "yt_jodisea", "yt_jefillysh", "yt_elrobotdeplaton", "yt_quantumfracture",
-    "yt_pildorasinformaticas", "yt_exoplanetas", "yt_ecosdeunmundoestrellado",
-    "yt_fazttech", "yt_psicovlog", "yt_lagatadeschrodinger", "yt_sizematters",
-    "yt_curiosamente", "yt_iftmadrid", "yt_novagea", "yt_astrumespanol",
-    "yt_raqueldelamorenaoficial", "yt_darinmex", "yt_candeliousfang", "yt_jefidos",
-    "yt_pontebata", "yt_cienciadesofa", "yt_bitboss", "yt_iftwebinars",
-    "yt_astrovlog", "yt_javier_garcia", "yt_deborahciencia",
+    # Divulgación: los 37 canales de YouTube (1 tarjeta por canal). El feed es
+    # flaky; fetch_youtube reintenta y cachea, así que TODOS entran por defecto.
+    "yt_jodisea", "yt_radientnews", "yt_jefillysh", "yt_elrobotdeplaton",
+    "yt_jesusgmaestro", "yt_quantumfracture", "yt_pildorasinformaticas",
+    "yt_exoplanetas", "yt_robotitus", "yt_ecosdeunmundoestrellado", "yt_fazttech",
+    "yt_psicovlog", "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente",
+    "yt_iftmadrid", "yt_novagea", "yt_astrumespanol", "yt_raqueldelamorenaoficial",
+    "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos", "yt_midulive",
+    "yt_matesmike", "yt_pontebata", "yt_cienciadesofa", "yt_bitboss",
+    "yt_cinematixfilms", "yt_anatomiahumanaydiseccion", "yt_iftwebinars",
+    "yt_astrovlog", "yt_lahiperactina", "yt_alvamajo", "yt_javier_garcia",
+    "yt_antroporamadivulgacion", "yt_deborahciencia",
     # Social (gratis): una tarjeta por red en "Voces de la red"
     "mastodon", "bluesky",
 ]
@@ -165,8 +169,17 @@ def run_pipeline(topics: list[str], sources_filter: list[str] | None = None,
         raw.extend(fetch_source(s, topic_cfgs, limit))
 
     deduped = dedupe(raw)
-    clustered = cluster_stories(deduped)
-    ranked = diversify(rank(clustered))
-    log.info("Total: %d crudos -> %d tras deduplicar -> %d tras agrupar historias",
-             len(raw), len(deduped), len(clustered))
+    # Los videos de Divulgación (YouTube) NO pasan por cluster_stories: agrupa
+    # por similitud de título entre fuentes distintas y podría fusionar un video
+    # con una noticia (ganaría la noticia, de tier menor) o dos canales entre sí,
+    # colapsando tarjetas (la sección muestra 1 por canal). Se apartan y se
+    # reinyectan tras agrupar el resto. El dedupe exacto por URL sí es seguro
+    # (cada video tiene URL única) y se mantiene para todos.
+    div = [it for it in deduped if "divulgacion" in it.topics]
+    non_div = [it for it in deduped if "divulgacion" not in it.topics]
+    clustered = cluster_stories(non_div)
+    ranked = diversify(rank(clustered + div))
+    log.info("Total: %d crudos -> %d tras deduplicar -> %d tras agrupar "
+             "(%d videos de divulgación al margen del cluster)",
+             len(raw), len(deduped), len(clustered), len(div))
     return ranked, meta, len(raw)
