@@ -44,7 +44,7 @@
 {%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
 <article id="{{ c.id }}" class="carta" style="--sello:{{ c.seal_color }};">
-  {% if c.image %}<div class="carta-img"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</div>{% else %}<div class="carta-img ph" aria-hidden="true">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</div>{% endif %}
+  {% if c.image %}<a class="carta-img" href="{{ c.url }}" aria-label="{{ c.title|e }}"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% else %}<a class="carta-img ph" href="{{ c.url }}" aria-label="{{ c.title|e }}">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% endif %}
   <h4>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
     <a href="{{ c.url }}">{{ c.title }}</a>
@@ -342,8 +342,9 @@
   article.carta.futura:hover{ border-color:rgba(94,230,224,.5);
     box-shadow:0 22px 50px -26px rgba(94,230,224,.5), inset 0 0 30px rgba(94,230,224,.05); }
   /* ---- Banda de imagen (real o placeholder) ---- */
-  .carta-img{ margin:-22px -24px 14px; aspect-ratio:16/9; overflow:hidden;
-    background:var(--noche); position:relative; }
+  .carta-img{ display:block; margin:-22px -24px 14px; aspect-ratio:16/9; overflow:hidden;
+    background:var(--noche); position:relative; color:inherit; text-decoration:none; }
+  .carta-img:focus-visible{ outline:2px solid rgba(94,230,224,.6); outline-offset:2px; }
   .carta-img img{ width:100%; height:100%; object-fit:cover; display:block;
     transition:transform .4s; }
   .carta:hover .carta-img img{ transform:scale(1.04); }
