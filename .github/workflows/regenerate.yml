@@ -129,9 +129,10 @@ jobs:
           SIBYLLA_SITE_URL: ${{ vars.SIBYLLA_SITE_URL || 'https://sibylla.cl' }}
           SIBYLLA_GOOGLE_VERIFICATION: ${{ vars.SIBYLLA_GOOGLE_VERIFICATION }}
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+          NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
           BLUESKY_IDENTIFIER: ${{ secrets.BLUESKY_IDENTIFIER }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
-        run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia --with-x --html --translate auto
+        run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --translate auto
 
       - name: Subir web/ y persistir historial en el host (scp)
         env:
@@ -190,11 +191,11 @@ jobs:
               echo "ERROR: no se pudo crear $REMOTE_DATA en el host."
               exit 1
             }
-            reintentar "subida de runs.json" subir_runs || {
-              echo "ERROR: no se pudo subir runs.json (¡historial no persistido!)."
-              exit 1
-            }
-            echo "✓ Historial persistido en $REMOTE_DATA/runs.json"
+            if reintentar "subida de runs.json" subir_runs; then
+              echo "✓ Historial persistido en $REMOTE_DATA/runs.json"
+            else
+              echo "⚠ No se pudo subir runs.json; la web ya fue desplegada, pero el historial no quedó persistido."
+            fi
           else
             echo "ⓘ No hay data/runs.json que persistir (¿generación sin métricas?)."
           fi
