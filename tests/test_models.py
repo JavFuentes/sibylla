@@ -15,6 +15,7 @@ from sibylla.models import (
     canonicalize_url,
     clean_text,
     normalize_title,
+    safe_link_url,
 )
 
 # ---------------------------------------------------------------------------
@@ -140,6 +141,28 @@ def test_normalize_title(title, expected, _desc):
 
 
 # ---------------------------------------------------------------------------
+# safe_link_url
+# ---------------------------------------------------------------------------
+SAFE_LINK_CASES = [
+    ("", "", "vacío"),
+    ("https://example.com/a", "https://example.com/a", "https preservado"),
+    ("http://example.com/a", "http://example.com/a", "http preservado"),
+    ("javascript:alert(1)", "", "esquema javascript: bloqueado"),
+    ("JavaScript:alert(1)", "", "esquema javascript: case-insensitive"),
+    ("data:text/html,<script>alert(1)</script>", "", "esquema data: bloqueado"),
+    ("vbscript:msgbox(1)", "", "esquema vbscript: bloqueado"),
+    ("  https://example.com/a  ", "https://example.com/a", "espacios recortados"),
+    ("ftp://files.example.com", "", "esquema ftp no permitido en enlaces"),
+    ("not a url at all", "", "sin esquema -> bloqueado"),
+]
+
+
+@pytest.mark.parametrize("url,expected,_desc", SAFE_LINK_CASES)
+def test_safe_link_url(url, expected, _desc):
+    assert safe_link_url(url) == expected
+
+
+# ---------------------------------------------------------------------------
 # NewsItem.__post_init__
 # ---------------------------------------------------------------------------
 def test_post_init_cleans_title_and_summary():
@@ -180,6 +203,16 @@ def test_post_init_published_none():
         published=None,
     )
     assert it.published is None
+
+
+def test_post_init_sanea_url_con_esquema_peligroso():
+    """Un feed comprometido (p. ej. post federado de Mastodon) no puede colar
+    una URL javascript: en el href de la tarjeta."""
+    it = NewsItem(
+        title="t", url="javascript:alert(document.cookie)",
+        source_id="s", source_name="S", tier=1,
+    )
+    assert it.url == ""
 
 
 # ---------------------------------------------------------------------------

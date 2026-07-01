@@ -13,12 +13,19 @@ on:
   pull_request: {}
   workflow_dispatch: {}
 
+# Endurece el GITHUB_TOKEN: solo lectura al repo. Este workflow solo corre
+# tests (sin red ni secrets), así que no necesita ningún permiso de escritura.
+permissions:
+  contents: read
+
 jobs:
   pytest:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configurar Python
         uses: actions/setup-python@v5

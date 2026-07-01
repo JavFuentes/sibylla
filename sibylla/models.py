@@ -38,6 +38,25 @@ _TRACKING = {
 }
 
 
+def safe_link_url(url: str) -> str:
+    """Descarta esquemas peligrosos en un enlace saliente: solo http/https pasan.
+
+    Los títulos/URLs de posts federados (Mastodon: cualquier instancia del
+    fediverso) o de un feed comprometido no son de confianza. Sin este filtro,
+    una URL `javascript:...` llegaría intacta al `href` de la tarjeta (Jinja2
+    autoescapea el contenido del atributo, pero no valida el esquema). Devuelve
+    "" si la URL no es http(s); el llamador ya tolera URL vacía (degrada a
+    dedupe por título, sin enlace roto visible: no hay `<a>` sin href).
+    """
+    if not url:
+        return ""
+    try:
+        scheme = urlsplit(url.strip()).scheme.lower()
+    except ValueError:
+        return ""
+    return url.strip() if scheme in ("http", "https") else ""
+
+
 def canonicalize_url(url: str) -> str:
     """Normaliza una URL para comparar: https, sin www, sin tracking, sin '/' final."""
     if not url:
@@ -80,6 +99,7 @@ class NewsItem:
     def __post_init__(self) -> None:
         self.title = clean_text(self.title)
         self.summary = clean_text(self.summary)
+        self.url = safe_link_url(self.url)
         if self.published and self.published.tzinfo is None:
             self.published = self.published.replace(tzinfo=timezone.utc)
 

@@ -23,6 +23,13 @@ concurrency:
   group: regenerate
   cancel-in-progress: false
 
+# Endurece el GITHUB_TOKEN: solo lectura al repo. El despliegue va por SSH
+# (DEPLOY_KEY), nunca vía token de git. actions/cache se autentica con un
+# runtime token aparte que inyecta el runner, así que NO hace falta
+# actions: write para salvar caché.
+permissions:
+  contents: read
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -35,6 +42,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Configurar Python
         uses: actions/setup-python@v5
