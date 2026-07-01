@@ -27,6 +27,7 @@ from dateutil import parser as dateparser
 
 from .config import ROOT, Source, get_youtube_api_key, load_social_config
 from .models import NewsItem, clean_text as _clean_text
+from .net import safe_error
 
 log = logging.getLogger("sibylla")
 
@@ -336,7 +337,7 @@ def _fetch_pubmed_abstracts(ids: list[str], common: dict) -> dict[str, str]:
         }).content
         root = ET.fromstring(xml_bytes)
     except Exception as exc:  # noqa: BLE001  (timeout, 4xx/5xx, XML malformado...)
-        log.warning("efetch PubMed falló (%s); tarjetas sin abstract.", exc)
+        log.warning("efetch PubMed falló (%s); tarjetas sin abstract.", safe_error(exc))
         return {}
     out: dict[str, str] = {}
     for art in root.findall(".//PubmedArticle"):
@@ -605,7 +606,7 @@ def _youtube_api_fetch(source: Source, limit: int, api_key: str) -> list[NewsIte
         r.raise_for_status()
         data = r.json()
     except Exception as exc:  # noqa: BLE001
-        log.warning("  %-16s [youtube] API v3 falló (%s); uso RSS+caché.", source.id, exc)
+        log.warning("  %-16s [youtube] API v3 falló (%s); uso RSS+caché.", source.id, safe_error(exc))
         return []
 
     items: list[NewsItem] = []
@@ -668,7 +669,7 @@ def fetch_youtube(source: Source, limit: int, attempts: int = 4) -> list[NewsIte
                 return items
             last = "feed 200 sin entradas"
         except Exception as exc:  # noqa: BLE001
-            last = str(exc) or exc.__class__.__name__
+            last = safe_error(exc)
         if i < attempts - 1:
             time.sleep((2 ** i) + _random.uniform(0, 0.6))  # 1s, 2s, 4s + jitter
     cached = _yt_cache_get(source, limit)
@@ -1347,7 +1348,7 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
             items.extend(fetch_x(source, query, limit, budget,
                                  curated_handles=curated_set, freshness_hours=freshness))
         except Exception as ex:  # noqa: BLE001
-            log.warning("  x_twitter FALLÓ: %s", ex)
+            log.warning("  x_twitter FALLÓ: %s", safe_error(ex))
         return items
 
     if source.id in SOCIAL_API_SOURCES:
@@ -1366,7 +1367,7 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
             elif source.id == "bluesky":
                 items.extend(fetch_bluesky(source, lens, limit))
         except Exception as ex:  # noqa: BLE001
-            log.warning("  %-16s FALLÓ: %s", source.id, ex)
+            log.warning("  %-16s FALLÓ: %s", source.id, safe_error(ex))
         return items
 
     if source.id == "google_news_nacional":
@@ -1385,7 +1386,7 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
                 items.extend(got)
                 log.info("  %-16s [nacional] -> %d ítems (site: GN)", source.id, len(got))
         except Exception as ex:  # noqa: BLE001
-            log.warning("  %-16s [nacional] FALLÓ: %s", source.id, ex)
+            log.warning("  %-16s [nacional] FALLÓ: %s", source.id, safe_error(ex))
         return items
 
     if source.raw.get("category") == "youtube":
@@ -1400,7 +1401,7 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
             items.extend(got)
             log.info("  %-16s [youtube] -> %d videos", source.id, len(got))
         except Exception as ex:  # noqa: BLE001
-            log.warning("  %-16s [youtube] FALLÓ: %s", source.id, ex)
+            log.warning("  %-16s [youtube] FALLÓ: %s", source.id, safe_error(ex))
         return items
 
     if source.id in QUERY_SOURCES:
@@ -1422,7 +1423,7 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
                 items.extend(got)
                 log.info("  %-16s [%s] -> %d ítems", source.id, topic, len(got))
             except Exception as ex:  # noqa: BLE001  (aislamos cada fuente)
-                log.warning("  %-16s [%s] FALLÓ: %s", source.id, topic, ex)
+                log.warning("  %-16s [%s] FALLÓ: %s", source.id, topic, safe_error(ex))
 
     elif source.type in ("rss", "atom") and source.url:
         try:
@@ -1443,6 +1444,6 @@ def fetch_source(source: Source, topic_cfgs: list[tuple[str, dict]], limit: int)
                     items.append(it)
             log.info("  %-16s [rss] -> %d/%d relevantes", source.id, len(items), len(raw))
         except Exception as ex:  # noqa: BLE001
-            log.warning("  %-16s [rss] FALLÓ: %s", source.id, ex)
+            log.warning("  %-16s [rss] FALLÓ: %s", source.id, safe_error(ex))
 
     return items

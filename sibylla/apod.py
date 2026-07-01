@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 import requests
 
+from .net import safe_error
 from .translate import load_cache, save_cache, translate_cards
 
 log = logging.getLogger("sibylla")
@@ -38,7 +39,7 @@ def fetch_apod(api_key: str, *, timeout: int = 20) -> dict | None:
         r.raise_for_status()
         data = r.json()
     except (requests.RequestException, ValueError) as exc:
-        log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", exc)
+        log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", safe_error(exc))
         return None
     if not isinstance(data, dict) or not data.get("title") or not data.get("explanation") or not data.get("date"):
         log.warning("Respuesta de APOD incompleta. Sidecar de traduccion omitido.")

@@ -16,11 +16,18 @@ Diseño:
 Solo la usa ``articles.py`` (contenido de prensa de URLs arbitrarias). Los
 fetchers que consultan endpoints fijos y de confianza (arXiv, PubMed...)
 siguen usando ``_get`` directo: ahí el host es conocido y no hay riesgo.
+
+``safe_error`` (saneo de excepciones para logs) es ortogonal a la guarda SSRF:
+la usan los fetchers y ``apod.py`` para que un ``requests.RequestException`` no
+vuelque credenciales embebidas en la URL (api_key/token en query param, o
+userinfo ``user:pass@``). Es lógica pura (regex sobre el mensaje) → testeable
+sin red.
 """
 from __future__ import annotations
 
 import ipaddress
 import logging
+import re
 import socket
 from typing import Optional
 from urllib.parse import urljoin, urlsplit
@@ -179,3 +186,68 @@ def _read_capped(resp: requests.Response, max_bytes: int) -> bytes:
     finally:
         resp.close()
     return b"".join(chunks)
+
+
+# --- Saneo de excepciones para logs -----------------------------------------
+# Las excepciones de ``requests`` (ConnectionError, Timeout, HTTPError, ...)
+# stringifican incluyendo la URL completa con query string. Algunas APIs exigen
+# la clave en un parámetro (YouTube ``key=``, NASA APOD ``api_key=``, NCBI
+# ``api_key=``): loguear ``exc`` crudo filtraría esa clave. ``safe_error``
+# redacta los valores sensibles y deja el resto del mensaje legible.
+#
+# Trozo de query string dentro de un mensaje: desde '?' hasta el primer
+# delimitador de URL en texto (espacio, comilla, paréntesis...). Best-effort
+# sobre texto libre, no es un parser de URLs.
+_QUERY_RE = re.compile(r"\?([^\s'\"<>()\[\]]*)")
+
+# Autoridad con userinfo (``https://user:pass@host``): la quitamos entera; el
+# host sí es informativo, las credenciales no.
+_USERINFO_RE = re.compile(r"(https?://)[^\s/@:]+:[^\s/@]+@")
+
+# Subcadenas que marcan un parámetro como sensible: si el nombre (en minúsculas)
+# contiene alguna, su valor se redacta. Lista conservadora enfocada en claves;
+# sobre-redactar (un parámetro benigno que case) es seguro; al revés, no.
+_SENSITIVE = ("key", "token", "secret", "pass", "pwd", "auth", "sig", "code", "api", "bearer")
+
+
+def _redact_query(qs: str) -> str:
+    """Redacta los valores sensibles de una query string, conservando los nombres.
+
+    ``api_key=SECRET&db=pubmed`` -> ``api_key=<redacted>&db=pubmed``. Así el log
+    sigue siendo útil para depurar (vemos host, path y parámetros no sensibles)
+    sin exponer la credencial.
+    """
+    if not qs:
+        return qs
+    kept = []
+    for pair in qs.split("&"):
+        name, sep, _ = pair.partition("=")
+        if sep and any(s in name.lower() for s in _SENSITIVE):
+            kept.append(f"{name}=<redacted>")
+        else:
+            kept.append(pair)
+    return "&".join(kept)
+
+
+def safe_error(exc: BaseException, *, max_len: int = 300) -> str:
+    """Excepción stringificada apta para logs: redacta URLs y credenciales.
+
+    - Quita el userinfo de la autoridad (``https://user:pass@host`` ->
+      ``https://host``).
+    - Redacta los **valores** de parámetros de query cuyo nombre parece sensible
+      (api_key, token, secret, ...) y conserva el resto del mensaje.
+    - Acota la longitud (``max_len``) para no volcar cuerpos o trazas enormes.
+
+    Uso típico en un ``except``::
+
+        log.warning("fetch falló (%s); degrado.", safe_error(exc))
+
+    No-op para mensajes sin URL/credenciales: ``safe_error(ValueError("x"))``
+    devuelve ``"x"``.
+    """
+    msg = str(exc) or type(exc).__name__
+    msg = _USERINFO_RE.sub(r"\1", msg)
+    msg = _QUERY_RE.sub(lambda m: "?" + _redact_query(m.group(1)), msg)
+    if len(msg) > max_len:
+        msg = msg[:max_len].rstrip() + "…"
+    return msg

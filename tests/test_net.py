@@ -11,7 +11,7 @@ usan literales IP, que ``getaddrinfo`` resuelve **sin DNS** y por tanto sin red.
 """
 import pytest
 
-from sibylla.net import _host_is_safe, _ip_is_routable, _is_http_url
+from sibylla.net import _host_is_safe, _ip_is_routable, _is_http_url, _redact_query, safe_error
 
 # ---------------------------------------------------------------------------
 # _ip_is_routable
@@ -86,3 +86,50 @@ HOST_CASES = [
 @pytest.mark.parametrize("host, esperado, _desc", HOST_CASES)
 def test_host_is_safe_ip_literals(host, esperado, _desc):
     assert _host_is_safe(host) is esperado
+
+
+# ---------------------------------------------------------------------------
+# _redact_query
+# ---------------------------------------------------------------------------
+REDACT_QUERY_CASES = [
+    # (query, esperado, descripción)
+    ("db=pubmed&api_key=SECRET&term=cancer", "db=pubmed&api_key=<redacted>&term=cancer", "api_key entre otros params"),
+    ("key=ABC", "key=<redacted>", "key sola"),
+    ("access_token=t&refresh_token=r", "access_token=<redacted>&refresh_token=<redacted>", "múltiples tokens"),
+    ("foo=1&bar=2", "foo=1&bar=2", "sin secrets: intacto"),
+    ("", "", "vacío"),
+    ("code=1234", "code=<redacted>", "code (OAuth)"),
+    ("id=5", "id=5", "id no es sensible"),
+]
+
+
+@pytest.mark.parametrize("qs, esperado, _desc", REDACT_QUERY_CASES)
+def test_redact_query(qs, esperado, _desc):
+    assert _redact_query(qs) == esperado
+
+
+# ---------------------------------------------------------------------------
+# safe_error
+# ---------------------------------------------------------------------------
+# (exc, debe_contener, no_debe_contener, descripción)
+SAFE_ERROR_CASES = [
+    (ValueError("bad parse"), "bad parse", "http", "sin URL: mensaje intacto"),
+    (Exception(""), "Exception", "http", "mensaje vacío: cae al nombre del tipo"),
+    (Exception("404 Client Error: Not Found for url: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&api_key=SK_REAL_KEY_123"),
+     "eutils.ncbi.nlm.nih.gov", "SK_REAL_KEY_123", "NCBI: api_key redactada, host preservado"),
+    (Exception("HTTPConnectionPool(host='www.googleapis.com', port=443): Max retries exceeded with url: /youtube/v3/playlistItems?part=snippet&key=AIzaSY_FAKE_KEY (Caused by NewConnectionError)"),
+     "playlistItems", "AIzaSY_FAKE_KEY", "YouTube: key redactada, path preservado"),
+    (Exception("https://usuario:s3creto@host.example/api/x?token=tok"),
+     "host.example", "s3creto", "userinfo user:pass redactado y token también"),
+]
+
+
+@pytest.mark.parametrize("exc, debe, no_debe, _desc", SAFE_ERROR_CASES)
+def test_safe_error(exc, debe, no_debe, _desc):
+    out = safe_error(exc)
+    assert (debe in out) and (no_debe not in out)
+
+
+def test_safe_error_trunca_mensajes_largos():
+    out = safe_error(Exception("x" * 500))
+    assert out.endswith("…") and len(out) <= 301
