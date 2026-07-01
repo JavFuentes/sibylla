@@ -4,8 +4,9 @@
 > visto la conversación que lo originó. Para la arquitectura general, ver
 > [AGENTS.md](AGENTS.md); para las reglas de cada sección, [SECCIONES.md](SECCIONES.md).
 >
-> **Estado:** especificado, **no implementado**. Los **37 canales** del usuario
-> ya están **resueltos y verificados** (§9 + Apéndices A–B). Listo para implementar.
+> **Estado 2026-07-01:** la sección ya está implementada y visible en producción,
+> pero quedan problemas abiertos con feeds YouTube que fallan en GitHub Actions y
+> con selección de solo 5 tarjetas en una corrida. Ver **§12** antes de tocar código.
 
 ---
 
@@ -491,6 +492,161 @@ Los 37 canales del usuario, con su `channel_id` `UC…` resuelto y su feed Atom
 - **Más allá de YouTube:** el tema se llama `divulgacion` (no `youtube`) para
   poder sumar otras fuentes de divulgación (podcasts, etc.) a la misma sección
   sin renombrar.
+
+---
+
+## 12. Estado actual y problemas abiertos (2026-07-01)
+
+Esta sección documenta lo aprendido después de implementar y desplegar
+Divulgación. Es la parte más importante para retomar el trabajo.
+
+### 12.1 Qué ya está implementado
+
+- `fetchers.py`: `TOPIC_CONFIG["divulgacion"] = {}` como pass-through.
+- `config/sources.yaml`: bloque de canales YouTube con `topics: [divulgacion]`, `category: youtube`, `handle`, `status` y `url` Atom.
+- `pipeline.py`: `DEFAULT_FREE_SOURCES` incluye una lista reducida de `yt_*`.
+- `web.py`: `_is_divulgacion()`, `_select_divulgacion()`, separación de `divulgacion_raw`, log de conteo y render como tarjetas de video.
+- `templates/index.html.j2`: bloque `#divulgacion`, sello `▶`, miniatura y enlace a YouTube.
+- `cli.py`: `divulgacion` está en los topics por defecto y excluido del digest temático.
+- `locales/*.json`: claves UI de Divulgación y `video_label`.
+- `tests/test_divulgacion.py`: tests puros del selector.
+- `.github/workflows/regenerate.yml`: el workflow incluye `divulgacion` en `--topics` y falla si `web/index.html` no contiene `id="divulgacion"`.
+
+### 12.2 Evidencia del último workflow
+
+La sección ya aparece en producción, pero el build de GitHub Actions mostró solo
+5 tarjetas y muchos errores `yt_*`:
+
+```text
+Divulgación: 105 videos recibidos, 5 tarjetas seleccionadas
+```
+
+Feeds YouTube que respondieron correctamente en esa corrida de CI:
+
+| Fuente | Resultado CI |
+|--------|--------------|
+| `yt_ecosdeunmundoestrellado` | `15/15 relevantes` |
+| `yt_lagatadeschrodinger` | `15/15 relevantes` |
+| `yt_astrumespanol` | `15/15 relevantes` |
+| `yt_raqueldelamorenaoficial` | `15/15 relevantes` |
+| `yt_darinmex` | `15/15 relevantes` |
+| `yt_bitboss` | `15/15 relevantes` |
+| `yt_deborahciencia` | `15/15 relevantes` |
+
+Feeds YouTube que fallaron en esa corrida de CI:
+
+| Fuente | Error CI |
+|--------|----------|
+| `yt_jodisea` | 404 |
+| `yt_jefillysh` | 404 |
+| `yt_elrobotdeplaton` | 404 |
+| `yt_quantumfracture` | 500 |
+| `yt_pildorasinformaticas` | 404 |
+| `yt_exoplanetas` | 404 |
+| `yt_fazttech` | 404 |
+| `yt_psicovlog` | 404 |
+| `yt_sizematters` | 404 |
+| `yt_curiosamente` | 500 |
+| `yt_iftmadrid` | 404 |
+| `yt_novagea` | 404 |
+| `yt_candeliousfang` | 500 |
+| `yt_jefidos` | 500 |
+| `yt_pontebata` | 500 |
+| `yt_cienciadesofa` | 500 |
+| `yt_iftwebinars` | 404 |
+| `yt_astrovlog` | 404 |
+| `yt_javier_garcia` | 500 |
+
+También apareció un fallo no relacionado:
+
+```text
+scientific_american [rss] FALLÓ: 403 Client Error: Forbidden
+```
+
+Ese `403` no afecta Divulgación; tratarlo por separado si se quiere limpiar el
+log general.
+
+### 12.3 Lecciones aprendidas
+
+- La verificación local de feeds YouTube no basta. Varios feeds que respondían en local devolvieron `404` o `500` desde GitHub Actions.
+- La fuente de verdad operativa debe ser el comportamiento en CI, porque la web se genera desde GitHub Actions.
+- YouTube Atom parece sensible al entorno o a rate/region/infra. Los errores no implican necesariamente que el `channel_id` sea inválido.
+- Marcar un canal como `verified_YYYY-MM-DD` por una prueba local es demasiado optimista si luego falla en CI.
+- Conviene separar tres estados: `verified_local`, `verified_github`, `feed_unavailable_github`.
+- El build ya degrada bien: una fuente `yt_*` que falla no rompe la corrida, pero ensucia logs y reduce tarjetas.
+- Con 7 feeds exitosos deberían salir 6 tarjetas. Que salieran 5 sugiere una pérdida posterior al fetch.
+
+### 12.4 Hipótesis de por qué salen 5 tarjetas con 7 feeds exitosos
+
+El pipeline hace:
+
+```python
+raw -> dedupe -> cluster_stories -> rank -> diversify -> build_all_sites
+```
+
+Divulgación se separa en `build_all_sites`, es decir **después** de `cluster_stories`.
+Eso puede ser un problema para videos: `cluster_stories()` agrupa ítems de fuentes
+distintas si los títulos se parecen o comparten entidades. En noticias eso es
+deseable; en videos curados no. Dos videos de canales distintos pueden compartir
+palabras de tema y quedar fusionados como si fueran la misma historia.
+
+Diagnóstico probable:
+
+- Los feeds exitosos aportaron 105 videos crudos.
+- Después de dedupe/cluster/rank, `divulgacion_raw` vio menos diversidad efectiva.
+- `_select_divulgacion()` solo recibió representantes de clusters, no todos los videos originales.
+- Resultado: 5 canales seleccionables aunque 7 feeds habían respondido.
+
+### 12.5 Corrección recomendada para retomar
+
+1. Ajustar `DEFAULT_FREE_SOURCES` a los `yt_*` que funcionaron en GitHub Actions:
+   `yt_ecosdeunmundoestrellado`, `yt_lagatadeschrodinger`, `yt_astrumespanol`,
+   `yt_raqueldelamorenaoficial`, `yt_darinmex`, `yt_bitboss`, `yt_deborahciencia`.
+2. En `config/sources.yaml`, marcar los `yt_*` que fallaron en CI como
+   `feed_unavailable_github_2026-07-01` o `verified_local_2026-07-01` según corresponda.
+3. Cambiar el pipeline para que los ítems de `divulgacion` no pasen por `cluster_stories`.
+4. Mantener dedupe exacto por URL para Divulgación, pero evitar near-dedup por similitud de título.
+5. Añadir un test que demuestre que dos videos `divulgacion` de canales distintos con títulos parecidos sobreviven como dos ítems.
+6. Añadir un test o comprobación de selector: con 7 canales exitosos sintéticos se seleccionan 6.
+7. Ejecutar `python -m pytest tests/ -v`.
+8. Lanzar workflow y confirmar en logs: `Divulgación: ... videos recibidos, 6 tarjetas seleccionadas`.
+
+### 12.6 Sketch técnico para excluir Divulgación de clustering
+
+Opción mínima en `pipeline.py`:
+
+```python
+deduped = dedupe(raw)
+divulgacion = [it for it in deduped if "divulgacion" in it.topics]
+clusterable = [it for it in deduped if "divulgacion" not in it.topics]
+clustered = cluster_stories(clusterable) + divulgacion
+ranked = diversify(rank(clustered))
+```
+
+Consideración: si se quiere preservar el conteo del log, cambiarlo a algo como:
+
+```python
+log.info(
+    "Total: %d crudos -> %d tras deduplicar -> %d tras agrupar historias (+%d divulgación sin cluster)",
+    len(raw), len(deduped), len(clustered) - len(divulgacion), len(divulgacion),
+)
+```
+
+No usar `_is_divulgacion()` desde `web.py` en `pipeline.py` para evitar dependencia circular;
+usar directamente `"divulgacion" in it.topics` o mover el predicate a un módulo común si se
+vuelve necesario.
+
+### 12.7 Sobre la lista de canales
+
+El Apéndice A y el Apéndice B más abajo son históricos: sirvieron para la primera
+implementación, pero ya no deben copiarse literalmente. La lista operativa actual
+vive en `config/sources.yaml` y `sibylla/pipeline.py`.
+
+Para próximos cambios, preferir este criterio:
+
+- Documentar todos los canales curados en `sources.yaml`.
+- Activar en `DEFAULT_FREE_SOURCES` solo los feeds que funcionen en GitHub Actions.
+- Si un canal importante falla en Atom desde CI, buscar alternativa: RSS por proxy propio, API YouTube Data, o scraping controlado. No hacerlo dentro de `fetch_generic_rss` sin aislar costo/riesgo.
 
 ---
 
