@@ -27,7 +27,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .config import ROOT, get_google_verification, get_site_url, load_social_config
+from .apod import build_apod_i18n, fetch_apod
+from .config import ROOT, get_google_verification, get_nasa_api_key, get_site_url, load_social_config
 from .i18n import load_translations, t
 from .models import NewsItem
 from .pipeline import _score, _social_score
@@ -53,6 +54,9 @@ _RELATED_CAP = 3
 STELLAR_NEWS_FILE = "stellar-news.json"
 STELLAR_NEWS_SCHEMA = "cl.sibylla.stellar_news.v1"
 STELLAR_NEWS_LANGS = ("es", "en", "it")
+
+# Sidecar de traduccion es/it del APOD de HOY (ver sibylla/apod.py).
+APOD_I18N_FILE = "apod-i18n.json"
 
 # Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
 SOCIAL_SOURCE_IDS: set[str] = {"x_twitter", "mastodon", "bluesky"}
@@ -809,6 +813,12 @@ def _write_stellar_news(payload: dict) -> Path:
     return out
 
 
+def _write_apod_i18n(payload: dict) -> Path:
+    out = SITE_DIR / APOD_I18N_FILE
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    lang: str = "es", max_por_tema: int = 6,
                    is_landing: bool = False,
@@ -1119,6 +1129,14 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
         tracker=translate_tracker,
     )
     paths.append(_write_stellar_news(stellar_payload))
+
+    # JSON público para Stellar-View: traducción es/it del APOD de HOY (solo
+    # "hoy"; ver sibylla/apod.py). Si la API de NASA falla, se omite el
+    # archivo de esta corrida y la app cae al inglés (nunca rompe el build).
+    apod_data = fetch_apod(get_nasa_api_key())
+    if apod_data is not None:
+        apod_payload = build_apod_i18n(apod_data, translate=translate, tracker=translate_tracker)
+        paths.append(_write_apod_i18n(apod_payload))
 
     # Assets estáticos (favicons, iconos, manifest) → se publican en la raíz.
     paths.extend(_copy_static_assets())

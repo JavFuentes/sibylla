@@ -76,6 +76,12 @@ def load_social_config(path: Path = CONFIG_PATH) -> dict:
     return data.get("social", {}) or {}
 
 
+def get_nasa_api_key() -> str:
+    """Clave de la API de NASA (APOD). Lee NASA_API_KEY del .env; 'DEMO_KEY' si no
+    se define (limite de tasa muy bajo, solo sirve para pruebas)."""
+    return os.getenv("NASA_API_KEY", "DEMO_KEY").strip() or "DEMO_KEY"
+
+
 def get_google_verification() -> str:
     """Token de verificación de Google Search Console (método 'etiqueta HTML').
 
