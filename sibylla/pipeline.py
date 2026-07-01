@@ -28,14 +28,14 @@ DEFAULT_FREE_SOURCES = [
     # Astronomía: 3 prioritarias (CL) + 6 agencias espaciales
     "alma", "cata", "sochias",
     "jaxa", "cnes", "asi", "uksa",
-    # Divulgación: canales de YouTube curados (1 tarjeta por canal)
-    "yt_jodisea", "yt_radientnews", "yt_jefillysh", "yt_elrobotdeplaton", "yt_jesusgmaestro", "yt_quantumfracture",
-    "yt_pildorasinformaticas", "yt_exoplanetas", "yt_robotitus", "yt_ecosdeunmundoestrellado", "yt_fazttech", "yt_psicovlog",
-    "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente", "yt_iftmadrid", "yt_novagea", "yt_astrumespanol",
-    "yt_raqueldelamorenaoficial", "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos", "yt_midulive",
-    "yt_matesmike", "yt_pontebata", "yt_cienciadesofa", "yt_bitboss", "yt_cinematixfilms", "yt_anatomiahumanaydiseccion",
-    "yt_iftwebinars", "yt_astrovlog", "yt_lahiperactina", "yt_alvamajo", "yt_javier_garcia", "yt_antroporamadivulgacion",
-    "yt_deborahciencia",
+    # Divulgación: feeds Atom de YouTube verificados (1 tarjeta por canal).
+    "yt_jodisea", "yt_jefillysh", "yt_elrobotdeplaton", "yt_quantumfracture",
+    "yt_pildorasinformaticas", "yt_exoplanetas", "yt_ecosdeunmundoestrellado",
+    "yt_fazttech", "yt_psicovlog", "yt_lagatadeschrodinger", "yt_sizematters",
+    "yt_curiosamente", "yt_iftmadrid", "yt_novagea", "yt_astrumespanol",
+    "yt_raqueldelamorenaoficial", "yt_darinmex", "yt_candeliousfang", "yt_jefidos",
+    "yt_pontebata", "yt_cienciadesofa", "yt_bitboss", "yt_iftwebinars",
+    "yt_astrovlog", "yt_javier_garcia", "yt_deborahciencia",
     # Social (gratis): una tarjeta por red en "Voces de la red"
     "mastodon", "bluesky",
 ]

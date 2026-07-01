@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import random as _random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -33,6 +34,8 @@ from .i18n import load_translations, t
 from .models import NewsItem
 from .pipeline import _score, _social_score
 from .translate import load_cache, save_cache, translate_cards
+
+log = logging.getLogger("sibylla")
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 SITE_DIR = ROOT / "web"  # salida: web/{index,es,en,it,pt}.html
@@ -1075,6 +1078,9 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     astro_top = _select_astronomia(astro_raw, today) if astro_raw else []
     divulgacion_top = _select_divulgacion(divulgacion_raw) if divulgacion_raw else []
+    if "divulgacion" in topics:
+        log.info("Divulgación: %s videos recibidos, %s tarjetas seleccionadas",
+                 len(divulgacion_raw), len(divulgacion_top))
 
     # Fetch house posts (cuentas propias de Sibylla) y seleccionar 6 tarjetas.
     from .fetchers import fetch_house_posts

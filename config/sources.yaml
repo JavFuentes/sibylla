@@ -1029,7 +1029,8 @@ sources:
 # DIVULGACIÓN — canales de YouTube curados a mano. Cada canal es una fuente RSS
 # (feed Atom nativo de YouTube, gratis, sin key). Se muestran como tarjetas de
 # video en la sección homónima (1 por canal, 6 más recientes).
-# channel_id + feed verificados en vivo el 2026-06-30.
+# channel_id + feed verificados en vivo el 2026-07-01. Solo los feeds con
+# status verified_* entran en DEFAULT_FREE_SOURCES.
 # =============================================================================
   - id: yt_jodisea
     name: "Jodisea | El mundo de las Odiseas"
@@ -1037,13 +1038,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@jodisea"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCz6Cf-gSFs6jDdCo5vctKHA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_radientnews
     name: "Radient News"
@@ -1051,13 +1053,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@RadientNews"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCnfI40TiTcj0BNWJkw2y8Mg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 404. No se incluye por defecto."
 
   - id: yt_jefillysh
     name: "jefillysh"
@@ -1065,13 +1069,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@jefillysh"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCTfQ65AxquXmih3r6rZmK-Q"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_elrobotdeplaton
     name: "El Robot de Platón"
@@ -1079,13 +1084,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@ElRobotdePlaton"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCaVPhFg-Ax873wvhbNitsrQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_jesusgmaestro
     name: "Jesús G. Maestro"
@@ -1093,13 +1099,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@JesúsGMaestro"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCfWWjBMY6zpvvU6wAe5j_Eg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El feed Atom devuelve 404. No se incluye por defecto."
 
   - id: yt_quantumfracture
     name: "QuantumFracture"
@@ -1107,13 +1115,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@QuantumFracture"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCbdSYaPD-lr1kW27UJuk8Pw"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_pildorasinformaticas
     name: "pildorasinformaticas"
@@ -1121,13 +1130,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@pildorasinformaticas"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCdulIs-x_xrRd1ezwJZR9ww"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_exoplanetas
     name: "EXOPLANETAS Noticias Ciencia y Tecnología"
@@ -1135,13 +1145,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@exoplanetas"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC92-DgDvLQPM_r2oHbDr60w"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_robotitus
     name: "Noticias Robotitus"
@@ -1149,13 +1160,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@ROBOTITUS"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC5rJaxmE3UyVz59OGxbPdAg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
 
   - id: yt_ecosdeunmundoestrellado
     name: "Ecosdeunmundoestrellado"
@@ -1163,13 +1176,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@Ecosdeunmundoestrellado"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCSoZXagwqt4OYBXjAYKbjpQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_fazttech
     name: "Fazt"
@@ -1177,13 +1191,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@FaztTech"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCX9NJ471o7Wie1DQe94RVIg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_psicovlog
     name: "Psico Vlog"
@@ -1191,13 +1206,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@psicovlog"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCKK25Prf-UD9Qak0W1d02KQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_lagatadeschrodinger
     name: "La gata de Schrödinger"
@@ -1205,13 +1221,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@LaGataDeSchrödinger"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCoXtmmnLCbXDiSo8GxsmOzA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_sizematters
     name: "SizeMatters"
@@ -1219,13 +1236,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@SizeMatters"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC6h-HID9dV2BAGSMy4_J84g"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_curiosamente
     name: "CuriosaMente"
@@ -1233,13 +1251,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@curiosamente"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCX16cLWl6dCjlZMgUBxgGkA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_iftmadrid
     name: "Instituto de Física Teórica IFT"
@@ -1247,13 +1266,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@IFTMadrid"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCk195x4zYdMx4LhqEwhcPng"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_novagea
     name: "NovaGea"
@@ -1261,13 +1281,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@novagea"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCpRzJ0uX8ATOQkJfBfGS1uA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_astrumespanol
     name: "Astrum Español"
@@ -1275,13 +1296,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@astrumespanol"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC-2A6Z4k5-AJBLO_wDA-ZUg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_raqueldelamorenaoficial
     name: "Raquel de la Morena"
@@ -1289,13 +1311,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@raqueldelamorenaoficial"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC_0j0mtBAGTj1U7LD3J0dhQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_ter
     name: "Ter"
@@ -1303,13 +1326,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@Ter"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCCNgRIfWQKZyPkNvHEzPh7Q"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 404. No se incluye por defecto."
 
   - id: yt_darinmex
     name: "Darin McNabb"
@@ -1317,13 +1342,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@darinmex"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC6GbAKHWYUJDWlkxY6HPldg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_candeliousfang
     name: "Candeliousfang"
@@ -1331,13 +1357,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@Candeliousfang"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCJAsPjHqO0AHSd6Uasj7oVA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_jefidos
     name: "Carolina Jefillysh"
@@ -1345,13 +1372,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@jefidos"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCnN7Hrbc7dsvuDVkU6ro-SQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_midulive
     name: "midulive"
@@ -1359,13 +1387,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@midulive"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC3aj05GEEyzdOqYM5FLSFeg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
 
   - id: yt_matesmike
     name: "Mates Mike"
@@ -1373,13 +1403,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@MatesMike"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC-_kZ3UZBsnCWJEVr8ysMww"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
 
   - id: yt_pontebata
     name: "Ponte Bata"
@@ -1387,13 +1419,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@PonteBata"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCmwwKS5em7UNZvghNcfugHg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_cienciadesofa
     name: "CienciaDeSofa"
@@ -1401,13 +1434,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@CienciaDeSofa"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCMbQbVilo-nezMvwf1BZfAA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_bitboss
     name: "BitBoss"
@@ -1415,13 +1449,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@BitBoss"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC51m1mQmjKJ10YZWtRr8tgA"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_cinematixfilms
     name: "Cinematix"
@@ -1429,13 +1464,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@cinematixfilms"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCpuKDBw8IVIdKWPhiB2VDNQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
 
   - id: yt_anatomiahumanaydiseccion
     name: "Anatomía Humana y Disección"
@@ -1443,13 +1480,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@AnatomíaHumanayDisección"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCw-oldhkk_2ftVa_PL0eoSQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El feed Atom devuelve 404. No se incluye por defecto."
 
   - id: yt_iftwebinars
     name: "IFT Webinars"
@@ -1457,13 +1496,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@IFTWebinars"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCcdmQRtxk_xdpt9iFATTDQQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_astrovlog
     name: "astrovlog"
@@ -1471,13 +1511,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@astrovlog"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC-8DZ-sTOoohhzndLNl4w1A"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_lahiperactina
     name: "La Hiperactina"
@@ -1485,13 +1526,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@Lahiperactina"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCV5G678sZwW5IcF3pCfRbHQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
 
   - id: yt_alvamajo
     name: "Alva Majo"
@@ -1499,13 +1542,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@AlvaMajo"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCmaEoq1zaakpdudbzgll-zw"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 500. No se incluye por defecto."
 
   - id: yt_javier_garcia
     name: "Javier Garcia"
@@ -1513,13 +1558,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@Javier_Garcia"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCYOv9HwOFwK0lY2dUQlZSpg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
   - id: yt_antroporamadivulgacion
     name: "Antroporama"
@@ -1527,13 +1573,15 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@AntroporamaDivulgacion"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCGKzjVZGdJ0YmUqg42xfO5w"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: feed_unavailable_2026-07-01
+    notes: "El handle existe, pero el feed Atom devuelve 404. No se incluye por defecto."
 
   - id: yt_deborahciencia
     name: "deborahciencia"
@@ -1541,13 +1589,14 @@ sources:
     tier: 3
     type: rss
     category: youtube
+    handle: "@deborahciencia"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCibUX4QoSrRwmBZf0Ig-OCg"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
     access: open
     cost: free
-    status: verified_2026-06-30
+    status: verified_2026-07-01
 
 # =============================================================================
 # Voces de la red — Configuración de lentes y cuentas propias

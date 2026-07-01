@@ -134,6 +134,14 @@ jobs:
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
         run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --translate auto
 
+      - name: Verificar sección Divulgación
+        run: |
+          set -euo pipefail
+          if ! grep -q 'id="divulgacion"' web/index.html; then
+            echo "::error::La sección Divulgación no quedó renderizada en web/index.html. Revisa los logs de ingesta yt_* y el conteo 'Divulgación: ...'."
+            exit 1
+          fi
+
       - name: Subir web/ y persistir historial en el host (scp)
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
