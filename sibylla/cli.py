@@ -65,6 +65,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="idioma del resumen y la web: es, en, it, pt (def. según config, SIBYLLA_LANG, o 'es')")
     parser.add_argument("--dashboard", action="store_true",
                         help="abre el dashboard de métricas en local: descarga runs.json del host y lo muestra (no toca el sitio público)")
+    parser.add_argument("--apod-only", action="store_true",
+                        help="genera y escribe SOLO web/apod-i18n.json (sin correr el pipeline de noticias); "
+                             "para un cron temprano que corra apenas NASA publique el APOD del día, "
+                             "antes del build completo de las 11 (ver sibylla/apod.py)")
     parser.add_argument("-q", "--quiet", action="store_true", help="menos logs")
     args = parser.parse_args(argv)
 
@@ -74,6 +78,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.dashboard:
         from .dashboard import open_local_dashboard
         return open_local_dashboard()
+
+    # Sidecar del APOD solo: no corre el pipeline de noticias (ver DEPLOY.md §4
+    # y .github/workflows/regenerate-apod.yml).
+    if args.apod_only:
+        from .web import write_apod_sidecar
+        path = write_apod_sidecar(translate=args.translate != "off")
+        if path is None:
+            log.warning("No se pudo obtener el APOD de hoy; sidecar omitido "
+                        "(el build de las 11 lo reintentará).")
+            return 1
+        print(f"✓ Sidecar APOD escrito: {path}")
+        return 0
 
     topics = [t.strip() for t in args.topics.split(",") if t.strip()]
     sources = [s.strip() for s in args.sources.split(",")] if args.sources else None

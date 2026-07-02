@@ -146,6 +146,21 @@ Configura en *Settings → Secrets and variables → Actions* del repo:
 
 Disparo manual: pestaña *Actions → Regenerar sitio Sibylla → Run workflow*.
 
+#### APOD temprano (para Stellar-View)
+
+NASA publica el APOD del día ~2-3 AM hora de Chile, varias horas antes de que
+corra el build de arriba. Sin nada más, la traducción es/it del APOD de "hoy"
+(`apod-i18n.json`, ver §"APOD i18n" en `sibylla/apod.py`) quedaba vieja durante
+esa ventana y Stellar-View mostraba el texto en inglés de NASA hasta las 11.
+
+El workflow [`.github/workflows/regenerate-apod.yml`](.github/workflows/regenerate-apod.yml)
+corre `python -m sibylla.cli --apod-only` en un cron aparte y más temprano
+(07:00 y 10:00 UTC), publicando SOLO `apod-i18n.json` — no toca noticias,
+YouTube, X ni el historial de métricas. Reusa los mismos secrets de la tabla
+de arriba (`NASA_API_KEY`, `LLM_*`, `DEPLOY_*`); no requiere configurar nada
+adicional. Es idempotente: el build de las 11 lo vuelve a escribir sin
+problema.
+
 ### B) GitHub Actions → GitHub Pages
 
 Si prefieres no gestionar credenciales de host: publica en **GitHub Pages** y

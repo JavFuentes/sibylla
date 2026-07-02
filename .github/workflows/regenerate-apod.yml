@@ -1,0 +1,110 @@
+# Publica SOLO el sidecar apod-i18n.json, aparte del build completo del sitio.
+#
+# Por que existe: NASA publica el APOD nuevo ~2-3 AM hora de Chile, pero
+# regenerate.yml (el build completo, con noticias) corre a las 11 AM a proposito
+# -- para que las noticias del sitio salgan frescas. Con un solo cron a las 11,
+# Stellar-View mostraba el APOD de "hoy" en ingles durante esas ~9 horas: la app
+# pide la foto directo a NASA en tiempo real, pero la traduccion es/it solo se
+# aplica si `apod-i18n.json` ya trae la fecha de HOY (ver sibylla/apod.py).
+#
+# Este workflow corre temprano y escribe unicamente `web/apod-i18n.json` (1
+# llamada a NASA + 2 al LLM). No toca noticias, YouTube, X ni runs.json/dashboard
+# -- por eso no necesita el descargar/subir historial que hace regenerate.yml.
+# Es idempotente: el build de las 11 lo vuelve a escribir sin problema.
+name: Publicar APOD temprano
+
+on:
+  schedule:
+    # Dos disparos para cubrir el jitter de NASA y el cambio de horario de
+    # Chile (UTC-3/UTC-4): 07:00 UTC (~03-04 AM Chile) y, de respaldo, 10:00
+    # UTC (~06-07 AM Chile) por si NASA se atraso en el primero.
+    - cron: "0 7 * * *"
+    - cron: "0 10 * * *"
+  workflow_dispatch: {}     # permite disparo manual desde la pestaña Actions
+
+# No se cruza con regenerate.yml (grupos distintos): ambos pueden escribir
+# apod-i18n.json sin pisarse, el ultimo en subir gana y el contenido es el mismo.
+concurrency:
+  group: regenerate-apod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish-apod:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      # Misma key que regenerate.yml: comparten el cache de traducciones, asi
+      # el build de las 11 no vuelve a llamar al LLM por el mismo APOD.
+      - name: Restaurar cache de traducciones
+        uses: actions/cache@v4
+        with:
+          path: data/translations.json
+          key: data-cache-${{ github.run_id }}
+          restore-keys: |
+            data-cache-
+
+      - name: Preparar clave SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: Generar apod-i18n.json
+        env:
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          NASA_API_KEY: ${{ secrets.NASA_API_KEY }}
+        run: python -m sibylla.cli --apod-only --translate auto
+
+      - name: Subir apod-i18n.json (scp)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -euo pipefail
+          source .github/scripts/ssh_retry.sh
+          PORT="${DEPLOY_PORT:-22}"
+
+          if [ ! -f web/apod-i18n.json ]; then
+            echo "ⓘ No se genero apod-i18n.json en esta corrida (NASA aun no publica); nada que subir."
+            exit 0
+          fi
+
+          probar_ssh() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
+          subir()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy web/apod-i18n.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/apod-i18n.json"; }
+
+          echo "→ Probando conectividad SSH (con reintentos)..."
+          reintentar "test de conectividad SSH" probar_ssh || {
+            echo "ERROR: No se pudo conectar por SSH a $DEPLOY_USER@$DEPLOY_HOST:$PORT tras varios intentos."
+            exit 1
+          }
+
+          echo "→ Subiendo apod-i18n.json (con reintentos)..."
+          reintentar "subida de apod-i18n.json" subir || {
+            echo "ERROR: No se pudo subir apod-i18n.json tras varios intentos."
+            exit 1
+          }
+
+          echo "✅ apod-i18n.json publicado en $DEPLOY_PATH"

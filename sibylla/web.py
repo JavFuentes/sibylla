@@ -822,6 +822,22 @@ def _write_apod_i18n(payload: dict) -> Path:
     return out
 
 
+def write_apod_sidecar(*, translate: bool = True, tracker: list[dict] | None = None) -> Path | None:
+    """Genera y escribe SOLO `apod-i18n.json`, sin tocar el resto del sitio.
+
+    NASA publica el APOD ~2-3 AM Chile, pero el build completo (`build_all_sites`)
+    corre recien a las 11 para que las noticias salgan frescas. Esta funcion la usa
+    un cron aparte, mas temprano, para achicar a minutos la ventana en la que
+    Stellar-View muestra el APOD de hoy en ingles (ver sibylla/apod.py). Idempotente:
+    el build de las 11 vuelve a escribir el mismo archivo sin duplicar trabajo raro."""
+    apod_data = fetch_apod(get_nasa_api_key())
+    if apod_data is None:
+        return None
+    SITE_DIR.mkdir(parents=True, exist_ok=True)
+    payload = build_apod_i18n(apod_data, translate=translate, tracker=tracker)
+    return _write_apod_i18n(payload)
+
+
 def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    lang: str = "es", max_por_tema: int = 6,
                    is_landing: bool = False,
@@ -1139,10 +1155,11 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # JSON público para Stellar-View: traducción es/it del APOD de HOY (solo
     # "hoy"; ver sibylla/apod.py). Si la API de NASA falla, se omite el
     # archivo de esta corrida y la app cae al inglés (nunca rompe el build).
-    apod_data = fetch_apod(get_nasa_api_key())
-    if apod_data is not None:
-        apod_payload = build_apod_i18n(apod_data, translate=translate, tracker=translate_tracker)
-        paths.append(_write_apod_i18n(apod_payload))
+    # Normalmente ya lo dejó escrito el cron temprano de regenerate-apod.yml;
+    # esto lo re-escribe (idempotente) por si NASA cambió algo o ese cron falló.
+    apod_path = write_apod_sidecar(translate=translate, tracker=translate_tracker)
+    if apod_path is not None:
+        paths.append(apod_path)
 
     # Assets estáticos (favicons, iconos, manifest) → se publican en la raíz.
     paths.extend(_copy_static_assets())
