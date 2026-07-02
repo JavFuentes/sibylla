@@ -53,7 +53,7 @@ jobs:
       # Misma key que regenerate.yml: comparten el cache de traducciones, asi
       # el build de las 11 no vuelve a llamar al LLM por el mismo APOD.
       - name: Restaurar cache de traducciones
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/translations.json
           key: data-cache-${{ github.run_id }}
