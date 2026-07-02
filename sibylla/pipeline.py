@@ -35,11 +35,12 @@ DEFAULT_FREE_SOURCES = [
     "yt_exoplanetas", "yt_robotitus", "yt_ecosdeunmundoestrellado", "yt_fazttech",
     "yt_psicovlog", "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente",
     "yt_iftmadrid", "yt_novagea", "yt_astrumespanol", "yt_raqueldelamorenaoficial",
-    "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos", "yt_midulive",
+    "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos",
     "yt_matesmike", "yt_pontebata", "yt_cienciadesofa", "yt_bitboss",
     "yt_cinematixfilms", "yt_anatomiahumanaydiseccion", "yt_iftwebinars",
     "yt_astrovlog", "yt_lahiperactina", "yt_alvamajo", "yt_javier_garcia",
     "yt_antroporamadivulgacion", "yt_deborahciencia",
+    "yt_midudev",
     # Social (gratis): una tarjeta por red en "Voces de la red"
     "mastodon", "bluesky",
 ]

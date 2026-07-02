@@ -421,7 +421,6 @@ Los 37 canales del usuario, con su `channel_id` `UC…` resuelto y su feed Atom
 | @darinmex | `yt_darinmex` | Darin McNabb |
 | @Candeliousfang | `yt_candeliousfang` | Candeliousfang |
 | @jefidos | `yt_jefidos` | Carolina Jefillysh |
-| @midulive | `yt_midulive` | midulive |
 | @MatesMike | `yt_matesmike` | Mates Mike |
 | @PonteBata | `yt_pontebata` | Ponte Bata |
 | @CienciaDeSofa | `yt_cienciadesofa` | CienciaDeSofa |
@@ -435,13 +434,14 @@ Los 37 canales del usuario, con su `channel_id` `UC…` resuelto y su feed Atom
 | @Javier_Garcia | `yt_javier_garcia` | Javier Garcia |
 | @AntroporamaDivulgacion | `yt_antroporamadivulgacion` | Antroporama |
 | @deborahciencia | `yt_deborahciencia` | deborahciencia |
+| @midudev | `yt_midudev` | midudev |
 
 > **Notas para el usuario (no bloquean la implementación):**
 > - **`@jefillysh` y `@jefidos`** son de la misma creadora (Jefillysh / "Carolina
 >   Jefillysh"): son **dos canales distintos** pero del mismo proyecto. Ambos
 >   quedan incluidos; quitar uno si se prefiere no duplicar autor.
 > - El roster es **divulgación amplia**, no solo "ciencia" estricta: hay programación
->   (`midulive`, `Fazt`, `pildorasinformaticas`, `BitBoss`), cine (`Cinematix`),
+>   (`midudev`, `Fazt`, `pildorasinformaticas`, `BitBoss`), cine (`Cinematix`),
 >   filosofía/letras (`Jesús G. Maestro`, `Darin McNabb`), videojuegos/humor
 >   (`Alva Majo`), arte/arquitectura (`Ter`). Encaja con un título de sección
 >   "Divulgación" a secas; si se quiere mantener "Divulgación **científica**",
@@ -985,20 +985,6 @@ feed verificados en vivo el 2026-06-30.
     cost: free
     status: verified_2026-06-30
 
-  - id: yt_midulive
-    name: "midulive"
-    publisher: "YouTube"
-    tier: 3
-    type: rss
-    category: youtube
-    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC3aj05GEEyzdOqYM5FLSFeg"
-    topics: [divulgacion]
-    lang: es
-    license: "solo miniatura + título + enlace al video"
-    access: open
-    cost: free
-    status: verified_2026-06-30
-
   - id: yt_matesmike
     name: "Mates Mike"
     publisher: "YouTube"
@@ -1180,6 +1166,20 @@ feed verificados en vivo el 2026-06-30.
     access: open
     cost: free
     status: verified_2026-06-30
+
+  - id: yt_midudev
+    name: "midudev"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC8LeXCWOalN8SxlrPcG-PaQ"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-06-30
 ```
 
 ---
@@ -1194,10 +1194,10 @@ Pegar en `sibylla/pipeline.py` dentro de la lista `DEFAULT_FREE_SOURCES`
     "yt_jodisea", "yt_radientnews", "yt_jefillysh", "yt_elrobotdeplaton", "yt_jesusgmaestro", "yt_quantumfracture",
     "yt_pildorasinformaticas", "yt_exoplanetas", "yt_robotitus", "yt_ecosdeunmundoestrellado", "yt_fazttech", "yt_psicovlog",
     "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente", "yt_iftmadrid", "yt_novagea", "yt_astrumespanol",
-    "yt_raqueldelamorenaoficial", "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos", "yt_midulive",
+    "yt_raqueldelamorenaoficial", "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos",
     "yt_matesmike", "yt_pontebata", "yt_cienciadesofa", "yt_bitboss", "yt_cinematixfilms", "yt_anatomiahumanaydiseccion",
     "yt_iftwebinars", "yt_astrovlog", "yt_lahiperactina", "yt_alvamajo", "yt_javier_garcia", "yt_antroporamadivulgacion",
-    "yt_deborahciencia",
+    "yt_deborahciencia", "yt_midudev",
 ```
 
 > ⚠️ **Rendimiento del build:** 37 fuentes RSS nuevas = 37 GET extra por corrida.

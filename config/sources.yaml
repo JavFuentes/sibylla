@@ -1382,22 +1382,6 @@ sources:
     cost: free
     status: verified_2026-07-01
 
-  - id: yt_midulive
-    name: "midulive"
-    publisher: "YouTube"
-    tier: 3
-    type: rss
-    category: youtube
-    handle: "@midulive"
-    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC3aj05GEEyzdOqYM5FLSFeg"
-    topics: [divulgacion]
-    lang: es
-    license: "solo miniatura + título + enlace al video"
-    access: open
-    cost: free
-    status: verified_2026-07-01
-    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
-
   - id: yt_matesmike
     name: "Mates Mike"
     publisher: "YouTube"
@@ -1592,6 +1576,21 @@ sources:
     category: youtube
     handle: "@deborahciencia"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCibUX4QoSrRwmBZf0Ig-OCg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-07-01
+
+  - id: yt_midudev
+    name: "midudev"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    handle: "@midudev"
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UC8LeXCWOalN8SxlrPcG-PaQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"
