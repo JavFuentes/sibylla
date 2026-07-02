@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import requests
 
+import sibylla.apod as apod_mod
 from sibylla.apod import build_apod_i18n, fetch_apod
 
 _APOD = {
@@ -29,34 +30,76 @@ class _FakeResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise requests.HTTPError(f"HTTP {self.status_code}")
+            exc = requests.HTTPError(f"HTTP {self.status_code}")
+            exc.response = self  # requests real adjunta la respuesta; fetch_apod lee .status_code de ahi
+            raise exc
 
     def json(self):
         return self._payload
 
 
 def test_fetch_apod_feliz(monkeypatch):
-    """Respuesta valida de NASA se devuelve tal cual."""
-    monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse(_APOD))
+    """Respuesta valida de NASA se devuelve tal cual, sin reintentar."""
+    calls = []
+    def _get(*a, **k):
+        calls.append(1)
+        return _FakeResponse(_APOD)
+    monkeypatch.setattr(requests, "get", _get)
+    assert fetch_apod("DEMO_KEY") == _APOD
+    assert len(calls) == 1
+
+
+def test_fetch_apod_503_persistente_agota_reintentos_y_devuelve_none(monkeypatch):
+    """Un 503 persistente (fallo transitorio de NASA) se reintenta `attempts`
+    veces y, si nunca se recupera, devuelve None sin lanzar."""
+    monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
+    calls = []
+    def _get(*a, **k):
+        calls.append(1)
+        return _FakeResponse({}, status=503)
+    monkeypatch.setattr(requests, "get", _get)
+    assert fetch_apod("DEMO_KEY", attempts=3) is None
+    assert len(calls) == 3
+
+
+def test_fetch_apod_503_se_recupera_en_reintento(monkeypatch):
+    """Si el primer intento falla con un codigo transitorio pero el segundo
+    responde bien, el reintento recupera el APOD (no hace falta esperar al
+    cron de respaldo)."""
+    monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
+    respuestas = [_FakeResponse({}, status=503), _FakeResponse(_APOD)]
+    monkeypatch.setattr(requests, "get", lambda *a, **k: respuestas.pop(0))
     assert fetch_apod("DEMO_KEY") == _APOD
 
 
-def test_fetch_apod_http_error_devuelve_none(monkeypatch):
-    """Un error HTTP (p.ej. rate limit) no rompe: devuelve None."""
-    monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse({}, status=429))
+def test_fetch_apod_error_permanente_no_reintenta(monkeypatch):
+    """Un 401 (API key invalida) es un error permanente: reintentar no lo
+    arregla, asi que se abandona en el primer intento."""
+    calls = []
+    def _get(*a, **k):
+        calls.append(1)
+        return _FakeResponse({}, status=401)
+    monkeypatch.setattr(requests, "get", _get)
     assert fetch_apod("DEMO_KEY") is None
+    assert len(calls) == 1
 
 
-def test_fetch_apod_excepcion_red_devuelve_none(monkeypatch):
-    """Un fallo de transporte (timeout, DNS...) tampoco rompe: devuelve None."""
+def test_fetch_apod_excepcion_red_reintenta_y_devuelve_none(monkeypatch):
+    """Un fallo de transporte (timeout, DNS...) es transitorio: se reintenta,
+    y si persiste, no rompe (devuelve None)."""
+    monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
+    calls = []
     def _raise(*a, **k):
+        calls.append(1)
         raise requests.ConnectionError("boom")
     monkeypatch.setattr(requests, "get", _raise)
-    assert fetch_apod("DEMO_KEY") is None
+    assert fetch_apod("DEMO_KEY", attempts=3) is None
+    assert len(calls) == 3
 
 
 def test_fetch_apod_respuesta_incompleta_devuelve_none(monkeypatch):
     """Falta 'explanation' -> se descarta en vez de propagar un payload cojo."""
+    monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
     incompleta = {"date": "2026-06-30", "title": "X"}
     monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse(incompleta))
     assert fetch_apod("DEMO_KEY") is None

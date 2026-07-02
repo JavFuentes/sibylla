@@ -16,6 +16,7 @@ al ingles de NASA para la fecha de hoy. Nunca rompe el build.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -31,16 +32,45 @@ APOD_I18N_SCHEMA = "cl.sibylla.apod_i18n.v1"
 # 'en' es el original de NASA (no requiere traduccion).
 APOD_I18N_LANGS = ("es", "it")
 
+# Codigos que ameritan reintento (fallo transitorio del lado de NASA, no del
+# request). Medido: la API de NASA devuelve 503 en ~1 de cada 5 llamadas en
+# horas pico. Un 4xx que no sea de esta lista (401 key invalida, 400 fecha
+# mala...) es un error permanente: reintentar no lo arregla.
+_RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 
-def fetch_apod(api_key: str, *, timeout: int = 20) -> dict | None:
-    """Descarga el APOD de HOY desde la API de NASA. None ante cualquier fallo."""
-    try:
-        r = requests.get(APOD_URL, params={"api_key": api_key}, timeout=timeout)
-        r.raise_for_status()
-        data = r.json()
-    except (requests.RequestException, ValueError) as exc:
-        log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", safe_error(exc))
+
+def fetch_apod(api_key: str, *, timeout: int = 20, attempts: int = 3) -> dict | None:
+    """Descarga el APOD de HOY desde la API de NASA. None ante cualquier fallo.
+
+    Reintenta con backoff corto (2s, 4s) ante fallos transitorios (ver
+    _RETRY_STATUS, mas timeouts/errores de conexion): el cron que llama a esto
+    tiene pocas oportunidades de reintento a nivel de corrida completa (ver
+    .github/workflows/regenerate-apod.yml). Un error permanente (p.ej. API key
+    invalida) se abandona en el primer intento, sin reintentar en vano.
+    """
+    last_err = ""
+    for i in range(attempts):
+        try:
+            r = requests.get(APOD_URL, params={"api_key": api_key}, timeout=timeout)
+            r.raise_for_status()
+            data = r.json()
+            break
+        except requests.RequestException as exc:
+            last_err = safe_error(exc)
+            status = getattr(exc.response, "status_code", None)
+            if status is not None and status not in _RETRY_STATUS:
+                log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", last_err)
+                return None
+        except ValueError as exc:
+            log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", safe_error(exc))
+            return None
+        if i < attempts - 1:
+            time.sleep(2 ** (i + 1))  # 2s, 4s
+    else:
+        log.warning("No se pudo obtener el APOD de hoy tras %d intentos (%s). Sidecar de traduccion omitido.",
+                    attempts, last_err)
         return None
+
     if not isinstance(data, dict) or not data.get("title") or not data.get("explanation") or not data.get("date"):
         log.warning("Respuesta de APOD incompleta. Sidecar de traduccion omitido.")
         return None

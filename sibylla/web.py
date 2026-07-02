@@ -29,7 +29,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .apod import build_apod_i18n, fetch_apod
-from .config import ROOT, get_google_verification, get_nasa_api_key, get_site_url, load_social_config
+from .config import ROOT, get_google_verification, get_nasa_api_key, get_site_url, load_env, load_social_config
 from .i18n import load_translations, t
 from .models import NewsItem
 from .pipeline import _score, _social_score
@@ -830,6 +830,11 @@ def write_apod_sidecar(*, translate: bool = True, tracker: list[dict] | None = N
     un cron aparte, mas temprano, para achicar a minutos la ventana en la que
     Stellar-View muestra el APOD de hoy en ingles (ver sibylla/apod.py). Idempotente:
     el build de las 11 vuelve a escribir el mismo archivo sin duplicar trabajo raro."""
+    # Se auto-suficiente en .env: `--apod-only` (cli.py) llega aqui SIN pasar por
+    # run_pipeline (que es quien normalmente carga el .env). En CI no hace falta
+    # (las vars ya vienen inyectadas por el workflow), pero en corridas/pruebas
+    # locales sin esto NASA_API_KEY y el proveedor LLM quedan sin configurar.
+    load_env()
     apod_data = fetch_apod(get_nasa_api_key())
     if apod_data is None:
         return None
