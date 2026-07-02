@@ -260,9 +260,15 @@ Cada fuente trae `scope: national | regional` (alimenta la cuota regional).
    LLM o ante error, cae al top-6 heurístico.
 3. **Cuota** (`_apply_quota`): `N_CARDS = 6`, **`MIN_REGIONAL = 2`** (mínimo de
    tarjetas regionales), **`MAX_PER_OUTLET = 2`** (tope por medio).
+4. **Separación de portada** (`_separate_front`): garantiza que las **2 primeras
+   tarjetas sean de medios distintos** (si el juez sitúa dos del mismo medio en
+   posiciones 1 y 2, intercambia la 2.ª por la siguiente de medio distinto). Solo
+   reordena, sin descartar, así que no afecta a la cuota regional. Equivalente a
+   la regla 5 del selector curado de IA/Medicina. No-op si es imposible (<3
+   tarjetas o todo el pool de un solo medio).
 
 **Orden de las tarjetas:** el de prioridad del juez (o de la heurística),
-**preservado** tras aplicar la cuota.
+**preservado** tras aplicar la cuota y la separación de portada.
 
 > Parámetros editables: `N_CARDS`, `MIN_REGIONAL`, `MAX_PER_OUTLET`,
 > `SHORTLIST_N` en `sibylla/nacional.py`.

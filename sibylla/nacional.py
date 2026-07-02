@@ -163,6 +163,33 @@ def _apply_quota(ordered: list[NewsItem], n: int,
     return selected[:n]
 
 
+def _separate_front(ordered: list[NewsItem]) -> list[NewsItem]:
+    """Garantiza que las 2 primeras tarjetas sean de medios distintos.
+
+    Si las posiciones 0 y 1 comparten medio (mismo `_outlet_key`), intercambia la
+    2.ª por la primera tarjeta de medio distinto que aparezca después. Con
+    `MAX_PER_OUTLET=2` siempre existe tal candidata (un medio no puede ocupar más
+    de 2 plazas en el resultado de `_apply_quota`), salvo que falten cartas (<3)
+    o todo el listado sea de un solo medio: en esos casos no hace nada.
+    Solo REORDENA (no descarta), así que no altera la cuota regional ya aplicada
+    por `_apply_quota`. Equivalente a la regla 5 del selector curado de IA/Medicina.
+    """
+    if len(ordered) < 3:
+        return ordered
+    front = _outlet_key(ordered[0])
+    if _outlet_key(ordered[1]) != front:
+        return ordered
+    swap_idx = next(
+        (i for i in range(2, len(ordered)) if _outlet_key(ordered[i]) != front),
+        None,
+    )
+    if swap_idx is None:
+        return ordered
+    out = list(ordered)
+    out[1], out[swap_idx] = out[swap_idx], out[1]
+    return out
+
+
 def select_nacional(items: list[NewsItem], *, n: int = N_CARDS,
                     min_regional: int = MIN_REGIONAL,
                     max_per_outlet: int = MAX_PER_OUTLET,
@@ -196,7 +223,7 @@ def select_nacional(items: list[NewsItem], *, n: int = N_CARDS,
     else:
         ordered = ranked
 
-    final = _apply_quota(ordered, n, min_regional, max_per_outlet)
+    final = _separate_front(_apply_quota(ordered, n, min_regional, max_per_outlet))
     final_ids = {id(x) for x in final}
     leftover_nac = [it for it in ranked if id(it) not in final_ids]
 
