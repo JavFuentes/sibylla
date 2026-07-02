@@ -94,8 +94,12 @@ jobs:
             exit 0
           fi
 
-          probar_ssh() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
-          subir()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy web/apod-i18n.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/apod-i18n.json"; }
+          probar_ssh()    { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
+          subir()         { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy web/apod-i18n.json "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/apod-i18n.json"; }
+          # `scp -r` sobre un directorio remoto que YA existe mergea (no purga
+          # los archivos de dias anteriores), asi se acumula un apod-i18n/<fecha>.json
+          # por dia sin necesitar el patron descargar/subir del historial (runs.json).
+          subir_archivo() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r web/apod-i18n "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
 
           echo "→ Probando conectividad SSH (con reintentos)..."
           reintentar "test de conectividad SSH" probar_ssh || {
@@ -110,3 +114,11 @@ jobs:
           }
 
           echo "✅ apod-i18n.json publicado en $DEPLOY_PATH"
+
+          # Best-effort: el APOD de hoy ya quedo publicado arriba, asi que un
+          # fallo aca no aborta el workflow (no vale la pena reintentar el APOD
+          # de hoy solo porque el archivo historico no subio).
+          echo "→ Subiendo copia histórica (apod-i18n/<fecha>.json)..."
+          reintentar "subida de apod-i18n/ (historico)" subir_archivo \
+            && echo "✓ Copia histórica persistida en $DEPLOY_PATH/apod-i18n/" \
+            || echo "⚠ No se pudo persistir la copia histórica; el APOD de hoy sigue disponible, pero no quedó en el archivo hasta la próxima corrida exitosa."

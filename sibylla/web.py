@@ -60,6 +60,10 @@ STELLAR_NEWS_LANGS = ("es", "en", "it")
 
 # Sidecar de traduccion es/it del APOD de HOY (ver sibylla/apod.py).
 APOD_I18N_FILE = "apod-i18n.json"
+# Archivo historico: una copia por fecha que nunca se sobreescribe, para que
+# Stellar-View pueda mostrar traducciones de APODs anteriores (desde que este
+# archivo empezo a persistirse; los dias previos caen al ingles de NASA).
+APOD_I18N_ARCHIVE_DIR = "apod-i18n"
 
 # Fuentes cuyos ítems se muestran en la sección "Voces de la red" (no en los temas).
 SOCIAL_SOURCE_IDS: set[str] = {"x_twitter", "mastodon", "bluesky"}
@@ -822,14 +826,30 @@ def _write_apod_i18n(payload: dict) -> Path:
     return out
 
 
+def _write_apod_i18n_archive(payload: dict) -> Path:
+    """Copia inmutable en `apod-i18n/<fecha>.json`.
+
+    A diferencia de `apod-i18n.json` (que se pisa cada corrida), este archivo
+    nunca se reescribe una vez publicado: los workflows lo suben con `scp -r`
+    sobre un directorio remoto existente, que MERGEA en vez de purgar, así se
+    acumula un archivo por dia sin necesitar el patron descargar/subir que usa
+    el historial de metricas (runs.json)."""
+    archive_dir = SITE_DIR / APOD_I18N_ARCHIVE_DIR
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    out = archive_dir / f"{payload['date']}.json"
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return out
+
+
 def write_apod_sidecar(*, translate: bool = True, tracker: list[dict] | None = None) -> Path | None:
-    """Genera y escribe SOLO `apod-i18n.json`, sin tocar el resto del sitio.
+    """Genera y escribe `apod-i18n.json` + su copia historica, sin tocar el resto del sitio.
 
     NASA publica el APOD ~2-3 AM Chile, pero el build completo (`build_all_sites`)
     corre recien a las 11 para que las noticias salgan frescas. Esta funcion la usa
     un cron aparte, mas temprano, para achicar a minutos la ventana en la que
     Stellar-View muestra el APOD de hoy en ingles (ver sibylla/apod.py). Idempotente:
-    el build de las 11 vuelve a escribir el mismo archivo sin duplicar trabajo raro."""
+    el build de las 11 vuelve a escribir el mismo archivo sin duplicar trabajo raro
+    (y su copia historica, con el mismo nombre de archivo por fecha)."""
     # Se auto-suficiente en .env: `--apod-only` (cli.py) llega aqui SIN pasar por
     # run_pipeline (que es quien normalmente carga el .env). En CI no hace falta
     # (las vars ya vienen inyectadas por el workflow), pero en corridas/pruebas
@@ -840,6 +860,7 @@ def write_apod_sidecar(*, translate: bool = True, tracker: list[dict] | None = N
         return None
     SITE_DIR.mkdir(parents=True, exist_ok=True)
     payload = build_apod_i18n(apod_data, translate=translate, tracker=tracker)
+    _write_apod_i18n_archive(payload)
     return _write_apod_i18n(payload)
 
 
@@ -1157,11 +1178,12 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     )
     paths.append(_write_stellar_news(stellar_payload))
 
-    # JSON público para Stellar-View: traducción es/it del APOD de HOY (solo
-    # "hoy"; ver sibylla/apod.py). Si la API de NASA falla, se omite el
-    # archivo de esta corrida y la app cae al inglés (nunca rompe el build).
-    # Normalmente ya lo dejó escrito el cron temprano de regenerate-apod.yml;
-    # esto lo re-escribe (idempotente) por si NASA cambió algo o ese cron falló.
+    # JSON público para Stellar-View: traducción es/it del APOD de HOY, más su
+    # copia histórica en apod-i18n/<fecha>.json (ver sibylla/apod.py). Si la
+    # API de NASA falla, se omiten ambos archivos en esta corrida y la app cae
+    # al inglés (nunca rompe el build). Normalmente ya los dejó escritos el
+    # cron temprano de regenerate-apod.yml; esto los re-escribe (idempotente)
+    # por si NASA cambió algo o ese cron falló.
     apod_path = write_apod_sidecar(translate=translate, tracker=translate_tracker)
     if apod_path is not None:
         paths.append(apod_path)

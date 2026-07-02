@@ -212,8 +212,18 @@ jobs:
           fi
           echo "→ Assets estáticos a subir: ${ASSETS[*]:-(ninguno)}"
 
+          # Archivo histórico del APOD (apod-i18n/<fecha>.json): `scp -r` sobre
+          # un directorio remoto ya existente MERGEA (no purga lo que ya hay),
+          # así se acumula un archivo por día sin el patrón descargar/subir que
+          # usa el historial de métricas (runs.json). Normalmente ya lo dejó
+          # escrito el cron temprano de regenerate-apod.yml; esto lo re-sube
+          # (idempotente) por si ese cron falló.
+          APOD_ARCHIVE=()
+          [ -d web/apod-i18n ] && APOD_ARCHIVE+=(web/apod-i18n)
+          echo "→ Archivo histórico de APOD a subir: ${APOD_ARCHIVE[*]:-(ninguno)}"
+
           probar_ssh()     { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo 'SSH OK'"; }
-          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" "${JSONS[@]}" "${ASSETS[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
+          subir_web()      { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy -r "${PUBLICOS[@]}" "${JSONS[@]}" "${ASSETS[@]}" "${APOD_ARCHIVE[@]}" web/robots.txt web/sitemap.xml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"; }
           crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
           subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }
           subir_xusage()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_usage.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json"; }

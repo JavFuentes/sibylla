@@ -155,11 +155,22 @@ esa ventana y Stellar-View mostraba el texto en inglés de NASA hasta las 11.
 
 El workflow [`.github/workflows/regenerate-apod.yml`](.github/workflows/regenerate-apod.yml)
 corre `python -m sibylla.cli --apod-only` en un cron aparte y más temprano
-(07:00 y 10:00 UTC), publicando SOLO `apod-i18n.json` — no toca noticias,
+(07:00 y 10:00 UTC), publicando `apod-i18n.json` — no toca noticias,
 YouTube, X ni el historial de métricas. Reusa los mismos secrets de la tabla
 de arriba (`NASA_API_KEY`, `LLM_*`, `DEPLOY_*`); no requiere configurar nada
 adicional. Es idempotente: el build de las 11 lo vuelve a escribir sin
 problema.
+
+Cada corrida además deja una copia inmutable en `apod-i18n/<fecha>.json`
+(dentro de `DEPLOY_PATH`), que nunca se sobrescribe: es el archivo histórico
+que le permite a Stellar-View mostrar traducciones de APODs de días
+anteriores (desde que este mecanismo empezó a correr; antes de eso, la app
+cae al inglés de NASA). Se sube con `scp -r` sobre un directorio remoto ya
+existente, que mergea en vez de purgar — así se acumula un archivo por día
+sin necesitar el patrón descargar/subir que usa `runs.json`. La subida del
+histórico es *best-effort*: si falla, no aborta el workflow (el APOD de
+"hoy" ya quedó publicado; ese día solo no se archiva hasta la próxima
+corrida exitosa).
 
 ### B) GitHub Actions → GitHub Pages
 

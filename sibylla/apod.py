@@ -1,11 +1,14 @@
-"""Sidecar de traduccion es/it para el APOD (Astronomy Picture of the Day) de HOY.
+"""Sidecar de traduccion es/it para el APOD (Astronomy Picture of the Day).
 
 Stellar-View pide el APOD directo a la API de NASA (imagen + texto en ingles,
 para cualquier fecha del archivo). Este modulo publica un JSON aparte,
-`apod-i18n.json`, con SOLO el titulo/explicacion de HOY traducidos: el
-selector de fecha de la app cubre 30 anios de archivo, imposible de traducir
-por completo, y el texto es identico para todo el mundo (tiene sentido
-traducirlo una vez aqui, no una vez por dispositivo).
+`apod-i18n.json`, con el titulo/explicacion de HOY traducidos: el selector de
+fecha de la app cubre 30 anios de archivo, imposible de traducir por completo
+retroactivamente, y el texto es identico para todo el mundo (tiene sentido
+traducirlo una vez aqui, no una vez por dispositivo). Cada corrida ademas deja
+una copia inmutable en `apod-i18n/<fecha>.json` (ver `web.py::write_apod_sidecar`),
+asi se va acumulando un archivo historico de traducciones desde que este
+mecanismo empezo a correr; los dias anteriores a eso caen al ingles de NASA.
 
 Reutiliza `translate.py::translate_cards` (mismo cache `translations.json`,
 mismo troceo/reintento) tratando titulo+explicacion como una card mas, igual

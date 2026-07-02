@@ -1,15 +1,21 @@
 """Tests para el sidecar de traduccion del APOD de hoy (sibylla/apod.py).
 
-Cubre fetch_apod (requests mockeado, sin red real) y build_apod_i18n (con
-translate_cards monkeypatcheado, sin llamar al LLM real). Sigue el mismo molde
-que test_translate.py y test_stellar.py: logica pura, cero red.
+Cubre fetch_apod (requests mockeado, sin red real), build_apod_i18n (con
+translate_cards monkeypatcheado, sin llamar al LLM real) y write_apod_sidecar
+(sibylla/web.py: escritura de apod-i18n.json + su copia historica en
+apod-i18n/<fecha>.json). Sigue el mismo molde que test_translate.py y
+test_stellar.py: logica pura, cero red.
 """
 from __future__ import annotations
+
+import json
 
 import requests
 
 import sibylla.apod as apod_mod
+import sibylla.web as web_mod
 from sibylla.apod import build_apod_i18n, fetch_apod
+from sibylla.web import write_apod_sidecar
 
 _APOD = {
     "date": "2026-06-30",
@@ -163,3 +169,58 @@ def test_build_apod_i18n_usa_id_namespaced_por_fecha(monkeypatch):
     build_apod_i18n(_APOD, translate=True)
 
     assert seen_ids == ["apod:2026-06-30", "apod:2026-06-30"]  # una llamada por idioma (es, it)
+
+
+# ---------------------------------------------------------------------------
+# write_apod_sidecar (sibylla/web.py): apod-i18n.json + copia historica
+# ---------------------------------------------------------------------------
+def _patch_sidecar_deps(monkeypatch, tmp_path, apod=_APOD):
+    """Aisla write_apod_sidecar de red/env/LLM: SITE_DIR a tmp_path, fetch_apod
+    fijo, sin .env real y sin traduccion (translate=False en los tests que no
+    la necesiten evita tocar el cache/LLM)."""
+    monkeypatch.setattr(web_mod, "SITE_DIR", tmp_path)
+    monkeypatch.setattr(web_mod, "load_env", lambda: None)
+    monkeypatch.setattr(web_mod, "get_nasa_api_key", lambda: "DEMO_KEY")
+    monkeypatch.setattr(web_mod, "fetch_apod", lambda api_key: apod)
+
+
+def test_write_apod_sidecar_escribe_archivo_de_hoy_y_copia_historica(monkeypatch, tmp_path):
+    """Cada corrida deja DOS archivos: el sidecar de hoy (se pisa siempre) y
+    una copia en apod-i18n/<fecha>.json (el archivo historico)."""
+    _patch_sidecar_deps(monkeypatch, tmp_path)
+
+    path = write_apod_sidecar(translate=False)
+
+    assert path == tmp_path / "apod-i18n.json"
+    assert path.exists()
+    archivo = tmp_path / "apod-i18n" / "2026-06-30.json"
+    assert archivo.exists()
+    # Mismo contenido en ambos (misma corrida, mismo payload).
+    assert json.loads(path.read_text(encoding="utf-8")) == json.loads(archivo.read_text(encoding="utf-8"))
+
+
+def test_write_apod_sidecar_copia_historica_no_se_pisa_entre_fechas(monkeypatch, tmp_path):
+    """Una corrida de un dia posterior no borra la copia historica del dia
+    anterior: cada fecha vive en su propio archivo dentro de apod-i18n/."""
+    _patch_sidecar_deps(monkeypatch, tmp_path, apod=_APOD)
+    write_apod_sidecar(translate=False)
+
+    apod_manana = {**_APOD, "date": "2026-07-01", "title": "Another Nebula"}
+    _patch_sidecar_deps(monkeypatch, tmp_path, apod=apod_manana)
+    write_apod_sidecar(translate=False)
+
+    archivo_dir = tmp_path / "apod-i18n"
+    assert (archivo_dir / "2026-06-30.json").exists()  # no se borro
+    assert (archivo_dir / "2026-07-01.json").exists()
+    hoy = json.loads((tmp_path / "apod-i18n.json").read_text(encoding="utf-8"))
+    assert hoy["date"] == "2026-07-01"  # el sidecar de "hoy" si se piso
+
+
+def test_write_apod_sidecar_sin_apod_no_escribe_nada(monkeypatch, tmp_path):
+    """Si NASA no responde (fetch_apod -> None), no se escribe ni el sidecar
+    ni la copia historica; write_apod_sidecar devuelve None."""
+    _patch_sidecar_deps(monkeypatch, tmp_path, apod=None)
+
+    assert write_apod_sidecar(translate=False) is None
+    assert not (tmp_path / "apod-i18n.json").exists()
+    assert not (tmp_path / "apod-i18n").exists()
