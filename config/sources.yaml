@@ -841,7 +841,7 @@ sources:
     access: paid_api
     cost: "pay-per-use (~$0.005/lectura de post; tope 2M/mes). Publicar: $0.015, o $0.20 si lleva enlace"
     budget_usd_loaded: 5.00
-    monthly_read_budget: 300        # ~$1.50/mes -> ver plan en README
+    monthly_read_budget: 470        # ~$2.35/mes -> ver plan en README
     social_freshness_hours: 48      # solo posts de las últimas 48 h ('buzz' actual)
     # Consulta híbrida para "Voces de la red" (NO enriquece los temas):
     #   1) base curada: posts de estas cuentas de alta señal (IA + medicina).

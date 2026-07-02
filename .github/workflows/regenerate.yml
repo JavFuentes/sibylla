@@ -96,6 +96,8 @@ jobs:
           probar_ssh()       { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "echo SSH OK"; }
           descargar()        { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json" data/runs.json; }
           descargar_xusage() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json" data/x_usage.json; }
+          descargar_xrecent() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_recent.json" data/x_recent.json; }
+          descargar_xhouse()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_house.json" data/x_house.json; }
 
           # Si el host es inalcanzable ABORTAMOS: generar con historial vacío y
           # luego subirlo machacaría el runs.json bueno que vive en el servidor.
@@ -135,6 +137,21 @@ jobs:
             echo "✓ x_usage.json descargado ($(wc -c < data/x_usage.json) bytes)."
           else
             echo "ⓘ Sin x_usage.json en el host (o inalcanzable); el contador del mes arranca en 0."
+          fi
+
+          # Caché diaria de X (orgánico + house): best-effort. Sin esto, un
+          # workflow_dispatch manual el mismo día del cron volvería a gastar
+          # lecturas (cada corrida arranca en una VM limpia). Si no existe o
+          # falla, se sigue: esta corrida simplemente vuelve a leer de la API.
+          if descargar_xrecent 2>/dev/null; then
+            echo "✓ x_recent.json descargado ($(wc -c < data/x_recent.json) bytes)."
+          else
+            echo "ⓘ Sin x_recent.json en el host (o inalcanzable); se leerá de la API si toca."
+          fi
+          if descargar_xhouse 2>/dev/null; then
+            echo "✓ x_house.json descargado ($(wc -c < data/x_house.json) bytes)."
+          else
+            echo "ⓘ Sin x_house.json en el host (o inalcanzable); se leerá de la API si toca."
           fi
 
       - name: Generar sitio (con traducción de tarjetas)
@@ -200,6 +217,8 @@ jobs:
           crear_data_dir() { ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"; }
           subir_runs()     { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/runs.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/runs.json"; }
           subir_xusage()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_usage.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json"; }
+          subir_xrecent()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_recent.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_recent.json"; }
+          subir_xhouse()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_house.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_house.json"; }
 
           echo "→ Probando conectividad SSH (con reintentos)..."
           reintentar "test de conectividad SSH" probar_ssh || {
@@ -235,6 +254,22 @@ jobs:
             reintentar "subida de x_usage.json" subir_xusage \
               && echo "✓ Contador de X persistido en $REMOTE_DATA/x_usage.json" \
               || echo "⚠ No se pudo persistir x_usage.json; el cap del mes podría reiniciarse."
+          fi
+
+          # Persistir la caché diaria de X (best-effort, no aborta el deploy).
+          # Sin esto, un workflow_dispatch manual el mismo día del cron
+          # volvería a gastar lecturas en la próxima corrida.
+          if [ -f data/x_recent.json ]; then
+            echo "→ Persistiendo x_recent.json en el host ($REMOTE_DATA)..."
+            reintentar "subida de x_recent.json" subir_xrecent \
+              && echo "✓ Caché orgánica de X persistida en $REMOTE_DATA/x_recent.json" \
+              || echo "⚠ No se pudo persistir x_recent.json; la próxima corrida del día re-leería."
+          fi
+          if [ -f data/x_house.json ]; then
+            echo "→ Persistiendo x_house.json en el host ($REMOTE_DATA)..."
+            reintentar "subida de x_house.json" subir_xhouse \
+              && echo "✓ Caché house de X persistida en $REMOTE_DATA/x_house.json" \
+              || echo "⚠ No se pudo persistir x_house.json; la próxima corrida del día re-leería."
           fi
 
           echo "✅ Deploy completado a $DEPLOY_PATH"

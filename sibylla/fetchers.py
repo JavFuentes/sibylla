@@ -1024,21 +1024,22 @@ def _fetch_house_x(handle: str, limit: int = 5) -> list[NewsItem]:
 
     DE PAGO: el endpoint de timeline exige `max_results >= 5`, así que cada
     lectura real cuesta 5 posts. Para no repetir el gasto en builds del mismo
-    día se cachea el resultado en `data/x_house.json` con TTL. Respeta el tope
-    mensual duro compartido (`data/x_usage.json`). Sin token o sin presupuesto
-    devuelve [] (degradación elegante).
+    día se cachea el resultado en `data/x_house.json` por FECHA CALENDARIO (UTC):
+    la primera corrida del día hace la lectura real; las demás corridas de ese
+    mismo día (p. ej. un `workflow_dispatch` manual tras el cron) reutilizan el
+    caché. Respeta el tope mensual duro compartido (`data/x_usage.json`). Sin
+    token o sin presupuesto devuelve [] (degradación elegante).
     """
     import json
     import os
     handle_clean = handle.lstrip("@").strip()
-    TTL_HOURS = 6
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     cache_path = _x_house_cache_path()
-    # 1) Caché fresca -> 0 lecturas.
+    # 1) Caché del día -> 0 lecturas.
     try:
         c = json.loads(cache_path.read_text(encoding="utf-8"))
-        ts = _parse_date(c.get("fetched_at", ""))
-        if (c.get("handle") == handle_clean and ts and
-                (datetime.now(timezone.utc) - ts) < timedelta(hours=TTL_HOURS)):
+        fetched_at = c.get("fetched_at", "")
+        if c.get("handle") == handle_clean and fetched_at[:10] == today:
             return [_x_house_from_cache(d, handle_clean) for d in c.get("items", [])]
     except Exception:  # noqa: BLE001
         pass
@@ -1197,6 +1198,37 @@ def x_usage_reads() -> int:
     return reads
 
 
+def _x_recent_cache_path():
+    from .config import ROOT
+    return ROOT / "data" / "x_recent.json"
+
+
+def _x_recent_to_cache(it: NewsItem) -> dict:
+    """Serializa un post orgánico de X a JSON (para data/x_recent.json)."""
+    return {
+        "title": it.title, "url": it.url,
+        "source_id": it.source_id, "source_name": it.source_name, "tier": it.tier,
+        "published": it.published.isoformat() if it.published else None,
+        "summary": it.summary, "image": it.image,
+        "likes": it.extra.get("likes"), "reposts": it.extra.get("reposts"),
+        "author": it.extra.get("author", ""), "curated": it.extra.get("curated", False),
+    }
+
+
+def _x_recent_from_cache(d: dict) -> NewsItem:
+    """Reconstruye un post orgánico de X desde el JSON cacheado."""
+    return NewsItem(
+        title=d.get("title", ""), url=d.get("url", ""),
+        source_id=d.get("source_id", "x_twitter"),
+        source_name=d.get("source_name", ""), tier=int(d.get("tier", 3)),
+        published=_parse_date(d.get("published") or ""),
+        summary=d.get("summary", ""), image=d.get("image"),
+        extra={"kind": "post", "network": "x",
+               "likes": d.get("likes"), "reposts": d.get("reposts"),
+               "author": d.get("author", ""), "curated": d.get("curated", False)},
+    )
+
+
 def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
             curated_handles: frozenset[str] = frozenset(),
             freshness_hours: int = 48) -> list[NewsItem]:
@@ -1206,7 +1238,24 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
     `curated_handles` (en minúsculas, sin @) marca los posts de cuentas de alta
     señal con `extra["curated"]=True` para que el ranking social los anteponga.
     `freshness_hours` acota la ventana (recent search llega hasta 7 días).
+
+    Se cachea el resultado en `data/x_recent.json` por FECHA CALENDARIO (UTC) +
+    query exacta: la primera corrida del día hace la lectura real; las demás
+    corridas de ese mismo día (p. ej. un `workflow_dispatch` manual tras el cron)
+    reutilizan el caché y no gastan presupuesto. Si cambian las cuentas curadas
+    o la lente del día, la query cambia y el caché se invalida solo.
     """
+    query_full = f"({query}) -is:retweet -is:reply -job -hiring -\"job alert\" lang:en"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cache_path = _x_recent_cache_path()
+    try:
+        c = json.loads(cache_path.read_text(encoding="utf-8"))
+        if c.get("date") == today and c.get("query") == query_full:
+            log.info("  x_twitter: caché del día (0 lecturas nuevas)")
+            return [_x_recent_from_cache(d) for d in c.get("items", [])]
+    except Exception:  # noqa: BLE001
+        pass
+
     import os
     bearer = os.getenv("X_BEARER_TOKEN")
     if not bearer:
@@ -1220,7 +1269,7 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
         return []
     max_results = max(10, min(limit, remaining, 25))
     params = {
-        "query": f"({query}) -is:retweet -is:reply -job -hiring -\"job alert\" lang:en",
+        "query": query_full,
         "max_results": max_results,
         "tweet.fields": "created_at,public_metrics,lang,author_id,attachments",
         "expansions": "author_id,attachments.media_keys",
@@ -1286,6 +1335,16 @@ def fetch_x(source: Source, query: str, limit: int, monthly_budget: int,
     n_cur = sum(1 for it in items if it.extra.get("curated"))
     log.info("  %-16s -> %d posts (%d curados; lecturas del mes: %d/%d)",
              source.id, len(tweets), n_cur, used + len(tweets), monthly_budget)
+    # Guardar caché del día (best-effort; no rompe si falla).
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps({
+            "date": today,
+            "query": query_full,
+            "items": [_x_recent_to_cache(it) for it in items],
+        }), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
     return items
 
 

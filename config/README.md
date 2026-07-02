@@ -50,7 +50,7 @@ Tienes **$5 cargados** en X y la API es **pay-per-use**: **~$0.005 por post leí
 
 1. **Descubrimiento = 100% gratis.** Google News + GDELT + RSS/APIs detectan las noticias. Hacker News + Mastodon cubren el "qué se discute". Esto ya da el ~90% del valor sin gastar nada.
 2. **X solo para confirmar/enriquecer el top-N.** Una vez al día, tras rankear las historias, se permiten **unas pocas búsquedas dirigidas** en X (p. ej. el titular o el DOI) **solo para las 3–5 historias top**, para ver reacción de expertos.
-3. **Cap mensual duro en config.** `monthly_read_budget` en `sources.yaml` (arranca en **300 lecturas/mes ≈ $1.50**). El ingestor lleva un contador y **se detiene** al llegar al tope. $5 ⇒ ~3 meses de colchón.
+3. **Cap mensual duro en config.** `monthly_read_budget` en `sources.yaml` (**470 lecturas/mes ≈ $2.35**: cubre el peor caso de 15 lecturas/día — 10 orgánicas + 5 house — durante 31 días, con la caché diaria evitando gasto extra si el workflow se dispara varias veces el mismo día). El ingestor lleva un contador y **se detiene** al llegar al tope. $5 ⇒ ~2 meses de colchón.
 4. **Cuentas de alta señal, no búsquedas abiertas.** Cuando se use X, apuntar a una **lista curada** de cuentas fiables (revistas, agencias, científicos/periodistas), no a búsquedas amplias que devuelven ruido y multiplican lecturas.
 5. **No publicar en X con enlaces.** Publicar un post cuesta $0.015, pero **$0.20 si lleva un enlace**. Si algún día publicamos el resumen, va **sin** enlaces (o por otro canal).
 6. **Preferir Bluesky/Mastodon** para el rol de "firehose social": son **gratis y abiertos**. X queda como señal premium opcional.

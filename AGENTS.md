@@ -298,7 +298,7 @@ Cada uno devuelve `list[NewsItem]` con `extra` uniforme:
 |-----|---------|------|-----------|
 | Mastodon | `fetch_mastodon(source, lens, limit)` | Ninguno (instancia pública) | `trends/statuses` o `timelines/tag/{tag}`. Instancia configurable vía `MASTODON_INSTANCE` (def. `mastodon.social`). |
 | Bluesky | `fetch_bluesky(source, lens, limit)` | `BLUESKY_IDENTIFIER` + `BLUESKY_APP_PASSWORD` → `createSession` → `accessJwt` cacheado | `getFeed` (What's Hot) o `searchPosts` |
-| X | `fetch_x` (existente) | `X_BEARER_TOKEN` → Bearer, con tope mensual | `tweets/search/recent`. Su lente se mapea vía `x_topic` a keywords de `TOPIC_CONFIG`; fallback a `social_query` de `sources.yaml`. |
+| X | `fetch_x` (existente) | `X_BEARER_TOKEN` → Bearer, con tope mensual | `tweets/search/recent`. Su lente se mapea vía `x_topic` a keywords de `TOPIC_CONFIG`; fallback a `social_query` de `sources.yaml`. Cachea en `data/x_recent.json` por **fecha calendario (UTC) + query exacta**: la 1ª corrida del día lee de verdad, las siguientes (p. ej. un `workflow_dispatch` manual el mismo día) reusan el caché sin gastar presupuesto. |
 
 **House posts** (`fetch_house_posts(accounts, include_x)`): consulta el feed de
 las cuentas en `social.house_accounts` (incluyendo reposts): Mastodon vía
@@ -309,7 +309,8 @@ en la cuenta: el repost/boost si lo es, el post si no; ordena la Fase 2 por
 recencia **sin** tocar la fecha visible, que sigue siendo la del post original).
 X house: el endpoint de timeline exige `max_results>=5` (piso de 5 lecturas),
 respeta el tope mensual (`data/x_usage.json`) y **cachea** el resultado en
-`data/x_house.json` con TTL (6 h) para no recobrar en builds del mismo día.
+`data/x_house.json` por **fecha calendario (UTC)** para no recobrar en builds
+del mismo día (mismo criterio que el caché orgánico de arriba).
 
 #### Configuración (`config/sources.yaml` · bloque `social:`)
 
@@ -430,4 +431,5 @@ python -m pytest tests/ -v --cov=sibylla --cov-report=term-missing  # requiere p
 - **Relevancia bilingüe:** `is_relevant` quita tildes y compara stems ES/EN; las keywords cortas (≤3) usan límite de palabra (p. ej. `ai` no casa con `airport`).
 - **X recent search** exige `max_results ≥ 10`: si el presupuesto restante es < 10, se omite.
 - **Tope mensual de X en CI:** `x_usage.json` se **persiste en el host** (igual que `runs.json`): el workflow lo descarga antes de generar y lo sube después (best-effort, no aborta el deploy). Así el `monthly_read_budget` sí frena en CI. Es un contador de gasto, no historial: si se pierde, el mes solo reinicia a `reads=0` (no corrompe nada).
+- **Caché diaria de X en CI:** `x_recent.json` (orgánico) y `x_house.json` (house) también se persisten en el host, igual que `x_usage.json`, porque cada corrida de GitHub Actions arranca en una VM limpia — sin esto, un `workflow_dispatch` manual el mismo día del cron volvería a gastar lecturas. Si el host es inalcanzable, cada corrida solo vuelve a leer de la API (nunca rompe el build, en el peor caso gasta de más).
 - **Reblogs de Mastodon (boosts):** la API devuelve el `Announce` por fuera y el post original anidado en `reblog` (con `content`/`media_attachments`/contadores propios vacíos, y `uri` apuntando al JSON ActivityStreams). `_mastodon_effective(p)` desreferencia `reblog` para que la tarjeta enlace y muestre el post original (no el repost). Aplica tanto a `fetch_mastodon` como a las house cards. Bluesky ya viene desreferenciado por `getAuthorFeed` (`entry["post"]` = original).
