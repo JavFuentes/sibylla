@@ -1125,6 +1125,21 @@ sources:
     cost: free
     status: verified_2026-07-01
 
+  - id: yt_veritasiumes
+    name: "Veritasium en español"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    handle: "@VeritasiumES"
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCXtxgWwk55kVJo9lCCZRdmg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-07-02
+
   - id: yt_pildorasinformaticas
     name: "pildorasinformaticas"
     publisher: "YouTube"

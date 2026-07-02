@@ -280,7 +280,7 @@ Cada fuente trae `scope: national | regional` (alimenta la cuota regional).
 > **Bloque especial** (`#divulgacion`). Lógica en `web._select_divulgacion`
 > (`sibylla/web.py`). Tests: `tests/test_divulgacion.py`.
 
-**Fuentes posibles:** 37 canales de YouTube curados, cada uno como fuente RSS Atom
+**Fuentes posibles:** 38 canales de YouTube curados, cada uno como fuente RSS Atom
 en `config/sources.yaml` con `type: rss`, `category: youtube` y
 `topics: [divulgacion]`. El feed nativo de YouTube no requiere API key.
 

@@ -389,10 +389,10 @@ seguir en verde (de ahí que haya que tocar los 4 archivos).
 
 ---
 
-## 9. Canales — RESUELTOS Y VERIFICADOS (2026-06-30)
+## 9. Canales — RESUELTOS Y VERIFICADOS (2026-06-30, actualizado 2026-07-02)
 
-Los 37 canales del usuario, con su `channel_id` `UC…` resuelto y su feed Atom
-**probado en vivo** (HTTP 200 con `<entry>`) el 2026-06-30. Las entradas
+Los 38 canales del usuario, con su `channel_id` `UC…` resuelto y su feed Atom
+**probado en vivo** (HTTP 200 con `<entry>`) entre 2026-06-30 y 2026-07-02. Las entradas
 `sources.yaml` listas para pegar están en el **Apéndice A**; la lista de ids para
 `DEFAULT_FREE_SOURCES`, en el **Apéndice B**.
 
@@ -404,6 +404,7 @@ Los 37 canales del usuario, con su `channel_id` `UC…` resuelto y su feed Atom
 | @ElRobotdePlaton | `yt_elrobotdeplaton` | El Robot de Platón |
 | @JesúsGMaestro | `yt_jesusgmaestro` | Jesús G. Maestro |
 | @QuantumFracture | `yt_quantumfracture` | QuantumFracture |
+| @VeritasiumES | `yt_veritasiumes` | Veritasium en español |
 | @pildorasinformaticas | `yt_pildorasinformaticas` | pildorasinformaticas |
 | @exoplanetas | `yt_exoplanetas` | EXOPLANETAS Noticias Ciencia y Tecnología |
 | @ROBOTITUS | `yt_robotitus` | Noticias Robotitus |
@@ -746,6 +747,20 @@ feed verificados en vivo el 2026-06-30.
     access: open
     cost: free
     status: verified_2026-06-30
+
+  - id: yt_veritasiumes
+    name: "Veritasium en español"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCXtxgWwk55kVJo9lCCZRdmg"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-07-02
 
   - id: yt_pildorasinformaticas
     name: "pildorasinformaticas"
@@ -1190,8 +1205,8 @@ Pegar en `sibylla/pipeline.py` dentro de la lista `DEFAULT_FREE_SOURCES`
 (en su propio bloque comentado):
 
 ```python
-    # Divulgación científica: 37 canales de YouTube (1 tarjeta por canal)
-    "yt_jodisea", "yt_radientnews", "yt_jefillysh", "yt_elrobotdeplaton", "yt_jesusgmaestro", "yt_quantumfracture",
+    # Divulgación científica: 38 canales de YouTube (1 tarjeta por canal)
+    "yt_jodisea", "yt_radientnews", "yt_jefillysh", "yt_elrobotdeplaton", "yt_jesusgmaestro", "yt_quantumfracture", "yt_veritasiumes",
     "yt_pildorasinformaticas", "yt_exoplanetas", "yt_robotitus", "yt_ecosdeunmundoestrellado", "yt_fazttech", "yt_psicovlog",
     "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente", "yt_iftmadrid", "yt_novagea", "yt_astrumespanol",
     "yt_raqueldelamorenaoficial", "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos",
@@ -1200,7 +1215,7 @@ Pegar en `sibylla/pipeline.py` dentro de la lista `DEFAULT_FREE_SOURCES`
     "yt_deborahciencia", "yt_midudev",
 ```
 
-> ⚠️ **Rendimiento del build:** 37 fuentes RSS nuevas = 37 GET extra por corrida.
+> ⚠️ **Rendimiento del build:** 38 fuentes RSS nuevas = 38 GET extra por corrida.
 > Cada feed es ligero (~50 KB) y el fallo de una fuente está aislado, pero el
 > tiempo de fetch crecerá. Si se vuelve un problema, considerar paralelizar el
 > fetch de las fuentes `category: youtube` (hoy el pipeline las baja en serie).
