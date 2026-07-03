@@ -66,6 +66,16 @@ def test_parse_network_para_pill():
     assert _parse_publicacion(VALIDA).extra["network"] == SIBYLLA_SOURCE_ID
 
 
+def test_parse_slug_desde_parametro():
+    # El slug (stem del archivo) se guarda en extra para generar pub/<slug>.html.
+    assert _parse_publicacion(VALIDA, slug="2026-07-03-mi-noticia").extra["slug"] \
+        == "2026-07-03-mi-noticia"
+
+
+def test_parse_sin_slug_queda_none():
+    assert _parse_publicacion(VALIDA).extra["slug"] is None
+
+
 def test_parse_sin_url_queda_vacia():
     assert _parse_publicacion(VALIDA).url == ""
 

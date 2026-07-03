@@ -377,9 +377,14 @@ cuerpo opcional que se muestra en el acordeón "Resumen". Plantilla comentada:
 
 **Orden de las tarjetas:** recencia pura.
 
-**Render:** pill "Sibylla", sello tier 1 (fuente primaria de sí misma). Sin
-`url`, la tarjeta no enlaza y su identidad estable (`dedup_key`) deriva del
-título: no cambiar el título de una publicación desplegada. No se traduce ni
+**Render:** pill "Sibylla", sello tier 1 (fuente primaria de sí misma). **Sin
+`url` en el front-matter, el build genera automáticamente una página propia de
+la noticia en `web/pub/<slug>.html`** (slug = nombre del archivo sin extensión;
+plantilla `templates/pub.html.j2`) y la tarjeta enlaza ahí (título, imagen y
+botón "Original"); el cuerpo del `.md` es el contenido de esa página. Con `url`
+externa, gana esa y no se genera página. La identidad estable (`dedup_key`)
+deriva del título: no cambiar el título ni renombrar el archivo de una
+publicación ya desplegada (rompe el permalink `pub/<slug>`). No se traduce ni
 pasa por el LLM.
 
 **No personalizable:** sin chip en el onboarding, sin selector `− N +` ni

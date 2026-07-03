@@ -26,9 +26,13 @@ Reglas:
 - Sin `url`, el `dedup_key` de la tarjeta deriva del título: NO cambiar el
   título de una publicación ya desplegada (es su identidad estable: ancla
   pública `#n-...` y, a futuro, la clave del contenido social).
+- Sin `url`, `web.py` genera automáticamente una página propia para la noticia
+  en `web/pub/<slug>.html` (slug = nombre del archivo sin extensión) y la
+  tarjeta enlaza ahí; con `url` externa, gana esa y no se genera página.
+  El slug es estable mientras no se renombre el archivo.
 
 Estas publicaciones no se traducen ni piden resúmenes al LLM: se escriben en
-español y el cuerpo del archivo ES el texto del acordeón.
+español y el cuerpo del archivo ES el texto del acordeón (y de la página propia).
 """
 from __future__ import annotations
 
@@ -73,13 +77,16 @@ def _to_datetime(v) -> datetime | None:
     return None
 
 
-def _parse_publicacion(text: str, nombre: str = "?") -> NewsItem | None:
+def _parse_publicacion(text: str, nombre: str = "?",
+                       slug: str | None = None) -> NewsItem | None:
     """Parsea el texto de una publicación a NewsItem (None si no es publicable).
 
     Pura (sin disco ni red) para poder testearla con cadenas. Devuelve None
     ante front-matter ausente/ilegible, campos obligatorios faltantes o
     `publicado: false`; en los casos de error deja un warning con el nombre
-    del archivo para poder corregirlo."""
+    del archivo para poder corregirlo. `slug` (ej. el stem del archivo) se
+    guarda en `extra["slug"]` para que `web.py` pueda generar la página propia
+    `pub/<slug>.html` cuando la publicación no lleva `url` externa."""
     m = _FRONT_MATTER_RE.match(text or "")
     if not m:
         log.warning("Publicación %s: sin front-matter '---'; se omite.", nombre)
@@ -113,7 +120,8 @@ def _parse_publicacion(text: str, nombre: str = "?") -> NewsItem | None:
         published=fecha,
         summary=str(meta.get("resumen") or "").strip(),
         image=(str(meta.get("imagen")).strip() or None) if meta.get("imagen") else None,
-        extra={"kind": "pub", "network": SIBYLLA_SOURCE_ID, "body": cuerpo},
+        extra={"kind": "pub", "network": SIBYLLA_SOURCE_ID,
+               "body": cuerpo, "slug": slug},
     )
 
 
@@ -138,7 +146,8 @@ def load_publicaciones(now: datetime | None = None) -> list[NewsItem]:
         if path.name.startswith("_"):
             continue
         try:
-            it = _parse_publicacion(path.read_text(encoding="utf-8"), path.name)
+            it = _parse_publicacion(path.read_text(encoding="utf-8"),
+                                    path.name, slug=path.stem)
         except Exception as exc:  # noqa: BLE001 — fallo aislado, nunca rompe el build
             log.warning("Publicación %s ilegible (%s); se omite.", path.name, exc)
             continue

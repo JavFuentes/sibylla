@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<!-- ARCHIVO GENERADO por sibylla/web.py — NO editar a mano. Una página por
+     publicación propia (sección SIBYLLA). El diseño vive en esta plantilla. -->
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="96x96" href="../favicon-96x96.png">
+<link rel="icon" type="image/png" sizes="48x48" href="../favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<meta name="theme-color" content="#080B14">
+<title>{{ title }} · Sibylla</title>
+{% if description %}<meta name="description" content="{{ description }}">{% endif %}
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{{ canonical }}">
+<meta property="og:title" content="{{ title }}">
+{% if description %}<meta property="og:description" content="{{ description }}">{% endif %}
+<meta property="og:url" content="{{ canonical }}">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="es_CL">
+<meta property="og:site_name" content="Sibylla">
+<meta property="og:image" content="{{ og_image }}">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ title }}">
+{% if description %}<meta name="twitter:description" content="{{ description }}">{% endif %}
+<meta name="twitter:image" content="{{ og_image }}">
+<meta name="x-build" content="{{ build_v }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --obsidiana:#080B14; --noche:#0D1322;
+    --panel:rgba(20,27,46,.55); --panel-borde:rgba(217,184,95,.22);
+    --marfil:#ECE4D2; --marfil-2:#C3BCA9; --tenue:#8E8979;
+    --oro:#D9B85F; --oro-claro:#F2DD93; --bronce:#9C7B3E;
+    --radio:14px;
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; font-family:'Inter',system-ui,sans-serif; color:var(--marfil);
+    background:var(--obsidiana); -webkit-font-smoothing:antialiased; line-height:1.7;
+  }
+  .cielo{ position:fixed; inset:0; z-index:-1;
+    background:
+      radial-gradient(1100px 620px at 50% -8%, rgba(94,230,224,.10), transparent 60%),
+      radial-gradient(820px 520px at 82% 6%, rgba(217,184,95,.08), transparent 55%),
+      linear-gradient(180deg,#080B14, #0B1020 42%, #070A12);
+  }
+  .contenedor{ max-width:760px; margin:0 auto; padding:32px 22px 80px; position:relative; }
+  .volver{ display:inline-flex; align-items:center; gap:6px; color:var(--marfil-2);
+    text-decoration:none; font-size:.92rem; border:1px solid var(--panel-borde);
+    padding:8px 14px; border-radius:999px; transition:color .2s,border-color .2s; }
+  .volver:hover{ color:var(--oro-claro); border-color:rgba(242,221,147,.6); }
+  article.pub{ margin-top:26px; background:var(--panel); border:1px solid var(--panel-borde);
+    border-radius:var(--radio); padding:34px 38px; backdrop-filter:blur(4px); }
+  .pub-fuente{ display:flex; align-items:center; gap:10px; font-size:.82rem;
+    color:var(--oro-claro); letter-spacing:.02em; margin-bottom:18px; }
+  .sello{ display:inline-flex; align-items:center; justify-content:center;
+    width:22px; height:22px; border-radius:50%; font-size:.62rem; font-weight:600;
+    border:1px solid currentColor; }
+  .sep{ opacity:.5; margin:0 2px; }
+  h1.titulo{ font-family:'Cormorant Garamond',serif; font-weight:600;
+    font-size:clamp(1.8rem,4vw,2.6rem); line-height:1.2; margin:0 0 14px; color:var(--marfil); }
+  .resumen{ font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1.2rem;
+    color:var(--marfil-2); margin:0 0 26px; border-left:2px solid var(--oro);
+    padding:4px 0 4px 18px; }
+  {% if image %}
+  .pub-img{ width:100%; max-height:380px; object-fit:cover; border-radius:10px;
+    margin-bottom:26px; border:1px solid var(--panel-borde); }
+  {% endif %}
+  .cuerpo{ font-size:1.06rem; color:var(--marfil); white-space:pre-line; }
+  .pie-pub{ margin-top:40px; padding-top:22px; border-top:1px solid var(--panel-borde);
+    display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pie-pub .marca{ font-family:'Cormorant Garamond',serif; font-style:italic;
+    color:var(--tenue); font-size:.95rem; }
+  .pie-pub .marca b{ font-style:normal; color:var(--oro); font-weight:600; }
+  @media (max-width:560px){
+    article.pub{ padding:26px 20px; }
+    .contenedor{ padding:24px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="cielo" aria-hidden="true"></div>
+<main class="contenedor">
+  <a class="volver" href="../index.html">← {{ volver }}</a>
+  <article class="pub">
+    <div class="pub-fuente">
+      <span class="sello" style="color:{{ seal_color }};">{{ seal_roman }}</span>
+      <span>{{ source_name }}</span>
+      <span class="sep">·</span>
+      <span>{{ date_str }}</span>
+    </div>
+    <h1 class="titulo">{{ title }}</h1>
+    {% if resumen %}<p class="resumen">{{ resumen }}</p>{% endif %}
+    {% if image %}<img class="pub-img" src="{{ image }}" alt="">{% endif %}
+    {% if body %}<div class="cuerpo">{{ body }}</div>{% endif %}
+    <div class="pie-pub">
+      <span class="marca"><b>Sibylla</b> · {{ site_motto }}</span>
+      <a class="volver" href="../index.html">← {{ volver }}</a>
+    </div>
+  </article>
+</main>
+</body>
+</html>

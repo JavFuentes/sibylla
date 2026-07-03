@@ -19,7 +19,10 @@
 #   imagen     (opcional) Archivo publicado en static/ (p. ej. mi-foto.png) o
 #              URL absoluta. Sin imagen se usa el placeholder de Sibylla.
 #   url        (opcional) Enlace externo del título y del botón "Original".
-#              Sin url, la tarjeta no enlaza a ninguna parte.
+#              SIN url, el build genera automáticamente una página propia para
+#              la noticia en pub/<nombre-del-archivo>.html y la tarjeta enlaza
+#              ahí; el cuerpo de este archivo es el contenido de esa página.
+#              Con url externa, gana esa (no se genera página propia).
 #   publicado  (opcional) `false` = borrador; no se publica hasta quitarlo o
 #              ponerlo en `true`.
 #

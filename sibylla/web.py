@@ -1139,6 +1139,47 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                                         sibylla_items, resumenes, build_v))
 
 
+def _render_pub_page(it: NewsItem, site_url: str, build_v: int) -> str:
+    """Renderiza la página individual de una publicación propia (`pub/<slug>.html`).
+
+    La tarjeta SIBYLLA enlaza aquí cuando la publicación no lleva `url` externa.
+    Es una página estática autocontenida (CSS inline, español): el cuerpo del
+    archivo Markdown es el contenido, y `volver` enlaza a la portada. Reutiliza
+    el sello de tier y el formato de fecha de las tarjetas."""
+    tw = load_translations("es")["web"]
+    roman, _clase, color = _SEAL.get(it.tier, _SEAL[3])
+    slug = it.extra.get("slug") or _card_id(it)
+    # Los assets estáticos viven en la raíz del sitio; la página, en pub/.
+    image = it.image
+    if image and not image.startswith(("http://", "https://")):
+        image = f"../{image}"
+    og_image = (it.image if it.image and it.image.startswith(("http://", "https://"))
+                else f"{site_url}/icon-512.png")
+    ctx = {
+        "lang": "es",
+        "title": it.title,
+        "description": (it.summary or "")[:160] or None,
+        "canonical": f"{site_url}/pub/{slug}.html",
+        "og_image": og_image,
+        "build_v": build_v,
+        "volver": tw.get("pub_volver", "Volver al inicio"),
+        "source_name": it.source_name,
+        "date_str": _fecha(it.published, tw["months"], tw["no_date"]),
+        "seal_color": color,
+        "seal_roman": roman,
+        "resumen": it.summary or "",
+        "image": image,  # None si sin imagen (la plantilla omite el <img>)
+        "body": it.extra.get("body", ""),
+        "site_motto": tw.get("footer_motto", ""),
+    }
+    env = Environment(
+        loader=FileSystemLoader(str(TEMPLATES_DIR)),
+        autoescape=select_autoescape(["html", "j2"]),
+        trim_blocks=True, lstrip_blocks=True,
+    )
+    return env.get_template("pub.html.j2").render(**ctx)
+
+
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
     """Rechaza la generación si hay sospechosamente pocos ítems (evita que
     datos de prueba sobrescriban la salida real)."""
@@ -1208,20 +1249,24 @@ def _write_robots(site_url: str) -> Path:
     return out
 
 
-def _write_sitemap(site_url: str, lastmod: str) -> Path:
-    """Escribe web/sitemap.xml con la única página del sitio (index.html)."""
-    loc = f"{site_url}/index.html"
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        "  <url>\n"
-        f"    <loc>{loc}</loc>\n"
-        f"    <lastmod>{lastmod}</lastmod>\n"
-        "    <changefreq>hourly</changefreq>\n"
-        "    <priority>1.0</priority>\n"
-        "  </url>\n"
-        "</urlset>\n"
-    )
+def _write_sitemap(site_url: str, lastmod: str,
+                   extra_locs: list[str] | None = None) -> Path:
+    """Escribe web/sitemap.xml: la portada (index.html) + una entrada por cada
+    página de publicación propia generada en `pub/` (si las hay)."""
+    entries = [f"    <loc>{site_url}/index.html</loc>\n"
+               f"    <lastmod>{lastmod}</lastmod>\n"
+               f"    <changefreq>hourly</changefreq>\n"
+               f"    <priority>1.0</priority>\n"]
+    for loc in (extra_locs or []):
+        entries.append(f"    <loc>{loc}</loc>\n"
+                       f"    <lastmod>{lastmod}</lastmod>\n"
+                       f"    <changefreq>weekly</changefreq>\n"
+                       f"    <priority>0.6</priority>\n")
+    body = "\n".join(f"  <url>\n{e}  </url>" for e in entries)
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           f"{body}\n"
+           "</urlset>\n")
     out = SITE_DIR / "sitemap.xml"
     out.write_text(xml, encoding="utf-8")
     return out
@@ -1307,6 +1352,26 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # redeploy y mostrar el botón "Actualizar".
     ahora = datetime.now(timezone.utc)
     build_v = int(ahora.timestamp())
+    site_url = get_site_url()
+
+    # Páginas propias de las publicaciones SIBYLLA: las que NO llevan `url`
+    # externa reciben una página estática en web/pub/<slug>.html y la tarjeta
+    # enlaza ahí (mutando `it.url` antes de render_html). Las que ya traen
+    # `url` externa no generan página (gana esa). Las URLs se añaden al sitemap.
+    pub_locs: list[str] = []
+    if sibylla_items:
+        pub_dir = SITE_DIR / "pub"
+        pub_dir.mkdir(parents=True, exist_ok=True)
+        for it in sibylla_items:
+            if it.url:
+                continue
+            slug = it.extra.get("slug") or _card_id(it)
+            pub_html = _render_pub_page(it, site_url, build_v)
+            pub_path = pub_dir / f"{slug}.html"
+            pub_path.write_text(pub_html, encoding="utf-8")
+            paths.append(pub_path)
+            it.url = f"pub/{slug}.html"
+            pub_locs.append(f"{site_url}/pub/{slug}.html")
 
     # Única página del sitio (español).
     html = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
@@ -1326,7 +1391,6 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # El historial (data/stellar_history.json) se persiste en el host, NO se
     # publica a la web: evita repetir la misma noticia dia tras dia. Si no
     # existe (host nuevo), arranca vacio y no penaliza repeticiones.
-    site_url = get_site_url()
     stellar_history = _load_stellar_history()
     stellar_payload = build_stellar_news_payload(
         astro_top,
@@ -1359,6 +1423,6 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
 
     # Archivos SEO auxiliares.
     paths.append(_write_robots(site_url))
-    paths.append(_write_sitemap(site_url, ahora.strftime("%Y-%m-%d")))
+    paths.append(_write_sitemap(site_url, ahora.strftime("%Y-%m-%d"), pub_locs))
 
     return paths

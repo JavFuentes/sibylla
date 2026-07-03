@@ -13,10 +13,13 @@ ni base de datos). El generador produce, en la carpeta `web/`:
 
 ```
 web/
-  index.html   ← la única página del sitio (español)
+  index.html          ← la portada del sitio (español, una sola página)
+  pub/<slug>.html     ← una página por publicación propia SIBYLLA sin `url`
+                         externa (se autogenera en cada build)
 ```
 (El `dashboard.html` de métricas **no** se genera aquí ni se publica — es una
-herramienta de monitoreo local, ver §1.1.)
+herramienta de monitoreo local, ver §1.1. La subida es `scp -r web/` (o
+equivalente), así que `pub/` se publica sin pasos extra.)
 
 > **`web/` está en `.gitignore`**: es un *artefacto generado*, no se versiona.
 > Desplegar = **regenerar** `web/` y **subir su contenido** a la raíz pública del

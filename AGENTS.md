@@ -79,7 +79,8 @@ web/             # sitio estático generado — ignorado por git
 1. Copia `publicaciones/_plantilla.md` con un nombre nuevo **sin** guion bajo
    inicial (p. ej. `2026-07-15-mi-noticia.md`) y rellena el front-matter
    (`titulo` y `fecha` obligatorios; `resumen`, `imagen`, `url`, `publicado`
-   opcionales) y el cuerpo (se muestra en el acordeón "Resumen").
+   opcionales) y el cuerpo (se muestra en el acordeón "Resumen" y, sin `url`,
+   en la página propia `pub/<slug>.html` que se autogenera).
 2. Commit + push: aparece en el siguiente build del cron. Una `fecha` futura
    pospone la publicación; `publicado: false` la deja en borrador.
 3. No hay que tocar código: `sibylla/publicaciones.py` carga la carpeta en
@@ -315,10 +316,14 @@ Reglas:
   (con los intereses del ranking y las 2 sociales).
 - **Render:** pill "Sibylla" (`net_sibylla` del locale), sello tier 1, cuerpo
   del archivo en el acordeón "Resumen" (los saltos de párrafo se respetan:
-  `.resumen-panel` usa `white-space:pre-line`). Sin `url` en el front-matter,
-  la tarjeta no enlaza (el `<a>` va sin href y no hay botón "Original") y su
-  identidad (`dedup_key`) deriva del título: **no cambiar el título** de una
-  publicación ya desplegada. No se traduce ni se resume con LLM.
+  `.resumen-panel` usa `white-space:pre-line`). **Sin `url` en el front-matter,
+  el build genera automáticamente una página propia de la noticia en
+  `web/pub/<slug>.html`** (slug = nombre del archivo sin extensión; plantilla
+  `templates/pub.html.j2`) y la tarjeta enlaza ahí (título, imagen y botón
+  "Original"). Con `url` externa, gana esa y no se genera página. La identidad
+  (`dedup_key`) deriva del título: **no cambiar el título** ni renombrar el
+  archivo de una publicación ya desplegada (rompe el permalink `pub/<slug>`).
+  No se traduce ni se resume con LLM.
 - Tests: `tests/test_publicaciones.py`.
 
 ### Sección "Voces de la red" (redes sociales) · v2.0
