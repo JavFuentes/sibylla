@@ -12,7 +12,7 @@ parámetro indica el archivo/constante donde vive.
 
 ## 0. Visión general
 
-### Las seis secciones y su orden en la página
+### Las siete secciones y su orden en la página
 
 La portada (`sibylla/templates/index.html.j2`, contenedor `#secciones`) muestra,
 de arriba abajo:
@@ -24,13 +24,17 @@ de arriba abajo:
 | 3 | **Medicina** | `medicine` | Motor temático (score → diversify → top 6) | `sibylla/pipeline.py` |
 | 4 | **Astronomía** | `astronomia` | Selección curada con cupos reservados | `sibylla/web.py` |
 | 5 | **Divulgación** | `divulgacion` | 1 video por canal, 6 más recientes | `sibylla/web.py` |
-| 6 | **RRSS** ("Voces de la red") | — (redes) | Slots por red + house cards | `sibylla/web.py` |
+| 6 | **SIBYLLA** (publicaciones propias) | `sibylla` | Archivos de `publicaciones/`, por fecha | `sibylla/publicaciones.py` |
+| 7 | **RRSS** ("Voces de la red") | — (redes) | Slots por red + house cards | `sibylla/web.py` |
 
 El orden de los temas temáticos (1–3) sigue el orden pedido en `--topics`
 (default `nacional,ai,medicine,astronomia,divulgacion` en `sibylla/cli.py`);
-Astronomía, Divulgación y RRSS son bloques especiales que van siempre al final,
-en ese orden. El usuario puede **reordenar u ocultar** secciones en el navegador (persiste en
-`localStorage`); eso no cambia qué se elige, solo cómo se ve.
+Astronomía, Divulgación, SIBYLLA y RRSS son bloques especiales que van siempre
+al final, en ese orden (SIBYLLA solo si hay publicaciones vigentes). El usuario
+puede **reordenar u ocultar** secciones en el navegador (persiste en
+`localStorage`); eso no cambia qué se elige, solo cómo se ve. SIBYLLA es la
+excepción: no se personaliza (sin controles ni chip de onboarding, fija antes
+de RRSS).
 
 ### Todas muestran 6 tarjetas
 
@@ -50,17 +54,19 @@ defecto y puede ajustar es **client-side** y no toca el algoritmo de selección:
   visitante elige secciones **en orden** y el modo de visualización; se guarda
   en `localStorage` (`sibylla_prefs`) y define el default: 1er interés **4**
   tarjetas, el resto **2**, RRSS siempre visible con **2** al final, no
-  elegidas ocultas; opción estándar ("un poco de todo") = todas con 2. Sin JS
-  (o sin prefs) se ven las 6 de siempre. Detalle en AGENTS.md § "Onboarding de
-  intereses y modos de visualización".
+  elegidas ocultas; opción estándar ("un poco de todo") = todas con 2. SIBYLLA
+  no se ofrece: siempre visible con todas sus tarjetas, fija antes de RRSS.
+  Sin JS (o sin prefs) se ven las 6 de siempre. Detalle en AGENTS.md §
+  "Onboarding de intereses y modos de visualización".
 - Selector `− N +` por sección: pasos `0,2,4,6`; el valor inicial deriva del
   onboarding (fallback `data-default` = 6). Persiste en `localStorage`
   (`sibylla_cards`).
 - Reordenar/ocultar bloques: persiste en `localStorage` (`sibylla_layout`).
   **Restaurar** vuelve al estado derivado del onboarding, no al de fábrica.
-- **Modo Aleatorio**: feed de tarjetas sueltas (los 6 ítems de cada tema
-  elegido + RRSS) mezcladas con sesgo por ranking, sin títulos ni controles de
-  sección; conmutador `#modo-toggle` sobre las secciones.
+- **Modo Aleatorio**: feed de tarjetas sueltas (los ítems de cada tema
+  elegido + RRSS + las publicaciones SIBYLLA, todos en la primera fase)
+  mezcladas con sesgo por ranking, sin títulos ni controles de sección;
+  conmutador `#modo-toggle` sobre las secciones.
 
 Este documento describe **la selección de las 6** (build-time), no el ajuste
 visual posterior.
@@ -348,7 +354,42 @@ house cards se renderizan **idénticas** a las orgánicas (no llevan badge
 
 ---
 
-## 7. Apéndice — dónde editar cada regla
+## 7. SIBYLLA — Publicaciones propias
+
+> **Bloque especial** (`#sibylla`), entre Divulgación y RRSS. Lógica en
+> `sibylla/publicaciones.py`. Tests: `tests/test_publicaciones.py`.
+
+La única sección cuyo contenido **no viene de fuentes externas**: son noticias
+que publica Sibylla misma (anuncios del proyecto, notas editoriales, novedades
+del sitio), como archivos Markdown versionados en `publicaciones/`.
+
+**Fuente:** un archivo `.md` por noticia con front-matter YAML (`titulo` y
+`fecha` obligatorios; `resumen`, `imagen`, `url` y `publicado` opcionales) y un
+cuerpo opcional que se muestra en el acordeón "Resumen". Plantilla comentada:
+`publicaciones/_plantilla.md` (los archivos `_*.md` se ignoran).
+
+**Selección de las tarjetas** (`SIBYLLA_MAX_TOTAL = 6`):
+
+1. Se descartan borradores (`publicado: false`) y fechas futuras (una `fecha`
+   futura equivale a programar la publicación para un build posterior).
+2. Se ordenan por fecha descendente y se corta a 6.
+3. Un archivo malformado solo deja un `log.warning` (fallo aislado).
+
+**Orden de las tarjetas:** recencia pura.
+
+**Render:** pill "Sibylla", sello tier 1 (fuente primaria de sí misma). Sin
+`url`, la tarjeta no enlaza y su identidad estable (`dedup_key`) deriva del
+título: no cambiar el título de una publicación desplegada. No se traduce ni
+pasa por el LLM.
+
+**No personalizable:** sin chip en el onboarding, sin selector `− N +` ni
+botones de sección; fija justo antes de RRSS. Solo se renderiza si hay
+publicaciones vigentes. En modo Aleatorio sus tarjetas entran a la **fase 1**
+del feed (barajadas con los intereses y RRSS).
+
+---
+
+## 8. Apéndice — dónde editar cada regla
 
 | Quiero cambiar… | Parámetro | Archivo |
 |-----------------|-----------|---------|
@@ -365,6 +406,8 @@ house cards se renderizan **idénticas** a las orgánicas (no llevan badge
 | Etiquetas visibles de los temas | `web.topics.*` | `locales/*.json` |
 | Cupos / ventanas de Astronomía | `ASTRO_*` (`MAX_TOTAL`, `*_FRESH_DAYS`, `*_IDS`) | `sibylla/web.py` |
 | Nº y ventana de Divulgación | `DIVULGACION_MAX_TOTAL`, `DIVULGACION_FRESH_DAYS` | `sibylla/web.py` |
+| Tope de tarjetas de SIBYLLA | `SIBYLLA_MAX_TOTAL` (build) / `SIBYLLA_CARDS` (JS) | `sibylla/publicaciones.py`, `index.html.j2` |
+| Publicaciones de SIBYLLA | archivos `.md` | `publicaciones/` |
 | Canales de Divulgación | fuentes `yt_*` | `config/sources.yaml`, `sibylla/pipeline.py` |
 | Cuota de Nacional | `N_CARDS`, `MIN_REGIONAL`, `MAX_PER_OUTLET`, `SHORTLIST_N` | `sibylla/nacional.py` |
 | Nº y barajado de RRSS | `SOCIAL_MAX_TOTAL`, `social.shuffle` | `sibylla/web.py`, `config/sources.yaml` |

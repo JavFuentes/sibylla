@@ -19,6 +19,8 @@
     grupos      -> [{id, label, cards:[{url,title,source_name,date,
                     seal_roman,seal_class,seal_color,snippet,image,
                     resumen,has_resumen,related,...}]}]
+    sibylla_cards-> lo mismo, para "SIBYLLA" (publicaciones propias; puede
+                    venir vacío y la sección no se renderiza)
     social_cards-> lo mismo, para "Voces de la red"
 #}
 {% macro busto() -%}
@@ -42,19 +44,22 @@
   <button type="button" class="sec-btn sec-del" aria-label="{{ t.sec_remove }}" title="{{ t.sec_remove }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg></button>
 </span>
 {%- endmacro %}
+{# Sin c.url (p. ej. publicaciones propias sin enlace externo) el <a> se
+   renderiza sin href: HTML válido, sin semántica de enlace, y no aparece el
+   botón "Original". #}
 {% macro tarjeta(c, also_in='') -%}
 <article id="{{ c.id }}" class="carta" style="--sello:{{ c.seal_color }};">
-  {% if c.image %}<a class="carta-img" href="{{ c.url }}" aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% else %}<a class="carta-img ph" href="{{ c.url }}" aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}>{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% endif %}
+  {% if c.image %}<a class="carta-img"{% if c.url %} href="{{ c.url }}"{% endif %} aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% else %}<a class="carta-img ph"{% if c.url %} href="{{ c.url }}"{% endif %} aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}>{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% endif %}
   <h4>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
-    <a href="{{ c.url }}">{{ c.title }}</a>
+    <a{% if c.url %} href="{{ c.url }}"{% endif %}>{{ c.title }}</a>
   </h4>
   <div class="fuente">{% if c.is_video %}<span class="sello sello-video" title="{{ t.video_label }}">▶</span>{% else %}<span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span>{% endif %} {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
   {% if c.snippet %}<p class="resumen">{{ c.snippet }}</p>{% endif %}
   {% if c.related %}<p class="tambien">{{ also_in }}: {% for r in c.related %}<a href="{{ r.url }}">{{ r.source_name }}</a>{% if not loop.last %} <span class="sep">·</span> {% endif %}{% endfor %}{% if c.related_extra %} <span class="sep">·</span> +{{ c.related_extra }}{% endif %}</p>{% endif %}
   <div class="carta-acciones">
     {% if c.has_resumen %}<button type="button" class="btn-mini btn-resumen" aria-expanded="false">{{ t.btn_resumen }}</button>{% endif %}
-    <a class="btn-mini btn-original" href="{{ c.url }}" target="_blank" rel="noopener">{{ t.btn_original }}</a>
+    {% if c.url %}<a class="btn-mini btn-original" href="{{ c.url }}" target="_blank" rel="noopener">{{ t.btn_original }}</a>{% endif %}
   </div>
   {% if c.has_resumen %}<div class="resumen-panel" hidden>{{ c.resumen }}</div>{% endif %}
 </article>
@@ -389,8 +394,10 @@
   .carta.resumen-open .btn-resumen{ color:#1a1305; background:linear-gradient(180deg,#F2DD93,#D9B85F);
     border-color:#F2DD93; }
   .carta.resumen-open .btn-resumen::after{ transform:rotate(180deg); }
+  /* white-space:pre-line: los resúmenes LLM son de un párrafo (sin saltos),
+     pero el cuerpo de las publicaciones propias trae párrafos que deben verse. */
   .resumen-panel{ margin-top:12px; padding:14px 16px; border-radius:10px; font-size:.92rem;
-    line-height:1.65; color:var(--marfil);
+    line-height:1.65; color:var(--marfil); white-space:pre-line;
     background:linear-gradient(180deg, rgba(217,184,95,.08), rgba(94,230,224,.04));
     border:1px solid var(--panel-borde); }
   .resumen-panel[hidden]{ display:none; }
@@ -712,6 +719,19 @@
       </div>
     {% endif %}
 
+    {% if sibylla_cards %}
+      {# Sección SIBYLLA: publicaciones propias (publicaciones/*.md). No se
+         personaliza: sin chip en el onboarding, sin selector de tarjetas ni
+         controles de sección; fija al final, antes de RRSS (ver el JS del
+         pie). Solo se renderiza si hay algo que publicar. #}
+      <div class="bloque bloque-especial" id="sibylla" data-topic="sibylla">
+        <div class="tema" data-topic="sibylla"><h3>{{ t.sibylla_heading }}</h3><span class="raya"></span></div>
+        <div class="rejilla">
+          {% for c in sibylla_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
     {% if social_cards %}
       <div class="bloque bloque-especial" id="voces" data-topic="social">
         <div class="tema" data-topic="social"><h3>{{ t.social_topic_label }}</h3><span class="raya"></span>
@@ -809,9 +829,12 @@
   var defaultSteps=[0,2,4,6];
   /* Tarjetas por defecto según el onboarding: 1er interés 6, el resto 4;
      RRSS (social) no se elige: siempre visible con 2, al final;
-     opción estándar ("un poco de todo") = 4 en todas (RRSS igual 2). */
+     opción estándar ("un poco de todo") = 4 en todas (RRSS igual 2).
+     SIBYLLA (publicaciones propias) tampoco se elige: siempre visible con
+     todas sus tarjetas, fija justo antes de RRSS. */
   var SOCIAL_TOPIC='social';
-  var RANK_FIRST_CARDS=6, RANK_REST_CARDS=4, STD_CARDS=4, SOCIAL_CARDS=2;
+  var SIBYLLA_TOPIC='sibylla';
+  var RANK_FIRST_CARDS=6, RANK_REST_CARDS=4, STD_CARDS=4, SOCIAL_CARDS=2, SIBYLLA_CARDS=6;
 
   /* ---------- almacenamiento ---------- */
   function jget(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(_){ return null; } }
@@ -837,14 +860,17 @@
 
   /* ---------- estado derivado del onboarding (el default de Restaurar) ----------
      Cadena de resolución: ajuste manual -> derivado de prefs -> fábrica. */
+  /* Secciones fijas al final (no aparecen en el onboarding ni se ocultan):
+     SIBYLLA justo antes de RRSS. */
+  var PINNED=[SIBYLLA_TOPIC, SOCIAL_TOPIC];
   function derivedOrder(prefs){
     if(!prefs || prefs.estandar) return ORIGINAL.slice();
     var seq=[];
     prefs.ranking.forEach(function(tp){
-      if(tp!==SOCIAL_TOPIC && ORIGINAL.indexOf(tp)>=0 && seq.indexOf(tp)<0) seq.push(tp); });
+      if(PINNED.indexOf(tp)<0 && ORIGINAL.indexOf(tp)>=0 && seq.indexOf(tp)<0) seq.push(tp); });
     ORIGINAL.forEach(function(tp){
-      if(tp!==SOCIAL_TOPIC && seq.indexOf(tp)<0) seq.push(tp); });
-    if(ORIGINAL.indexOf(SOCIAL_TOPIC)>=0) seq.push(SOCIAL_TOPIC);
+      if(PINNED.indexOf(tp)<0 && seq.indexOf(tp)<0) seq.push(tp); });
+    PINNED.forEach(function(tp){ if(ORIGINAL.indexOf(tp)>=0) seq.push(tp); });
     return seq;
   }
   function derivedHidden(prefs){
@@ -853,10 +879,11 @@
        eligió; una sección nueva (ausente de `known`) queda visible al final. */
     var known=prefs.known||ORIGINAL;
     return ORIGINAL.filter(function(tp){
-      return tp!==SOCIAL_TOPIC && known.indexOf(tp)>=0 && prefs.ranking.indexOf(tp)<0; });
+      return PINNED.indexOf(tp)<0 && known.indexOf(tp)>=0 && prefs.ranking.indexOf(tp)<0; });
   }
   function derivedCardsFor(prefs, topic){
     if(topic===SOCIAL_TOPIC) return SOCIAL_CARDS;
+    if(topic===SIBYLLA_TOPIC) return SIBYLLA_CARDS;
     if(prefs.estandar) return STD_CARDS;
     return prefs.ranking.indexOf(topic)===0 ? RANK_FIRST_CARDS : RANK_REST_CARDS;
   }
@@ -928,6 +955,15 @@
     lay.order.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
     base.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
     present.forEach(function(b){ if(seq.indexOf(b.dataset.topic)<0) seq.push(b.dataset.topic); });
+    /* SIBYLLA va fija antes de RRSS. Un orden manual guardado ANTES de que la
+       sección existiera no la contiene y la dejaría anexada tras RRSS: se
+       reubica. Si el orden guardado ya la incluye, se respeta tal cual. */
+    if(byTopic[SIBYLLA_TOPIC] && byTopic[SOCIAL_TOPIC] && lay.order.indexOf(SIBYLLA_TOPIC)<0){
+      var si=seq.indexOf(SIBYLLA_TOPIC);
+      if(si>seq.indexOf(SOCIAL_TOPIC)){
+        seq.splice(si,1); seq.splice(seq.indexOf(SOCIAL_TOPIC),0,SIBYLLA_TOPIC);
+      }
+    }
     seq.forEach(function(tp){ CONT.appendChild(byTopic[tp]); });
     /* Ocultos: los no elegidos en el onboarding + los quitados a mano. */
     var baseHidden=derivedHidden(prefs);
@@ -1079,9 +1115,10 @@
      "Aleatorio" mueve las tarjetas a #feed y las revela por lotes al hacer
      scroll (mezcla nueva en cada visita). Con intereses elegidos son DOS fases
      duras: 1) los intereses (su mismo tope del modo ordenado: 6 el 1º, 4 el
-     resto) + 2 sociales, barajados entre sí; 2) las secciones NO elegidas,
-     barajadas, al final. En modo estándar / sin ranking es una sola mezcla
-     pareja (RRSS al fondo). "Ordenado" las devuelve a su rejilla original. */
+     resto) + 2 sociales + las publicaciones SIBYLLA, barajados entre sí;
+     2) las secciones NO elegidas, barajadas, al final. En modo estándar / sin
+     ranking es una sola mezcla pareja (RRSS al fondo). "Ordenado" las
+     devuelve a su rejilla original. */
   var FEED=document.getElementById('feed');
   var FEED_REJILLA=document.getElementById('feed-rejilla');
   var FEED_FIN=document.getElementById('feed-fin');
@@ -1149,13 +1186,17 @@
       return pond.map(function(x){ return x.nodo; });
     }
     /* Ranking: dos fases duras. Fase 1 = cada interés con su mismo tope del modo
-       ordenado + las 2 sociales, barajados. Fase 2 = todas las cartas de las
-       secciones NO elegidas, barajadas, al final. */
+       ordenado + las 2 sociales + las publicaciones SIBYLLA, barajados. Fase 2 =
+       todas las cartas de las secciones NO elegidas, barajadas, al final. */
     var enFase1={}, fase1=[];
     ranked.forEach(function(tp){
       enFase1[tp]=true;
       fase1=fase1.concat(cartasDe(tp, cardCountFor(tp)));
     });
+    if(blockOf(SIBYLLA_TOPIC)){
+      enFase1[SIBYLLA_TOPIC]=true;
+      fase1=fase1.concat(cartasDe(SIBYLLA_TOPIC, cardCountFor(SIBYLLA_TOPIC)));
+    }
     if(blockOf(SOCIAL_TOPIC)){
       enFase1[SOCIAL_TOPIC]=true;
       fase1=fase1.concat(cartasDe(SOCIAL_TOPIC, cardCountFor(SOCIAL_TOPIC)));
@@ -1240,13 +1281,13 @@
   var ROMANOS=['I','II','III','IV','V','VI','VII','VIII','IX'];
 
   function knownTopics(){
-    return ORIGINAL.filter(function(tp){ return tp!==SOCIAL_TOPIC; });
+    return ORIGINAL.filter(function(tp){ return PINNED.indexOf(tp)<0; });
   }
   function onbBuildChips(){
     if(!onbChips) return;
     onbChips.innerHTML='';
     ORIGINAL.forEach(function(tp){
-      if(tp===SOCIAL_TOPIC) return;
+      if(PINNED.indexOf(tp)>=0) return;
       var b=blockOf(tp); if(!b) return;
       var h=b.querySelector('.tema h3');
       var btn=document.createElement('button');

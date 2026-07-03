@@ -17,6 +17,7 @@ sibylla/
   llm.py         # capa LLM agnóstica de proveedor (requests puro, sin SDKs)
   i18n.py        # internacionalización simple (JSON sin dependencias)
   web.py         # genera la web estática (una sola página index.html, en español) desde el pipeline
+  publicaciones.py # publicaciones propias de Sibylla (sección SIBYLLA) desde publicaciones/*.md
   translate.py   # traduce tarjetas de la web (título+snippet) al español con LLM; cache en data/
   articles.py    # extrae el cuerpo de artículos de prensa (trafilatura) para los resúmenes; cache en data/
   resumen.py     # resumen en español por tarjeta (abstract de papers / cuerpo de prensa) con LLM; cache en data/
@@ -26,6 +27,7 @@ config/
   sources.yaml   # registro curado de fuentes (tiers, acceso, costo)
   README.md      # documentación del registro y plan de presupuesto de X
 locales/         # traducciones JSON (es es la del sitio; en/it/pt se conservan para prompts/digest)
+publicaciones/   # noticias propias de Sibylla (Markdown + front-matter; plantilla en _plantilla.md)
 tests/           # tests unitarios (pytest, sin red)
   test_models.py    # canonicalize_url, clean_text, NewsItem
   test_relevance.py # _strip_accents, is_relevant, classify_topics
@@ -72,6 +74,16 @@ web/             # sitio estático generado — ignorado por git
 3. En `pipeline.py`, añade su `id` a `DEFAULT_FREE_SOURCES`.
 4. No hay que tocar `web.py`: `_select_divulgacion` toma 1 video por canal y
    muestra los 6 canales con video más reciente.
+
+### Publicar una noticia de Sibylla (sección SIBYLLA)
+1. Copia `publicaciones/_plantilla.md` con un nombre nuevo **sin** guion bajo
+   inicial (p. ej. `2026-07-15-mi-noticia.md`) y rellena el front-matter
+   (`titulo` y `fecha` obligatorios; `resumen`, `imagen`, `url`, `publicado`
+   opcionales) y el cuerpo (se muestra en el acordeón "Resumen").
+2. Commit + push: aparece en el siguiente build del cron. Una `fecha` futura
+   pospone la publicación; `publicado: false` la deja en borrador.
+3. No hay que tocar código: `sibylla/publicaciones.py` carga la carpeta en
+   cada build. Sin publicaciones vigentes, la sección no se renderiza.
 
 ### Añadir un medio (RSS/Atom)
 1. Añádelo en `config/sources.yaml` con `type: rss` (o `atom`) y su `url` de feed.
@@ -185,8 +197,10 @@ sibylla_prefs = { v:1, mode:"ordenado"|"aleatorio", estandar:bool,
 y define el **estado por defecto** de la portada:
 
 - **Orden y visibilidad:** las secciones elegidas, en el orden del ranking; las
-  no elegidas quedan ocultas. RRSS (`social`) no se ofrece en el onboarding:
-  siempre visible, al final, con 2 tarjetas.
+  no elegidas quedan ocultas. RRSS (`social`) y SIBYLLA (`sibylla`) no se
+  ofrecen en el onboarding: siempre visibles, al final (SIBYLLA justo antes de
+  RRSS; constante `PINNED` en el `<script>` del pie), RRSS con 2 tarjetas y
+  SIBYLLA con todas las suyas.
 - **Tarjetas:** 1er interés 6, el resto 4, RRSS 2. La opción estándar
   ("un poco de todo") = todas las secciones, orden de fábrica, 4 tarjetas
   (RRSS igual 2). Constantes en el `<script>` del pie: `RANK_FIRST_CARDS`,
@@ -204,9 +218,9 @@ orden del DOM). Al guardar el onboarding se limpian los ajustes manuales.
 mueven a `#feed` y se revelan por lotes de 8 con IntersectionObserver (scroll
 continuo, mensaje `feed_end` al agotar; mezcla nueva en cada visita). Con
 ranking, el feed son **dos fases duras** (`feedQueue`): 1) cada interés con su
-mismo tope del modo ordenado (6 el 1º, 4 el resto) + 2 sociales, barajados entre
-sí; 2) las secciones **no elegidas** (ocultas en Ordenado), con todas sus
-cartas, barajadas y al final. En modo estándar / sin ranking es una sola
+mismo tope del modo ordenado (6 el 1º, 4 el resto) + 2 sociales + las
+publicaciones SIBYLLA, barajados entre sí; 2) las secciones **no elegidas**
+(ocultas en Ordenado), con todas sus cartas, barajadas y al final. En modo estándar / sin ranking es una sola
 **mezcla ponderada pareja** (clave `rnd^(1/w)`, RRSS con el peso más bajo). En
 feed se ocultan los controles de sección y Restaurar; al volver a Ordenado cada
 tarjeta regresa a su rejilla original. El modo persiste en `sibylla_prefs.mode`
@@ -263,8 +277,8 @@ CNSA, Roscosmos, ISRO, DLR, CSA, KASA — no exponen RSS/Atom legible
 
 ### Sección "Divulgación" (videos de YouTube)
 
-Tras Astronomía y antes de "Voces de la red", se muestra **Divulgación** con
-videos de canales de YouTube curados por el usuario. Cada canal es una fuente RSS
+Tras Astronomía (y antes de SIBYLLA y "Voces de la red"), se muestra
+**Divulgación** con videos de canales de YouTube curados por el usuario. Cada canal es una fuente RSS
 Atom nativa (`https://www.youtube.com/feeds/videos.xml?channel_id=UC...`), sin API
 key ni fetcher propio.
 
@@ -279,6 +293,33 @@ Reglas:
 - Plantilla: bloque `#divulgacion` dentro de `#secciones`, reordenable/ocultable
   como las demás secciones.
 - Tests: `tests/test_divulgacion.py`.
+
+### Sección "SIBYLLA" (publicaciones propias)
+
+Tras Divulgación y antes de "Voces de la red", la sección **SIBYLLA** muestra
+las noticias que publica Sibylla misma (anuncios, notas editoriales, novedades
+del sitio). No pasa por el pipeline: `sibylla/publicaciones.py` carga los
+archivos Markdown de `publicaciones/` en cada build (fallo aislado por archivo).
+
+Reglas:
+- **Formato:** front-matter YAML + cuerpo opcional; plantilla comentada en
+  `publicaciones/_plantilla.md`. Los archivos `_*.md` se ignoran; `publicado:
+  false` = borrador; `fecha` futura = publicación programada (aparece en el
+  primer build posterior). Máx. `SIBYLLA_MAX_TOTAL = 6` tarjetas, por fecha
+  descendente.
+- **Solo aparece si hay algo que mostrar** (`{% if sibylla_cards %}`).
+- **No se personaliza:** sin chip en el onboarding, sin selector de tarjetas ni
+  botones subir/bajar/quitar; fija al final, justo antes de RRSS (incluso para
+  visitantes con un orden manual guardado de antes de que existiera).
+- **Modo aleatorio:** sus tarjetas se barajan dentro de la **fase 1** del feed
+  (con los intereses del ranking y las 2 sociales).
+- **Render:** pill "Sibylla" (`net_sibylla` del locale), sello tier 1, cuerpo
+  del archivo en el acordeón "Resumen" (los saltos de párrafo se respetan:
+  `.resumen-panel` usa `white-space:pre-line`). Sin `url` en el front-matter,
+  la tarjeta no enlaza (el `<a>` va sin href y no hay botón "Original") y su
+  identidad (`dedup_key`) deriva del título: **no cambiar el título** de una
+  publicación ya desplegada. No se traduce ni se resume con LLM.
+- Tests: `tests/test_publicaciones.py`.
 
 ### Sección "Voces de la red" (redes sociales) · v2.0
 

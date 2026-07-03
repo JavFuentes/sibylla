@@ -1010,6 +1010,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    social_items: list[NewsItem] | None = None,
                    astro_items: list[NewsItem] | None = None,
                     divulgacion_items: list[NewsItem] | None = None,
+                    sibylla_items: list[NewsItem] | None = None,
                     resumenes: dict | None = None,
                     build_v: int | None = None) -> dict:
     """Construye el contexto que recibe la plantilla.
@@ -1054,6 +1055,15 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     if divulgacion_items:
         divulgacion_cards = [_tarjeta(it, months, no_date, is_video=True) for it in divulgacion_items]
 
+    # Tarjetas de publicaciones propias (sección SIBYLLA). Ya vienen en español:
+    # no se traducen ni piden resumen al LLM; el cuerpo del archivo Markdown
+    # hace de resumen (acordeón), pasándolo por el mismo canal `resumenes`.
+    sibylla_cards: list[dict] = []
+    if sibylla_items:
+        pub_bodies = {it.dedup_key: it.extra["body"]
+                      for it in sibylla_items if it.extra.get("body")}
+        sibylla_cards = [_tarjeta(it, months, no_date, None, pub_bodies) for it in sibylla_items]
+
     # Tarjetas sociales.
     social_cards: list[dict] = []
     if social_items:
@@ -1093,6 +1103,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "grupos": grupos,
         "astro_cards": astro_cards,
         "divulgacion_cards": divulgacion_cards,
+        "sibylla_cards": sibylla_cards,
         "social_cards": social_cards,
         "observa": observa,
         "t": tw,
@@ -1112,6 +1123,7 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 social_items: list[NewsItem] | None = None,
                 astro_items: list[NewsItem] | None = None,
                 divulgacion_items: list[NewsItem] | None = None,
+                sibylla_items: list[NewsItem] | None = None,
                 resumenes: dict | None = None,
                 build_v: int | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
@@ -1123,8 +1135,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     tmpl = env.get_template("index.html.j2")
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
                                         is_landing, translations, social_items,
-                                        astro_items, divulgacion_items, resumenes,
-                                        build_v))
+                                        astro_items, divulgacion_items,
+                                        sibylla_items, resumenes, build_v))
 
 
 def _assert_min_items(items: list[NewsItem], min_n: int = 5) -> None:
@@ -1270,6 +1282,11 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     house_items = fetch_house_posts(house_accounts, include_x=include_x)
     social_top = _select_social(social_raw, house_items, sc, today)
 
+    # Publicaciones propias (sección SIBYLLA): archivos Markdown versionados en
+    # publicaciones/, sin red ni LLM. Sin publicaciones, la sección no existe.
+    from .publicaciones import load_publicaciones
+    sibylla_items = load_publicaciones()
+
     # Traducción de tarjetas (título + snippet) al español si hay LLM.
     translations = None
     if translate:
@@ -1296,6 +1313,7 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                         is_landing=False, translations=translations,
                         social_items=social_top, astro_items=astro_top,
                         divulgacion_items=divulgacion_top,
+                        sibylla_items=sibylla_items,
                         resumenes=resumenes, build_v=build_v)
     out = SITE_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
