@@ -403,6 +403,17 @@ de CI o en `.env` local — **nunca** en el repo (es público).
 - `X` es **de pago por uso**. `fetch_x` aplica un **tope mensual duro** (`x_twitter.monthly_read_budget` en `sources.yaml`, uso en `data/x_usage.json`). No lo quites.
 - No publiques en X con enlaces ($0.20/post). No subas `output/` ni `data/`.
 
+## Documentación privada local (`.security/`)
+
+La carpeta `.security/` está ignorada por git y **solo existe en la máquina del
+mantenedor**. Contiene documentación interna (modelo de amenazas y diseño de
+producto a futuro). Si existe en tu entorno, **lee `.security/VISION.md` antes
+de proponer cambios de arquitectura o diseñar soluciones que deban escalar**:
+documenta hacia dónde evoluciona el proyecto y las decisiones de hoy deben ser
+compatibles con eso. No cites ni copies su contenido en archivos versionados
+(el repo es público). Si la carpeta no existe (CI, clon fresco, worktree),
+trabaja normalmente con este archivo como guía.
+
 ## Tests (ver [TEST.md](TEST.md))
 
 - **Framework:** pytest (sin dependencias extra, sin red).

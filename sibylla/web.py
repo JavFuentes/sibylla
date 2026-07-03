@@ -58,6 +58,16 @@ STELLAR_NEWS_FILE = "stellar-news.json"
 STELLAR_NEWS_SCHEMA = "cl.sibylla.stellar_news.v1"
 STELLAR_NEWS_LANGS = ("es", "en", "it")
 
+# Historial de destacadas de Stellar-View: se persiste en el HOST (como
+# x_recent.json), NO se publica a la web. Sirve para no repetir la misma
+# noticia dia tras dia. Guarda una entrada {date, id, source_id} por corrida
+# que produzca destacada; se conservan las ultimas STELLAR_HISTORY_MAX (~1 mes).
+STELLAR_HISTORY_SCHEMA = "cl.sibylla.stellar_history.v1"
+STELLAR_HISTORY_MAX = 30
+# "Dias desde la ultima vez que fue destacada" para una noticia nunca destacada:
+# sentinela grande para que domine sobre cualquiera ya mostrada.
+_STELLAR_NEVER_FEATURED = 10**6
+
 # Sidecar de traduccion es/it del APOD de HOY (ver sibylla/apod.py).
 APOD_I18N_FILE = "apod-i18n.json"
 # Archivo historico: una copia por fecha que nunca se sobreescribe, para que
@@ -739,21 +749,131 @@ def _build_stellar_summary(
     return summary
 
 
+def _stellar_history_path() -> Path:
+    return ROOT / "data" / "stellar_history.json"
+
+
+def _load_stellar_history() -> list[dict]:
+    """Lee el historial de destacadas (o [] si no existe o esta corrupto).
+
+    Devuelve una lista de entradas {date, id, source_id}. Nunca lanza: si el
+    archivo falta o esta malformado, se degrada a "sin historial" (la primera
+    corrida en un host nuevo simplemente elige sin penalizar repeticiones)."""
+    try:
+        d = json.loads(_stellar_history_path().read_text(encoding="utf-8"))
+        entries = d.get("entries", [])
+    except Exception:  # noqa: BLE001
+        return []
+    return [e for e in entries
+            if isinstance(e, dict) and e.get("date") and e.get("id")]
+
+
+def _save_stellar_history(entries: list[dict]) -> Path:
+    """Persiste el historial recortado a las ultimas STELLAR_HISTORY_MAX entradas."""
+    path = _stellar_history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": STELLAR_HISTORY_SCHEMA,
+        "entries": entries[-STELLAR_HISTORY_MAX:],
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+    return path
+
+
+def _days_since_featured(dedup_key: str, history: list[dict], today: str) -> int:
+    """Dias desde la ultima vez que `dedup_key` fue destacada (grande = mejor).
+
+    `today` y las fechas del historial estan en formato 'YYYY-MM-DD' (UTC).
+    Nunca destacada -> sentinela grande para que gane a cualquiera ya mostrada.
+    """
+    fechas = [e["date"] for e in history
+              if e.get("id") == dedup_key and e.get("date")]
+    if not fechas:
+        return _STELLAR_NEVER_FEATURED
+    try:
+        last = max(datetime.strptime(f, "%Y-%m-%d").date() for f in fechas)
+        hoy = datetime.strptime(today, "%Y-%m-%d").date()
+    except ValueError:
+        return _STELLAR_NEVER_FEATURED
+    return max((hoy - last).days, 0)
+
+
+def _prev_featured_source(history: list[dict], today: str) -> "str | None":
+    """source_id de la destacada mas reciente ANTERIOR a hoy (para variar fuente)."""
+    prev = [e for e in history if e.get("date") and e["date"] < today]
+    if not prev:
+        return None
+    prev.sort(key=lambda e: e["date"])
+    return prev[-1].get("source_id")
+
+
+def _record_stellar_featured(
+    history: list[dict], today: str, dedup_key: str, source_id: str,
+) -> list[dict]:
+    """Devuelve el historial con la destacada de hoy anexada (sin duplicar el dia).
+
+    Si ya existia una entrada con fecha `today` (p. ej. la corrida temprana del
+    cron), se reemplaza: asi el anclaje intra-dia registra el item vigente sin
+    acumular dos entradas del mismo dia."""
+    entries = [e for e in history if e.get("date") != today]
+    entries.append({"date": today, "id": dedup_key, "source_id": source_id})
+    return entries[-STELLAR_HISTORY_MAX:]
+
+
 def _select_stellar_featured(
     astro_items: list[NewsItem],
     resumenes: dict[str, str],
+    *,
+    history: list[dict] | None = None,
+    today: str | None = None,
 ) -> "NewsItem | None":
     """Elige el item destacado para Stellar-View.
 
-    Prioridad: 1) tiene resumen, 2) tiene imagen, 3) orden original.
-    Garantiza que la pantalla de la app muestre resumen siempre que sea posible.
+    Prioridad (de mayor a menor peso):
+      1) tiene imagen real,
+      2) tiene resumen,
+      3) no repetida: mas dias desde la ultima vez que fue destacada
+         (nunca destacada = infinito practico),
+      4) fuente distinta a la de la destacada anterior,
+      5) desempate: mas reciente; a igualdad total, el primero del pool
+         (que respeta el orden curado de `_select_astronomia`).
+
+    Imagen y resumen encabezan porque la pantalla de la app los muestra siempre
+    que puede; la no-repeticion es penalizacion (no filtro) porque el pool son
+    solo 6 tarjetas y a veces repetir es inevitable, y degrada eligiendo la
+    menos repetida.
+
+    Anclaje intra-dia: si el historial ya trae una destacada con fecha `today`
+    y ese item sigue en el pool, se reutiliza para que una segunda corrida del
+    dia (el cron tardio o un workflow_dispatch manual) no cambie lo ya publicado.
     """
     if not astro_items:
         return None
-    return max(
-        astro_items,
-        key=lambda it: (it.dedup_key in resumenes, bool(it.image)),
-    )
+    history = history or []
+    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    hoy_ids = {e.get("id") for e in history if e.get("date") == today}
+    if hoy_ids:
+        for it in astro_items:
+            if it.dedup_key in hoy_ids:
+                return it
+
+    prev_src = _prev_featured_source(history, today)
+
+    def _recency(it: NewsItem):
+        return it.published or datetime.min.replace(tzinfo=timezone.utc)
+
+    def _key(it: NewsItem):
+        return (
+            bool(it.image),
+            it.dedup_key in resumenes,
+            _days_since_featured(it.dedup_key, history, today),
+            it.source_id != prev_src,
+            _recency(it),
+        )
+
+    return max(astro_items, key=_key)
 
 
 def build_stellar_news_payload(
@@ -765,16 +885,25 @@ def build_stellar_news_payload(
     resumenes: dict[str, str] | None = None,
     translate: bool = True,
     tracker: list[dict] | None = None,
+    history: list[dict] | None = None,
+    today: str | None = None,
 ) -> dict:
     """Contrato publico que consume Stellar-View.
 
-    Selecciona la noticia destacada priorizando aquellas con resumen disponible
-    (luego imagen, luego orden original). El campo ``summary`` es un dict
-    es/en/it con el resumen traducido; puede ser ``{}`` si no hay resumen.
-    El campo es opcional/aditivo: versiones antiguas de la app lo ignoran.
+    Selecciona la noticia destacada priorizando imagen, luego resumen, luego que
+    no se haya destacado recientemente (ver ``_select_stellar_featured``). El
+    campo ``summary`` es un dict es/en/it con el resumen traducido; puede ser
+    ``{}`` si no hay resumen. El campo es opcional/aditivo: versiones antiguas
+    de la app lo ignoran.
+
+    Si se pasa ``history`` (lista mutable), se anexa la destacada elegida IN
+    PLACE para que el caller persista el historial actualizado con
+    ``_save_stellar_history``.
     """
     resumenes = resumenes or {}
-    featured = _select_stellar_featured(astro_items, resumenes)
+    today = today or generated_at.strftime("%Y-%m-%d")
+    featured = _select_stellar_featured(
+        astro_items, resumenes, history=history, today=today)
 
     payload = {
         "schema": STELLAR_NEWS_SCHEMA,
@@ -813,6 +942,14 @@ def build_stellar_news_payload(
         },
         "published_at": _iso(featured.published),
     }
+
+    # Registrar la destacada del dia en el historial (in place) para que el
+    # caller lo persista. Reemplaza la entrada de hoy si ya existia, asi el
+    # anclaje intra-dia no acumula duplicados.
+    if history is not None:
+        history[:] = _record_stellar_featured(
+            history, today, featured.dedup_key, featured.source_id)
+
     return payload
 
 
@@ -1168,7 +1305,11 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     paths.append(_write_build_meta(build_v))
 
     # JSON publico para Stellar-View: una noticia destacada de Astronomia.
+    # El historial (data/stellar_history.json) se persiste en el host, NO se
+    # publica a la web: evita repetir la misma noticia dia tras dia. Si no
+    # existe (host nuevo), arranca vacio y no penaliza repeticiones.
     site_url = get_site_url()
+    stellar_history = _load_stellar_history()
     stellar_payload = build_stellar_news_payload(
         astro_top,
         site_url=site_url,
@@ -1177,8 +1318,13 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
         resumenes=resumenes,
         translate=translate,
         tracker=translate_tracker,
+        history=stellar_history,
+        today=today,
     )
     paths.append(_write_stellar_news(stellar_payload))
+    # Persistido aparte de `paths` (que son salidas de web/): este archivo vive
+    # en data/ y lo sube el workflow por SSH junto a x_recent.json.
+    _save_stellar_history(stellar_history)
 
     # JSON público para Stellar-View: traducción es/it del APOD de HOY, más su
     # copia histórica en apod-i18n/<fecha>.json (ver sibylla/apod.py). Si la

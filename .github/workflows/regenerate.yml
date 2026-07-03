@@ -159,6 +159,7 @@ jobs:
           descargar_xusage() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json" data/x_usage.json; }
           descargar_xrecent() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_recent.json" data/x_recent.json; }
           descargar_xhouse()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_house.json" data/x_house.json; }
+          descargar_stellarh() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/stellar_history.json" data/stellar_history.json; }
 
           # Si el host es inalcanzable ABORTAMOS: generar con historial vacío y
           # luego subirlo machacaría el runs.json bueno que vive en el servidor.
@@ -213,6 +214,15 @@ jobs:
             echo "✓ x_house.json descargado ($(wc -c < data/x_house.json) bytes)."
           else
             echo "ⓘ Sin x_house.json en el host (o inalcanzable); se leerá de la API si toca."
+          fi
+
+          # Historial de destacadas de Stellar-View: best-effort. Sin esto, la
+          # noticia destacada podría repetirse día a día (cada VM arranca limpia)
+          # y una segunda corrida del día no se anclaría a lo ya publicado.
+          if descargar_stellarh 2>/dev/null; then
+            echo "✓ stellar_history.json descargado ($(wc -c < data/stellar_history.json) bytes)."
+          else
+            echo "ⓘ Sin stellar_history.json en el host (o inalcanzable); arranca vacío."
           fi
 
       - name: Generar sitio (con traducción de tarjetas)
@@ -294,6 +304,7 @@ jobs:
           subir_xusage()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_usage.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_usage.json"; }
           subir_xrecent()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_recent.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_recent.json"; }
           subir_xhouse()   { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/x_house.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_house.json"; }
+          subir_stellarh() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/stellar_history.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/stellar_history.json"; }
 
           echo "→ Probando conectividad SSH (con reintentos)..."
           reintentar "test de conectividad SSH" probar_ssh || {
@@ -345,6 +356,15 @@ jobs:
             reintentar "subida de x_house.json" subir_xhouse \
               && echo "✓ Caché house de X persistida en $REMOTE_DATA/x_house.json" \
               || echo "⚠ No se pudo persistir x_house.json; la próxima corrida del día re-leería."
+          fi
+
+          # Persistir el historial de destacadas de Stellar-View (best-effort).
+          # Sin esto, la noticia destacada podría repetirse al día siguiente.
+          if [ -f data/stellar_history.json ]; then
+            echo "→ Persistiendo stellar_history.json en el host ($REMOTE_DATA)..."
+            reintentar "subida de stellar_history.json" subir_stellarh \
+              && echo "✓ Historial de destacadas persistido en $REMOTE_DATA/stellar_history.json" \
+              || echo "⚠ No se pudo persistir stellar_history.json; la próxima destacada podría repetirse."
           fi
 
           echo "✅ Deploy completado a $DEPLOY_PATH"
