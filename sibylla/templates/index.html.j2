@@ -44,7 +44,7 @@
 {%- endmacro %}
 {% macro tarjeta(c, also_in='') -%}
 <article id="{{ c.id }}" class="carta" style="--sello:{{ c.seal_color }};">
-  {% if c.image %}<a class="carta-img" href="{{ c.url }}" aria-label="{{ c.title|e }}"><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% else %}<a class="carta-img ph" href="{{ c.url }}" aria-label="{{ c.title|e }}">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% endif %}
+  {% if c.image %}<a class="carta-img" href="{{ c.url }}" aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% else %}<a class="carta-img ph" href="{{ c.url }}" aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}>{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% endif %}
   <h4>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
     <a href="{{ c.url }}">{{ c.title }}</a>
@@ -362,6 +362,8 @@
     background:rgba(8,11,20,.55); border:1px solid var(--oro);
     box-shadow:0 2px 14px rgba(0,0,0,.4); pointer-events:none; }
   .carta-img .play svg{ width:22px; height:22px; fill:var(--marfil); margin-left:3px; }
+  /* Reproductor embebido: sustituye la miniatura al pulsar (ver <script>). */
+  .carta-img iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
   .carta h4{ margin:0 0 12px; font-family:'Cormorant Garamond',serif; font-weight:600;
     font-size:clamp(1.15rem,2.5vw,1.35rem); line-height:1.28; }
   .carta h4 a{ color:var(--marfil); text-decoration:none; transition:color .2s; }
@@ -878,6 +880,26 @@
   });
   if(restore) restore.addEventListener('click', function(){ if(!REORDERING) restoreAll(); });
   window.addEventListener('hashchange', revealHashTarget);
+})();
+/* Miniaturas de Divulgación: al pulsar, sustituyen su contenido por el
+   reproductor embebido (youtube-nocookie) en vez de navegar a YouTube. El
+   <a> original se conserva como fallback si el usuario tiene JS desactivado. */
+(function(){
+  document.querySelectorAll('.carta-img[data-video-id]').forEach(function(a){
+    a.addEventListener('click', function(e){
+      e.preventDefault();
+      var id = a.dataset.videoId;
+      if(!id || a.querySelector('iframe')) return;
+      var iframe = document.createElement('iframe');
+      iframe.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&playsinline=1';
+      iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('title', a.getAttribute('aria-label') || '');
+      a.removeAttribute('href');
+      a.innerHTML = '';
+      a.appendChild(iframe);
+    });
+  });
 })();
 /* Acordeón "Resumen": despliega/oculta el panel dentro de la tarjeta. */
 (function(){

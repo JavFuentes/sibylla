@@ -479,11 +479,13 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         # selección de slots en `_select_social`.
         "is_house": False,
         "is_video": is_video,
+        "video_id": "",
     }
     if is_video:
         card["seal_color"] = "#5EE6E0"
         card["has_resumen"] = False
         card["resumen"] = None
+        card["video_id"] = str(it.extra.get("video_id") or "")
     return card
 
 

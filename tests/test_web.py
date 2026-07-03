@@ -211,6 +211,22 @@ def test_tarjeta_image_placeholder_cuando_no_hay():
     assert card["image"] == "placeholder-test.png"
 
 
+def test_tarjeta_video_propaga_video_id():
+    """Con is_video=True, el video_id de extra pasa a la tarjeta (para el
+    facade de reproducción embebida en la miniatura)."""
+    it = _item()
+    it.extra["video_id"] = "abc123"
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES, is_video=True)
+    assert card["video_id"] == "abc123"
+
+
+def test_tarjeta_no_video_no_propaga_video_id():
+    it = _item()
+    it.extra["video_id"] = "abc123"
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES, is_video=False)
+    assert card["video_id"] == ""
+
+
 # ---------------------------------------------------------------------------
 # _tarjeta (resumen y fallback de snippet)
 # ---------------------------------------------------------------------------
