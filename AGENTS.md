@@ -140,7 +140,7 @@ Cada `.tema` tiene un control `− N +` que el usuario ajusta en el navegador. P
 
 Los pasos son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
 El **valor inicial** deriva del onboarding (`sibylla_prefs`, ver "Onboarding de
-intereses" abajo): 1er interés 4, el resto 2, RRSS 2, estándar 2 en todas. Sin
+intereses" abajo): 1er interés 6, el resto 4, RRSS 2, estándar 4 en todas. Sin
 prefs (o sin JS) cae al `data-default` (6).
 
 ### Reordenar / ocultar secciones (cliente)
@@ -187,10 +187,10 @@ y define el **estado por defecto** de la portada:
 - **Orden y visibilidad:** las secciones elegidas, en el orden del ranking; las
   no elegidas quedan ocultas. RRSS (`social`) no se ofrece en el onboarding:
   siempre visible, al final, con 2 tarjetas.
-- **Tarjetas:** 1er interés 4, el resto 2, RRSS 2. La opción estándar
-  ("un poco de todo") = todas las secciones, orden de fábrica, 2 tarjetas.
-  Constantes en el `<script>` del pie: `RANK_FIRST_CARDS`, `RANK_REST_CARDS`,
-  `STD_CARDS`, `SOCIAL_CARDS`.
+- **Tarjetas:** 1er interés 6, el resto 4, RRSS 2. La opción estándar
+  ("un poco de todo") = todas las secciones, orden de fábrica, 4 tarjetas
+  (RRSS igual 2). Constantes en el `<script>` del pie: `RANK_FIRST_CARDS`,
+  `RANK_REST_CARDS`, `STD_CARDS`, `SOCIAL_CARDS`.
 - `known` registra qué secciones se ofrecieron: una sección **nueva** del sitio
   (ausente de `known`) aparece visible al final con 2 tarjetas, sin obligar a
   repetir el onboarding.
@@ -200,14 +200,17 @@ Cadena de resolución en runtime: **ajuste manual (`sibylla_cards` /
 orden del DOM). Al guardar el onboarding se limpian los ajustes manuales.
 
 **Modos:** el conmutador `#modo-toggle` (sobre `#secciones`) alterna entre
-*Ordenado* (la vista clásica por secciones) y *Aleatorio*: las tarjetas de los
-temas elegidos (+ RRSS) se mueven a `#feed`, mezcladas con **sesgo por ranking**
-(clave `rnd^(1/w)`, `w = 1/(posición+1)`; mezcla nueva en cada visita) y se
-revelan por lotes de 8 con IntersectionObserver (scroll continuo, mensaje
-`feed_end` al agotar). En feed se ocultan los controles de sección y Restaurar;
-al volver a Ordenado cada tarjeta regresa a su rejilla original. El modo
-persiste en `sibylla_prefs.mode` y **no** cuenta como "personalización" para
-Restaurar.
+*Ordenado* (la vista clásica por secciones) y *Aleatorio*: las tarjetas se
+mueven a `#feed` y se revelan por lotes de 8 con IntersectionObserver (scroll
+continuo, mensaje `feed_end` al agotar; mezcla nueva en cada visita). Con
+ranking, el feed son **dos fases duras** (`feedQueue`): 1) cada interés con su
+mismo tope del modo ordenado (6 el 1º, 4 el resto) + 2 sociales, barajados entre
+sí; 2) las secciones **no elegidas** (ocultas en Ordenado), con todas sus
+cartas, barajadas y al final. En modo estándar / sin ranking es una sola
+**mezcla ponderada pareja** (clave `rnd^(1/w)`, RRSS con el peso más bajo). En
+feed se ocultan los controles de sección y Restaurar; al volver a Ordenado cada
+tarjeta regresa a su rejilla original. El modo persiste en `sibylla_prefs.mode`
+y **no** cuenta como "personalización" para Restaurar.
 
 Textos UI (los 4 locales, por el test de paridad): `onb_*`, `mode_*`, `feed_end`.
 
