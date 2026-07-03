@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 15   # corrida típica: 1-3 min; corta un job colgado
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
