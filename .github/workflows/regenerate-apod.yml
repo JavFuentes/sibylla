@@ -1,16 +1,17 @@
 # Publica SOLO el sidecar apod-i18n.json, aparte del build completo del sitio.
 #
 # Por que existe: NASA publica el APOD nuevo ~2-3 AM hora de Chile, pero
-# regenerate.yml (el build completo, con noticias) corre a las 11 AM a proposito
-# -- para que las noticias del sitio salgan frescas. Con un solo cron a las 11,
-# Stellar-View mostraba el APOD de "hoy" en ingles durante esas ~9 horas: la app
-# pide la foto directo a NASA en tiempo real, pero la traduccion es/it solo se
-# aplica si `apod-i18n.json` ya trae la fecha de HOY (ver sibylla/apod.py).
+# regenerate.yml (el build completo, con noticias) corre a media mañana
+# (14:08/14:38 UTC ≈ 10-11 AM Chile) a proposito -- para que las noticias del
+# sitio salgan frescas. Con un solo cron a esa hora, Stellar-View mostraba el
+# APOD de "hoy" en ingles durante esas ~8 horas: la app pide la foto directo a
+# NASA en tiempo real, pero la traduccion es/it solo se aplica si
+# `apod-i18n.json` ya trae la fecha de HOY (ver sibylla/apod.py).
 #
 # Este workflow corre temprano y escribe unicamente `web/apod-i18n.json` (1
 # llamada a NASA + 2 al LLM). No toca noticias, YouTube, X ni runs.json/dashboard
 # -- por eso no necesita el descargar/subir historial que hace regenerate.yml.
-# Es idempotente: el build de las 11 lo vuelve a escribir sin problema.
+# Es idempotente: el build de media mañana lo vuelve a escribir sin problema.
 name: Publicar APOD temprano
 
 on:
@@ -36,6 +37,7 @@ permissions:
 jobs:
   publish-apod:
     runs-on: ubuntu-latest
+    timeout-minutes: 15   # corrida típica: 1-3 min; corta un job colgado
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,16 +48,27 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Instalar dependencias
         run: pip install -r requirements.txt
 
       # Misma key que regenerate.yml: comparten el cache de traducciones, asi
-      # el build de las 11 no vuelve a llamar al LLM por el mismo APOD.
-      - name: Restaurar cache de traducciones
+      # el build de media mañana no vuelve a llamar al LLM por el mismo APOD.
+      # IMPORTANTE: la lista de archivos debe ser LA MISMA que en regenerate.yml.
+      # Este workflow solo modifica translations.json, pero si cacheara solo ese
+      # archivo, su cache seria el mas reciente del dia y el build completo
+      # (restore-keys toma el ultimo) restauraria sin el cache de YouTube ni el
+      # de resumenes, dejandolos frios cada mañana. Restaurar + re-guardar los
+      # cuatro archivos los preserva sin tocarlos.
+      - name: Restaurar cache regenerable (compartido con regenerate.yml)
         uses: actions/cache@v4
         with:
-          path: data/translations.json
+          path: |
+            data/translations.json
+            data/youtube_cache.json
+            data/resumenes.json
+            data/articles.json
           key: data-cache-${{ github.run_id }}
           restore-keys: |
             data-cache-
