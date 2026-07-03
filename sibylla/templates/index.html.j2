@@ -442,6 +442,108 @@
   .punto.t1{ background:var(--tier1);} .punto.t2{ background:var(--tier2);} .punto.t3{ background:var(--tier3);}
   .pie .lema{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--tenue); font-size:.95rem; }
 
+  /* ---- Onboarding: elegir intereses (primera visita) ----
+     Overlay 100% client-side: sin JS nunca se muestra (el sitio queda como
+     siempre). Las chips se generan por JS desde los bloques reales de
+     #secciones (ver <script> del pie), excluyendo RRSS. El sello con numeral
+     romano (I, II, III…) marca el orden de selección, con el mismo lenguaje
+     visual que los sellos de tier. */
+  .onb{ position:fixed; inset:0; z-index:40; display:grid; place-items:center;
+    padding:26px 18px; overflow-y:auto;
+    background:rgba(8,11,20,.86); backdrop-filter:blur(9px);
+    transition:opacity .35s; }
+  .onb[hidden]{ display:none; }
+  .onb.is-closing{ opacity:0; pointer-events:none; }
+  body.onb-abierto{ overflow:hidden; }
+  .onb-panel{ width:100%; max-width:720px; margin:auto; overflow:hidden;
+    border-radius:var(--radio); border:1px solid rgba(217,184,95,.34);
+    background:linear-gradient(180deg, rgba(15,21,38,.97), rgba(9,13,24,.98));
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.85), 0 0 70px -24px rgba(217,184,95,.35); }
+  .onb-cuerpo{ padding:8px 34px 30px; }
+  .onb .apunte{ margin:18px 0 6px; }
+  .onb-titulo{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.18em;
+    font-size:clamp(1.15rem,2.6vw,1.4rem); margin:18px 0 10px;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .onb-body{ font-family:'Cormorant Garamond',serif; font-size:1.12rem; color:var(--marfil-2);
+    line-height:1.5; margin:0 0 6px; }
+  .chips-temas{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:20px 0 4px; }
+  .chip-tema{ display:flex; align-items:center; gap:12px; min-height:56px; text-align:left;
+    padding:12px 16px; border-radius:12px; cursor:pointer;
+    font-family:'Cinzel',serif; font-size:.8rem; letter-spacing:.13em; text-transform:uppercase;
+    color:var(--marfil-2); background:rgba(217,184,95,.05); border:1px solid rgba(217,184,95,.22);
+    transition:color .2s, border-color .2s, background .2s, box-shadow .2s, transform .2s; }
+  .chip-tema:hover{ color:var(--oro-claro); border-color:rgba(242,221,147,.55);
+    background:rgba(217,184,95,.10); transform:translateY(-1px); }
+  .chip-tema:focus-visible{ outline:2px solid rgba(94,230,224,.6); outline-offset:2px; }
+  .chip-tema .chip-sello{ width:30px; height:30px; flex:none; border-radius:50%;
+    display:grid; place-items:center; font-family:'Cinzel',serif; font-size:.72rem;
+    border:1px dashed rgba(217,184,95,.4); color:transparent;
+    transition:background .25s, color .25s, border-color .25s, box-shadow .25s; }
+  .chip-tema[aria-pressed="true"]{ color:var(--oro-claro); border-color:rgba(242,221,147,.7);
+    background:rgba(217,184,95,.13);
+    box-shadow:0 10px 26px -14px rgba(217,184,95,.6), inset 0 0 20px rgba(217,184,95,.05); }
+  .chip-tema[aria-pressed="true"] .chip-sello{ border:none; color:#3a2c08;
+    background:radial-gradient(circle at 40% 35%, #F2DD93, #C99B43);
+    box-shadow:0 0 14px -3px rgba(242,221,147,.7); }
+  .onb-acciones{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:24px; }
+  .onb button.boton{ cursor:pointer; }
+  .onb .boton.fantasma{ background:transparent; }
+  .onb .boton[disabled]{ opacity:.38; pointer-events:none; box-shadow:none; }
+  .onb-nota{ margin:16px 0 0; font-size:.78rem; letter-spacing:.04em; color:var(--tenue); }
+  @media (max-width:620px){
+    .onb{ padding:14px 10px; }
+    .onb-cuerpo{ padding:4px 18px 24px; }
+    .chips-temas{ grid-template-columns:1fr; gap:10px; }
+    .chip-tema{ min-height:52px; }
+    .onb-acciones .boton{ flex:1 1 auto; text-align:center; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .onb{ transition:none; }
+    .chip-tema{ transition:color .2s, border-color .2s, background .2s; }
+  }
+  /* Pregunta de modo dentro del onboarding: intereses = oro (contenido),
+     modo = cian (mecanismo), coherente con presente/futuro del sitio. */
+  .onb-subtitulo{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.16em;
+    font-size:.92rem; color:var(--marfil); margin:24px 0 12px; text-transform:uppercase; }
+  .onb-modos{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .onb-modo{ display:flex; flex-direction:column; gap:6px; text-align:left; padding:14px 16px;
+    border-radius:12px; cursor:pointer;
+    background:rgba(94,230,224,.04); border:1px solid rgba(94,230,224,.22);
+    transition:color .2s, border-color .2s, background .2s, box-shadow .2s; }
+  .onb-modo:hover{ border-color:rgba(94,230,224,.5); }
+  .onb-modo:focus-visible{ outline:2px solid rgba(242,221,147,.6); outline-offset:2px; }
+  .onb-modo-nombre{ font-family:'Cinzel',serif; font-size:.8rem; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--marfil); }
+  .onb-modo-desc{ font-family:'Cormorant Garamond',serif; font-style:italic; font-size:.98rem;
+    color:var(--marfil-2); line-height:1.35; }
+  .onb-modo[aria-pressed="true"]{ border-color:rgba(94,230,224,.75);
+    background:rgba(94,230,224,.10);
+    box-shadow:0 10px 26px -14px rgba(94,230,224,.55), inset 0 0 20px rgba(94,230,224,.05); }
+  .onb-modo[aria-pressed="true"] .onb-modo-nombre{ color:var(--cian-claro); }
+  @media (max-width:620px){ .onb-modos{ grid-template-columns:1fr; } }
+
+  /* ---- Conmutador de modo (Ordenado / Aleatorio) sobre las secciones ---- */
+  .modo-fila{ display:flex; justify-content:flex-end; margin:0 0 18px; }
+  .modo-toggle{ display:inline-flex; padding:4px; gap:4px; border-radius:999px;
+    background:rgba(217,184,95,.05); border:1px solid rgba(217,184,95,.24); }
+  .modo-btn{ font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
+    padding:8px 16px; border-radius:999px; cursor:pointer; border:1px solid transparent;
+    background:transparent; color:var(--marfil-2);
+    transition:color .2s, background .2s, box-shadow .2s; }
+  .modo-btn:hover{ color:var(--oro-claro); }
+  .modo-btn:focus-visible{ outline:2px solid rgba(94,230,224,.6); outline-offset:2px; }
+  .modo-btn[aria-pressed="true"]{ color:#1a1305;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F); border-color:#F2DD93;
+    box-shadow:0 0 20px -8px rgba(217,184,95,.7); }
+
+  /* ---- Modo aleatorio: feed de tarjetas sueltas ----
+     Reutiliza .rejilla (2 columnas desktop / 1 en móvil). En este modo se
+     ocultan las secciones, sus controles y el botón Restaurar. */
+  #feed{ margin-top:26px; }
+  .feed-sentinel{ height:2px; }
+  body.modo-aleatorio .restaurar{ display:none; }
+
   /* ================= Responsive: tablet ================= */
   @media (max-width:860px){
     .hero{ grid-template-columns:1fr; gap:36px; text-align:center; padding:48px 0; }
@@ -514,6 +616,7 @@
     </label>
     <nav class="menu">
       <a href="#presente">{{ t.nav_present }}</a>
+      <a href="#" id="nav-personalizar">{{ t.onb_edit }}</a>
       <a href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.nav_github }}</a>
       <a href="#">{{ t.nav_about }}</a>
     </nav>
@@ -558,6 +661,13 @@
   <section id="presente">
 
     {{ apunte(t.observes, observa) }}
+
+    <div class="modo-fila">
+      <div id="modo-toggle" class="modo-toggle" role="group" aria-label="{{ t.mode_label }}">
+        <button type="button" class="modo-btn" data-mode="ordenado" aria-pressed="true">{{ t.mode_ordered }}</button>
+        <button type="button" class="modo-btn" data-mode="aleatorio" aria-pressed="false">{{ t.mode_random }}</button>
+      </div>
+    </div>
 
     <div id="secciones">
     {% for g in grupos %}
@@ -617,6 +727,14 @@
     {% endif %}
     </div>
 
+    {# Modo aleatorio: el JS mueve aquí las tarjetas de los temas elegidos,
+       mezcladas con sesgo por ranking, y las revela por lotes al hacer scroll. #}
+    <div id="feed" hidden>
+      <div id="feed-rejilla" class="rejilla rejilla-feed"></div>
+      <div id="feed-sentinel" class="feed-sentinel" aria-hidden="true"></div>
+      <div id="feed-fin" hidden>{{ apunte(t.observes, t.feed_end, 'neutro') }}</div>
+    </div>
+
   </section>
 
 </main>
@@ -634,6 +752,37 @@
   </div>
 </footer>
 
+{# Onboarding: elegir intereses (primera visita o vía "Personalizar" del menú).
+   Las chips se generan por JS desde los bloques de #secciones (menos RRSS,
+   que siempre queda visible con 2 tarjetas). Sin JS permanece oculto. #}
+<div id="onboarding" class="onb" role="dialog" aria-modal="true" aria-labelledby="onb-titulo" hidden>
+  <div class="onb-panel">
+    <div class="meandro" aria-hidden="true"></div>
+    <div class="onb-cuerpo">
+      {{ apunte(t.observes, t.onb_voice) }}
+      <h2 id="onb-titulo" class="onb-titulo">{{ t.onb_title }}</h2>
+      <p class="onb-body">{{ t.onb_body }}</p>
+      <div id="onb-chips" class="chips-temas"></div>
+      <h3 class="onb-subtitulo">{{ t.onb_mode_title }}</h3>
+      <div id="onb-modos" class="onb-modos">
+        <button type="button" class="onb-modo" data-mode="ordenado" aria-pressed="true">
+          <span class="onb-modo-nombre">{{ t.mode_ordered }}</span>
+          <span class="onb-modo-desc">{{ t.onb_mode_ordered_desc }}</span>
+        </button>
+        <button type="button" class="onb-modo" data-mode="aleatorio" aria-pressed="false">
+          <span class="onb-modo-nombre">{{ t.mode_random }}</span>
+          <span class="onb-modo-desc">{{ t.onb_mode_random_desc }}</span>
+        </button>
+      </div>
+      <div class="onb-acciones">
+        <button type="button" id="onb-continuar" class="boton oro" disabled>{{ t.onb_continue }}</button>
+        <button type="button" id="onb-estandar" class="boton fantasma">{{ t.onb_standard }}</button>
+      </div>
+      <p class="onb-nota">{{ t.onb_note }}</p>
+    </div>
+  </div>
+</div>
+
 <button type="button" id="actualizar" class="actualizar" aria-hidden="true" aria-live="polite" tabindex="-1" title="{{ t.sec_update }}" disabled>
   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.6 8a5.4 5.4 0 0 1 9.25-3.8"/><path d="M2.4 2.4V5H5"/><path d="M13.4 8a5.4 5.4 0 0 1-9.25 3.8"/><path d="M13.6 13.6V11H11"/></svg>
   <span>{{ t.sec_update }}</span>
@@ -645,14 +794,24 @@
 </button>
 
 <script>
-/* Controles de sección + selector de tarjetas. Todo client-side: el HTML se
-   sirve completo y este script lo reordena/oculta. Persistencia en localStorage:
-     sibylla_cards  -> { topic: nº de tarjetas visibles }
-     sibylla_layout -> { order:[topic...], hidden:[topic...] } */
+/* Controles de sección + selector de tarjetas + onboarding de intereses.
+   Todo client-side: el HTML se sirve completo y este script lo reordena/oculta.
+   Persistencia en localStorage:
+     sibylla_prefs  -> { v:1, mode, estandar, ranking:[topic...], known:[topic...] }
+                       (resultado del onboarding; define el estado POR DEFECTO)
+     sibylla_cards  -> { topic: nº de tarjetas visibles }        (ajuste manual)
+     sibylla_layout -> { order:[topic...], hidden:[topic...] }   (ajuste manual)
+   Restaurar borra los ajustes manuales y vuelve al estado derivado de
+   sibylla_prefs (no al de fábrica). Sin sibylla_prefs se muestra el onboarding. */
 (function(){
   var CONT=document.getElementById('secciones');
   if(!CONT) return;
   var defaultSteps=[0,2,4,6];
+  /* Tarjetas por defecto según el onboarding: 1er interés 4, el resto 2;
+     RRSS (social) no se elige: siempre visible con 2, al final;
+     opción estándar ("un poco de todo") = 2 en todas. */
+  var SOCIAL_TOPIC='social';
+  var RANK_FIRST_CARDS=4, RANK_REST_CARDS=2, STD_CARDS=2, SOCIAL_CARDS=2;
 
   /* ---------- almacenamiento ---------- */
   function jget(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(_){ return null; } }
@@ -661,6 +820,13 @@
   function saveCards(o){ jset('sibylla_cards',o); }
   function loadLayout(){ var l=jget('sibylla_layout')||{}; return {order:l.order||[], hidden:l.hidden||[]}; }
   function saveLayout(l){ jset('sibylla_layout',l); }
+  function loadPrefs(){
+    var p=jget('sibylla_prefs');
+    if(!p || p.v!==1) return null;
+    if(!p.estandar && !(p.ranking && p.ranking.length)) return null;
+    return p;
+  }
+  function savePrefs(p){ jset('sibylla_prefs',p); }
 
   /* ---------- bloques ---------- */
   function blocks(){
@@ -668,6 +834,37 @@
       return el.classList && el.classList.contains('bloque'); });
   }
   var ORIGINAL=blocks().map(function(b){ return b.dataset.topic; });
+
+  /* ---------- estado derivado del onboarding (el default de Restaurar) ----------
+     Cadena de resolución: ajuste manual -> derivado de prefs -> fábrica. */
+  function derivedOrder(prefs){
+    if(!prefs || prefs.estandar) return ORIGINAL.slice();
+    var seq=[];
+    prefs.ranking.forEach(function(tp){
+      if(tp!==SOCIAL_TOPIC && ORIGINAL.indexOf(tp)>=0 && seq.indexOf(tp)<0) seq.push(tp); });
+    ORIGINAL.forEach(function(tp){
+      if(tp!==SOCIAL_TOPIC && seq.indexOf(tp)<0) seq.push(tp); });
+    if(ORIGINAL.indexOf(SOCIAL_TOPIC)>=0) seq.push(SOCIAL_TOPIC);
+    return seq;
+  }
+  function derivedHidden(prefs){
+    if(!prefs || prefs.estandar) return [];
+    /* Solo se ocultan las secciones que el usuario VIO en el onboarding y no
+       eligió; una sección nueva (ausente de `known`) queda visible al final. */
+    var known=prefs.known||ORIGINAL;
+    return ORIGINAL.filter(function(tp){
+      return tp!==SOCIAL_TOPIC && known.indexOf(tp)>=0 && prefs.ranking.indexOf(tp)<0; });
+  }
+  function derivedCardsFor(prefs, topic){
+    if(topic===SOCIAL_TOPIC) return SOCIAL_CARDS;
+    if(prefs.estandar) return STD_CARDS;
+    return prefs.ranking.indexOf(topic)===0 ? RANK_FIRST_CARDS : RANK_REST_CARDS;
+  }
+  function defaultCardsFor(topic){
+    var prefs=loadPrefs();
+    if(prefs) return derivedCardsFor(prefs, topic);
+    var ctrl=ctrlOf(topic); return deft(ctrl,getSteps(ctrl));
+  }
 
   /* ---------- selector de tarjetas (por tema) ---------- */
   function temaOf(topic){ return CONT.querySelector('.tema[data-topic="'+topic+'"]'); }
@@ -689,11 +886,10 @@
     var val=t.querySelector('.card-ctrl-val'); if(val) val.textContent=n;
   }
   function cardCountFor(topic){
-    var ctrl=ctrlOf(topic); var steps=getSteps(ctrl);
-    var c=loadCards(); return c[topic]!==undefined ? c[topic] : deft(ctrl,steps);
+    var c=loadCards(); return c[topic]!==undefined ? c[topic] : defaultCardsFor(topic);
   }
   function stepCards(topic, dir){
-    var ctrl=ctrlOf(topic); var steps=getSteps(ctrl); var d=deft(ctrl,steps);
+    var ctrl=ctrlOf(topic); var steps=getSteps(ctrl); var d=defaultCardsFor(topic);
     var cur=cardCountFor(topic);
     var idx=steps.indexOf(cur); if(idx<0) idx=steps.indexOf(d); if(idx<0) idx=steps.length-1;
     var next=steps[Math.min(steps.length-1, Math.max(0, idx+dir))];
@@ -722,15 +918,23 @@
     try{ b.scrollIntoView({block:'nearest'}); }catch(_){ b.scrollIntoView(); }
   }
   function applyLayout(){
+    var prefs=loadPrefs();
     var lay=loadLayout();
     var present=blocks(); var byTopic={};
     present.forEach(function(b){ byTopic[b.dataset.topic]=b; });
+    /* Orden: manual -> derivado del onboarding -> lo que quede en el DOM. */
+    var base=derivedOrder(prefs);
     var seq=[];
     lay.order.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
-    ORIGINAL.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
+    base.forEach(function(tp){ if(byTopic[tp] && seq.indexOf(tp)<0) seq.push(tp); });
     present.forEach(function(b){ if(seq.indexOf(b.dataset.topic)<0) seq.push(b.dataset.topic); });
     seq.forEach(function(tp){ CONT.appendChild(byTopic[tp]); });
-    present.forEach(function(b){ b.style.display = lay.hidden.indexOf(b.dataset.topic)>=0 ? 'none' : ''; });
+    /* Ocultos: los no elegidos en el onboarding + los quitados a mano. */
+    var baseHidden=derivedHidden(prefs);
+    present.forEach(function(b){
+      var tp=b.dataset.topic;
+      b.style.display = (lay.hidden.indexOf(tp)>=0 || baseHidden.indexOf(tp)>=0) ? 'none' : '';
+    });
     updateArrows(); reflectRestore();
   }
   function updateArrows(){
@@ -829,22 +1033,31 @@
     if(!id) return;
     var card=document.getElementById(id);
     if(!card || !card.classList.contains('carta')) return;
-    var bloque=card.closest('.bloque');
-    if(bloque) bloque.style.display='';
-    card.style.display='';
+    if(FEED && !FEED.hidden){
+      /* En modo feed la tarjeta puede estar en un lote sin revelar. */
+      while(feedCola.length && card.style.display==='none') feedReveal();
+    } else {
+      var bloque=card.closest('.bloque');
+      if(bloque) bloque.style.display='';
+      card.style.display='';
+    }
     setTimeout(function(){ card.scrollIntoView({block:'center'}); }, 0);
   }
 
   /* ---------- restaurar todo ---------- */
   var restore=document.getElementById('restaurar');
   function customized(){
+    /* "Personalizado" = distinto del estado derivado del onboarding
+       (o del de fábrica si aún no hay prefs), nunca del de fábrica a secas. */
+    var prefs=loadPrefs();
     var lay=loadLayout();
     if(lay.hidden.length) return true;
     var ids=blocks().map(function(b){return b.dataset.topic;});
-    for(var i=0;i<ids.length;i++){ if(ids[i]!==ORIGINAL[i]) return true; }
+    var base=derivedOrder(prefs);
+    for(var i=0;i<ids.length;i++){ if(ids[i]!==base[i]) return true; }
     var c=loadCards();
     for(var k in c){ if(c.hasOwnProperty(k)){
-      var ctrl=ctrlOf(k); if(c[k]!==deft(ctrl,getSteps(ctrl))) return true;
+      if(c[k]!==defaultCardsFor(k)) return true;
     }}
     return false;
   }
@@ -862,9 +1075,204 @@
     reflectRestore();
   }
 
+  /* ---------- modo de visualización: ordenado / aleatorio ----------
+     "Aleatorio" mueve las tarjetas de los temas visibles a #feed, mezcladas
+     con sesgo por ranking (mezcla nueva en cada visita), y las revela por
+     lotes al hacer scroll. "Ordenado" las devuelve a su rejilla original. */
+  var FEED=document.getElementById('feed');
+  var FEED_REJILLA=document.getElementById('feed-rejilla');
+  var FEED_FIN=document.getElementById('feed-fin');
+  var FEED_SENTINEL=document.getElementById('feed-sentinel');
+  var FEED_LOTE=8;
+  var feedCola=[];    /* tarjetas aún no reveladas */
+  var feedObs=null;
+  /* Registro del hogar de cada tarjeta, capturado antes de mover nada. */
+  var HOGAR=blocks().map(function(b){
+    var rej=b.querySelector('.rejilla');
+    return { rejilla:rej,
+             cartas:rej ? Array.prototype.slice.call(rej.querySelectorAll('.carta')) : [] };
+  });
+
+  function currentMode(){
+    var p=loadPrefs();
+    return (p && p.mode==='aleatorio') ? 'aleatorio' : 'ordenado';
+  }
+  function setMode(mode){
+    var p=loadPrefs();
+    if(p){ p.mode=mode; savePrefs(p); }
+    applyMode();
+  }
+  function paintModeToggle(){
+    var mt=document.getElementById('modo-toggle'); if(!mt) return;
+    var mode=currentMode();
+    Array.prototype.forEach.call(mt.querySelectorAll('.modo-btn'), function(b){
+      b.setAttribute('aria-pressed', b.dataset.mode===mode ? 'true' : 'false');
+    });
+  }
+  function feedWeightFor(topic){
+    /* Peso de mezcla: 1º interés = 1, 2º = 1/2, 3º = 1/3…; estándar = parejo;
+       RRSS siempre con el peso más bajo (tiende al fondo del feed). */
+    if(topic===SOCIAL_TOPIC) return 0.2;
+    var p=loadPrefs();
+    if(!p || p.estandar || !p.ranking.length) return 1;
+    var i=p.ranking.indexOf(topic);
+    return i<0 ? 0.25 : 1/(i+1);
+  }
+  function buildFeed(){
+    if(!FEED || !FEED_REJILLA) return;
+    teardownFeed();                       /* limpia una mezcla anterior */
+    var cartas=[];
+    visibleBlocks().forEach(function(b){
+      var rej=b.querySelector('.rejilla'); if(!rej) return;
+      var w=feedWeightFor(b.dataset.topic);
+      Array.prototype.forEach.call(rej.querySelectorAll('.carta'), function(c){
+        /* Mezcla ponderada sin reemplazo: ordenar por rnd^(1/w) descendente. */
+        cartas.push({ nodo:c, clave:Math.pow(Math.random(), 1/w) });
+      });
+    });
+    cartas.sort(function(a,b){ return b.clave-a.clave; });
+    feedCola=cartas.map(function(x){ return x.nodo; });
+    feedCola.forEach(function(c){ c.style.display='none'; FEED_REJILLA.appendChild(c); });
+    FEED.hidden=false;
+    CONT.style.display='none';
+    feedRevealLoop();                     /* primer lote (+ los que quepan ya en viewport) */
+    if(window.IntersectionObserver && FEED_SENTINEL && feedCola.length){
+      feedObs=new IntersectionObserver(function(entries){
+        for(var i=0;i<entries.length;i++){ if(entries[i].isIntersecting){ feedRevealLoop(); break; } }
+      }, {rootMargin:'600px 0px'});
+      feedObs.observe(FEED_SENTINEL);
+    } else {
+      while(feedCola.length) feedReveal();  /* sin IO: mostrar todo */
+    }
+  }
+  function feedReveal(){
+    var n=Math.min(FEED_LOTE, feedCola.length);
+    for(var i=0;i<n;i++){ feedCola.shift().style.display=''; }
+    if(!feedCola.length){
+      if(feedObs){ feedObs.disconnect(); feedObs=null; }
+      if(FEED_FIN) FEED_FIN.hidden=false;
+    }
+  }
+  function feedRevealLoop(){
+    /* El observer solo dispara en transiciones de intersección: si el
+       sentinel queda "atascado" a la vista (feed corto, ventana grande), un
+       solo disparo no basta. Tras cada lote, si el sentinel sigue dentro del
+       margen de carga, se revela otro lote, hasta agotar la cola o alejarlo. */
+    feedReveal();
+    if(!feedCola.length || !FEED_SENTINEL || !window.requestAnimationFrame) return;
+    requestAnimationFrame(function(){
+      var h=window.innerHeight||document.documentElement.clientHeight;
+      var r=FEED_SENTINEL.getBoundingClientRect();
+      if(r.top<h+600) feedRevealLoop();
+    });
+  }
+  function teardownFeed(){
+    if(feedObs){ feedObs.disconnect(); feedObs=null; }
+    feedCola=[];
+    HOGAR.forEach(function(h){
+      if(!h.rejilla) return;
+      h.cartas.forEach(function(c){ c.style.display=''; h.rejilla.appendChild(c); });
+    });
+    if(FEED) FEED.hidden=true;
+    if(FEED_FIN) FEED_FIN.hidden=true;
+    CONT.style.display='';
+  }
+  function applyMode(){
+    var mode=currentMode();
+    document.body.classList.toggle('modo-aleatorio', mode==='aleatorio');
+    if(mode==='aleatorio'){ buildFeed(); }
+    else {
+      teardownFeed();
+      blocks().forEach(function(b){ var tp=b.dataset.topic; applyCards(tp, cardCountFor(tp)); });
+    }
+    paintModeToggle(); reflectRestore();
+  }
+
+  /* ---------- onboarding: elegir intereses ----------
+     Se abre en la primera visita (sin sibylla_prefs) o desde "Personalizar".
+     Tocar una chip la suma al ranking (sello con numeral romano según orden);
+     tocarla de nuevo la quita y renumera. "Un poco de todo" = estándar. */
+  var ONB=document.getElementById('onboarding');
+  var onbChips=document.getElementById('onb-chips');
+  var onbGo=document.getElementById('onb-continuar');
+  var onbStd=document.getElementById('onb-estandar');
+  var onbSel=[];                                   /* ranking en curso */
+  var onbMode='ordenado';                          /* modo elegido en el overlay */
+  var ROMANOS=['I','II','III','IV','V','VI','VII','VIII','IX'];
+
+  function knownTopics(){
+    return ORIGINAL.filter(function(tp){ return tp!==SOCIAL_TOPIC; });
+  }
+  function onbBuildChips(){
+    if(!onbChips) return;
+    onbChips.innerHTML='';
+    ORIGINAL.forEach(function(tp){
+      if(tp===SOCIAL_TOPIC) return;
+      var b=blockOf(tp); if(!b) return;
+      var h=b.querySelector('.tema h3');
+      var btn=document.createElement('button');
+      btn.type='button'; btn.className='chip-tema';
+      btn.dataset.topic=tp; btn.setAttribute('aria-pressed','false');
+      var sello=document.createElement('span');
+      sello.className='chip-sello'; sello.setAttribute('aria-hidden','true');
+      var nombre=document.createElement('span');
+      nombre.textContent=h ? h.textContent : tp;
+      btn.appendChild(sello); btn.appendChild(nombre);
+      onbChips.appendChild(btn);
+    });
+  }
+  function onbPaint(){
+    if(!onbChips) return;
+    Array.prototype.forEach.call(onbChips.querySelectorAll('.chip-tema'), function(btn){
+      var i=onbSel.indexOf(btn.dataset.topic);
+      btn.setAttribute('aria-pressed', i>=0 ? 'true' : 'false');
+      var s=btn.querySelector('.chip-sello');
+      if(s) s.textContent = i>=0 ? (ROMANOS[i]||String(i+1)) : '';
+    });
+    if(onbGo) onbGo.disabled = onbSel.length===0;
+  }
+  function onbPaintModo(){
+    var cont=document.getElementById('onb-modos'); if(!cont) return;
+    Array.prototype.forEach.call(cont.querySelectorAll('.onb-modo'), function(b){
+      b.setAttribute('aria-pressed', b.dataset.mode===onbMode ? 'true' : 'false');
+    });
+  }
+  function onbOpen(){
+    if(!ONB || !onbChips) return;
+    var prefs=loadPrefs();
+    onbSel = (prefs && !prefs.estandar)
+      ? prefs.ranking.filter(function(tp){ return ORIGINAL.indexOf(tp)>=0; })
+      : [];
+    onbMode = currentMode();
+    onbBuildChips(); onbPaint(); onbPaintModo();
+    ONB.hidden=false;
+    document.body.classList.add('onb-abierto');
+    var first=onbChips.querySelector('.chip-tema');
+    if(first) first.focus();
+  }
+  function onbClose(){
+    if(!ONB) return;
+    document.body.classList.remove('onb-abierto');
+    if(prefersReducedMotion()){ ONB.hidden=true; return; }
+    ONB.classList.add('is-closing');
+    setTimeout(function(){ ONB.hidden=true; ONB.classList.remove('is-closing'); }, 360);
+  }
+  function onbSave(estandar){
+    savePrefs({ v:1,
+      mode:onbMode,
+      estandar:!!estandar,
+      ranking:estandar ? [] : onbSel.slice(),
+      known:knownTopics() });
+    /* El onboarding define el nuevo default: los ajustes manuales se limpian. */
+    try{ localStorage.removeItem('sibylla_layout'); localStorage.removeItem('sibylla_cards'); }catch(_){}
+    applyLayout();
+    applyMode();      /* ordenado: re-aplica tarjetas; aleatorio: arma el feed */
+    onbClose();
+  }
+
   /* ---------- init + binds ---------- */
   applyLayout();
-  blocks().forEach(function(b){ var tp=b.dataset.topic; applyCards(tp, cardCountFor(tp)); });
+  applyMode();      /* ordenado: aplica nº de tarjetas; aleatorio: arma el feed */
   revealHashTarget();
 
   CONT.addEventListener('click', function(e){
@@ -880,6 +1288,49 @@
   });
   if(restore) restore.addEventListener('click', function(){ if(!REORDERING) restoreAll(); });
   window.addEventListener('hashchange', revealHashTarget);
+
+  /* Binds del conmutador de modo. */
+  var modoToggle=document.getElementById('modo-toggle');
+  if(modoToggle) modoToggle.addEventListener('click', function(e){
+    var btn=e.target.closest ? e.target.closest('.modo-btn') : null;
+    if(btn) setMode(btn.dataset.mode);
+  });
+
+  /* Binds del onboarding. */
+  var onbModos=document.getElementById('onb-modos');
+  if(onbModos) onbModos.addEventListener('click', function(e){
+    var btn=e.target.closest ? e.target.closest('.onb-modo') : null;
+    if(!btn) return;
+    onbMode=btn.dataset.mode;
+    onbPaintModo();
+  });
+  if(onbChips) onbChips.addEventListener('click', function(e){
+    var btn=e.target.closest ? e.target.closest('.chip-tema') : null;
+    if(!btn) return;
+    var i=onbSel.indexOf(btn.dataset.topic);
+    if(i>=0) onbSel.splice(i,1); else onbSel.push(btn.dataset.topic);
+    onbPaint();
+  });
+  if(onbGo) onbGo.addEventListener('click', function(){ if(onbSel.length) onbSave(false); });
+  if(onbStd) onbStd.addEventListener('click', function(){ onbSave(true); });
+  var navPers=document.getElementById('nav-personalizar');
+  if(navPers) navPers.addEventListener('click', function(e){
+    e.preventDefault();
+    var mt=document.getElementById('menu-toggle'); if(mt) mt.checked=false;
+    onbOpen();
+  });
+  if(ONB) ONB.addEventListener('keydown', function(e){
+    /* Escape solo cierra si ya hay preferencias (cancelar edición); en la
+       primera visita se exige una elección explícita (o "un poco de todo"). */
+    if(e.key==='Escape'){ if(loadPrefs()) onbClose(); return; }
+    if(e.key!=='Tab') return;
+    var focos=ONB.querySelectorAll('button:not([disabled])');
+    if(!focos.length) return;
+    var first=focos[0], last=focos[focos.length-1];
+    if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+  });
+  if(!loadPrefs()) onbOpen();
 })();
 /* Miniaturas de Divulgación: al pulsar, sustituyen su contenido por el
    reproductor embebido (youtube-nocookie) en vez de navegar a YouTube. El

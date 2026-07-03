@@ -138,8 +138,10 @@ trae snippet, cae a un recorte del resumen. Ver `resumen.py` y `articles.py`.
 
 Cada `.tema` tiene un control `− N +` que el usuario ajusta en el navegador. Persiste en `localStorage` como JSON `{"topic_id": n}`. El JS (`querySelector('.carta')` por rejilla adyacente) oculta/muestra tarjetas sin recargar.
 
-Los valores por defecto son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
-La sección social usa `data-steps="0,1,2"` (máx. 2 tarjetas). El valor inicial se lee de `data-default`.
+Los pasos son `0, 2, 4, 6` (configurables vía `data-steps="0,2,4,6"` en el `.card-ctrl`).
+El **valor inicial** deriva del onboarding (`sibylla_prefs`, ver "Onboarding de
+intereses" abajo): 1er interés 4, el resto 2, RRSS 2, estándar 2 en todas. Sin
+prefs (o sin JS) cae al `data-default` (6).
 
 ### Reordenar / ocultar secciones (cliente)
 
@@ -159,11 +161,55 @@ guardado es robusto a rebuilds: temas ausentes se ignoran y los nuevos se anexan
 al final (orden original como respaldo).
 
 El botón flotante **Restaurar** (`#restaurar`, abajo a la derecha) aparece solo
-cuando hay personalización (orden, ocultos o nº de tarjetas distinto al
-defecto) y, al pulsarlo, borra ambas claves y vuelve todo al estado original.
+cuando hay personalización manual (orden, ocultos o nº de tarjetas distinto al
+default) y, al pulsarlo, borra ambas claves manuales y vuelve al estado
+**derivado del onboarding** (`sibylla_prefs`, ver siguiente sección) — ya no al
+de fábrica.
 
 Textos UI (los 4 locales, por el test de paridad): `sec_up`, `sec_down`,
 `sec_remove`, `sec_restore`.
+
+### Onboarding de intereses y modos de visualización (cliente)
+
+En la **primera visita** (sin `sibylla_prefs` en localStorage) se muestra el
+overlay `#onboarding`: el visitante toca sus intereses **en orden** (cada chip
+recibe un sello con numeral romano = posición en el ranking) y elige el modo de
+visualización. También se reabre desde el enlace **"Personalizar"** del menú,
+precargado. El resultado se guarda como:
+
+```js
+sibylla_prefs = { v:1, mode:"ordenado"|"aleatorio", estandar:bool,
+                  ranking:[topic...], known:[topic...] }
+```
+
+y define el **estado por defecto** de la portada:
+
+- **Orden y visibilidad:** las secciones elegidas, en el orden del ranking; las
+  no elegidas quedan ocultas. RRSS (`social`) no se ofrece en el onboarding:
+  siempre visible, al final, con 2 tarjetas.
+- **Tarjetas:** 1er interés 4, el resto 2, RRSS 2. La opción estándar
+  ("un poco de todo") = todas las secciones, orden de fábrica, 2 tarjetas.
+  Constantes en el `<script>` del pie: `RANK_FIRST_CARDS`, `RANK_REST_CARDS`,
+  `STD_CARDS`, `SOCIAL_CARDS`.
+- `known` registra qué secciones se ofrecieron: una sección **nueva** del sitio
+  (ausente de `known`) aparece visible al final con 2 tarjetas, sin obligar a
+  repetir el onboarding.
+
+Cadena de resolución en runtime: **ajuste manual (`sibylla_cards` /
+`sibylla_layout`) → derivado de `sibylla_prefs` → fábrica** (`data-default` /
+orden del DOM). Al guardar el onboarding se limpian los ajustes manuales.
+
+**Modos:** el conmutador `#modo-toggle` (sobre `#secciones`) alterna entre
+*Ordenado* (la vista clásica por secciones) y *Aleatorio*: las tarjetas de los
+temas elegidos (+ RRSS) se mueven a `#feed`, mezcladas con **sesgo por ranking**
+(clave `rnd^(1/w)`, `w = 1/(posición+1)`; mezcla nueva en cada visita) y se
+revelan por lotes de 8 con IntersectionObserver (scroll continuo, mensaje
+`feed_end` al agotar). En feed se ocultan los controles de sección y Restaurar;
+al volver a Ordenado cada tarjeta regresa a su rejilla original. El modo
+persiste en `sibylla_prefs.mode` y **no** cuenta como "personalización" para
+Restaurar.
+
+Textos UI (los 4 locales, por el test de paridad): `onb_*`, `mode_*`, `feed_end`.
 
 ### Sección "Astronomía" (agencias espaciales + observatorios)
 

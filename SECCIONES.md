@@ -46,10 +46,21 @@ defecto en `build_all_sites` / `build_context` de `sibylla/web.py`).
 El HTML se entrega siempre con las 6 tarjetas dentro. Lo que el visitante ve por
 defecto y puede ajustar es **client-side** y no toca el algoritmo de selección:
 
-- Selector `− N +` por sección: pasos `0,2,4,6`, valor inicial **6**
-  (`data-steps`/`data-default` en la plantilla; los temas temáticos heredan el
-  default del JS). Persiste en `localStorage` (`sibylla_cards`).
+- **Onboarding de intereses** (primera visita, overlay `#onboarding`): el
+  visitante elige secciones **en orden** y el modo de visualización; se guarda
+  en `localStorage` (`sibylla_prefs`) y define el default: 1er interés **4**
+  tarjetas, el resto **2**, RRSS siempre visible con **2** al final, no
+  elegidas ocultas; opción estándar ("un poco de todo") = todas con 2. Sin JS
+  (o sin prefs) se ven las 6 de siempre. Detalle en AGENTS.md § "Onboarding de
+  intereses y modos de visualización".
+- Selector `− N +` por sección: pasos `0,2,4,6`; el valor inicial deriva del
+  onboarding (fallback `data-default` = 6). Persiste en `localStorage`
+  (`sibylla_cards`).
 - Reordenar/ocultar bloques: persiste en `localStorage` (`sibylla_layout`).
+  **Restaurar** vuelve al estado derivado del onboarding, no al de fábrica.
+- **Modo Aleatorio**: feed de tarjetas sueltas (los 6 ítems de cada tema
+  elegido + RRSS) mezcladas con sesgo por ranking, sin títulos ni controles de
+  sección; conmutador `#modo-toggle` sobre las secciones.
 
 Este documento describe **la selección de las 6** (build-time), no el ajuste
 visual posterior.
