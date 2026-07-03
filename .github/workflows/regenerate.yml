@@ -265,12 +265,16 @@ jobs:
 
           # Assets estáticos (favicons, iconos, manifest): se derivan de static/
           # para que añadir un archivo allí lo despliegue sin tocar este workflow.
+          # OJO: el glob `static/*` de bash NO matchea dotfiles (p.ej. .htaccess)
+          # salvo `shopt -s dotglob`; por eso se activa acá antes del loop.
+          shopt -s dotglob
           ASSETS=()
           if [ -d static ]; then
             for f in static/*; do
               [ -f "$f" ] && [ -f "web/$(basename "$f")" ] && ASSETS+=("web/$(basename "$f")")
             done
           fi
+          shopt -u dotglob
           echo "→ Assets estáticos a subir: ${ASSETS[*]:-(ninguno)}"
 
           # Archivo histórico del APOD (apod-i18n/<fecha>.json): `scp -r` sobre

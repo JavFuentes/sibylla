@@ -1,0 +1,22 @@
+# Política de caché del sitio estático de Sibylla.
+#
+# El HTML/JSON se regenera ~2 veces al día (crons de regenerate.yml) y no usa
+# nombres versionados (siempre index.html, build.json, ...). Sin esta regla,
+# la caché heurística del navegador puede seguir sirviendo una copia vieja
+# después de un redeploy sin volver a preguntarle al servidor. "no-cache" no
+# significa "no cachear": el navegador guarda la copia pero debe revalidarla
+# (If-None-Match/If-Modified-Since) antes de usarla, así que un redeploy se ve
+# de inmediato y, si no cambió nada, el servidor responde 304 sin reenviar
+# el archivo completo.
+#
+# Los assets estáticos (favicons, iconos, manifest, placeholders de fuentes)
+# viven en static/ sin hash en el nombre pero cambian muy rara vez, así que
+# se cachean una semana.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|json|xml|txt)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.(png|ico|jpg|jpeg|svg|webmanifest)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
