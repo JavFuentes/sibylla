@@ -9,14 +9,16 @@
 # de inmediato y, si no cambió nada, el servidor responde 304 sin reenviar
 # el archivo completo.
 #
-# Los assets estáticos (favicons, iconos, manifest, placeholders de fuentes)
-# viven en static/ sin hash en el nombre pero cambian muy rara vez, así que
-# se cachean una semana.
+# Los assets estáticos (favicons, iconos, manifest, placeholders de fuentes,
+# JS y CSS) viven en static/ sin hash en el nombre pero cambian muy rara vez,
+# así que se cachean una semana. Los archivos a los que el HTML referencia con
+# un query de versión (p. ej. social.js?v=<build_v>) pueden cachearse fuerte:
+# el ?v= por despliegue invalida la copia del navegador al cambiar build_v.
 <IfModule mod_headers.c>
   <FilesMatch "\.(html|json|xml|txt)$">
     Header set Cache-Control "no-cache, must-revalidate"
   </FilesMatch>
-  <FilesMatch "\.(png|ico|jpg|jpeg|svg|webmanifest)$">
+  <FilesMatch "\.(png|ico|jpg|jpeg|svg|webmanifest|js|css)$">
     Header set Cache-Control "public, max-age=604800"
   </FilesMatch>
 </IfModule>

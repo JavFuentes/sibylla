@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Votos: doc id = <cardId>_<uid>. Un voto por usuario y tarjeta por
+    // construcción del id. read público: lo requieren las aggregations de
+    // contadores y la carga de los votos propios (uid seudónimo, sin datos
+    // personales).
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['card', 'uid', 'value', 'ts'])
+        && request.resource.data.uid == request.auth.uid
+        && voteId == request.resource.data.card + '_' + request.auth.uid
+        && request.resource.data.card is string
+        && request.resource.data.card.size() >= 3
+        && request.resource.data.card.size() <= 64
+        && request.resource.data.value in [1, -1]
+        && request.resource.data.ts == request.time;
+        // DECISIÓN Fase 1: verificación de correo NO obligatoria (comunidad
+        // inicial pequeña; Google llega verificado; exigirla al flujo email
+        // añade fricción). Para endurecer ante spam: descomentar la línea
+        // siguiente Y además implementar sendEmailVerification tras el
+        // registro + UX "revisa tu correo".
+        // && request.auth.token.email_verified == true
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['card', 'uid', 'value', 'ts'])
+        && request.resource.data.card == resource.data.card
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.value in [1, -1]
+        && request.resource.data.ts == request.time;
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -60,6 +60,9 @@
   <div class="carta-acciones">
     {% if c.has_resumen %}<button type="button" class="btn-mini btn-resumen" aria-expanded="false">{{ t.btn_resumen }}</button>{% endif %}
     {% if c.url %}<a class="btn-mini btn-original" href="{{ c.url }}" target="_blank" rel="noopener">{{ t.btn_original }}</a>{% endif %}
+    <span class="soc-grupo" data-card="{{ c.id }}">
+      <button type="button" class="sec-btn soc-btn soc-like is-locked" data-vote="1" aria-pressed="false" aria-label="{{ t.social_like }}" title="{{ t.social_gate_hint }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg><span class="soc-num" data-num="like"></span></button><button type="button" class="sec-btn soc-btn soc-dislike is-locked" data-vote="-1" aria-pressed="false" aria-label="{{ t.social_dislike }}" title="{{ t.social_gate_hint }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg><span class="soc-num" data-num="dislike"></span></button><button type="button" class="sec-btn soc-btn soc-com" aria-expanded="false" aria-label="{{ t.social_comments }}" title="{{ t.social_comments }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+    </span>
   </div>
   {% if c.has_resumen %}<div class="resumen-panel" hidden>{{ c.resumen }}</div>{% endif %}
 </article>
@@ -402,6 +405,101 @@
     border:1px solid var(--panel-borde); }
   .resumen-panel[hidden]{ display:none; }
 
+  /* ---- Social (Fase 1: votos + login) ----
+     Hidratación progresiva: todo el bloque social nace oculto y solo se revela
+     cuando social.js carga Firebase y añade body.social-on. Sin JS o si gstatic
+     falla, la página queda idéntica a la versión estática. El cardId de cada
+     tarjeta es c.id ("n-"+sha256(dedup_key)[:12]), estable entre rebuilds. */
+  .soc-grupo{ display:none; margin-left:auto; align-items:center; gap:10px; }
+  body.social-on .soc-grupo{ display:inline-flex; }
+  /* Contador como inscripción bajo el botón (absoluto: no deforma el círculo
+     de 28px ni desplaza la fila cuando el número aparece). */
+  .soc-num{ position:absolute; left:50%; bottom:-12px; transform:translateX(-50%);
+    font-size:.62rem; line-height:1; color:var(--tenue);
+    font-variant-numeric:tabular-nums; pointer-events:none; }
+  .soc-btn{ position:relative; }
+  .soc-btn svg{ width:16px; height:16px; }
+  /* Reading gate: like/dislike nacen atenuados hasta leer la noticia */
+  .soc-btn.is-locked{ opacity:.24; box-shadow:none; }
+  .soc-btn.is-locked:hover{ color:var(--marfil-2); border-color:rgba(217,184,95,.32);
+    background:transparent; transform:none; }    /* hover neutralizado: clicable solo para el tooltip */
+  /* Voto activo (mismo lenguaje que .carta.resumen-open .btn-resumen) */
+  .soc-like[aria-pressed="true"]{ color:#1a1305;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F); border-color:#F2DD93; }
+  .soc-dislike[aria-pressed="true"]{ color:#2a120b;
+    background:linear-gradient(180deg,#E7A38F,#C97B62); border-color:#E7A38F; }
+  /* Comentarios = futuro → hover cian */
+  .soc-com:hover{ color:var(--cian-claro); border-color:rgba(94,230,224,.6);
+    background:rgba(94,230,224,.10); }
+  .comentarios-panel{ margin-top:12px; padding:14px 16px; border-radius:10px;
+    font-size:.9rem; line-height:1.6; color:var(--cian-claro); font-style:italic;
+    background:linear-gradient(180deg, rgba(94,230,224,.06), rgba(94,230,224,.02));
+    border:1px solid rgba(94,230,224,.28); }
+  .comentarios-panel[hidden]{ display:none; }
+
+  /* ---- Sesión en el header ---- */
+  .sesion{ display:none; align-items:center; gap:10px; margin-left:auto; position:relative; }
+  body.social-on .sesion{ display:inline-flex; }
+  .sesion-entrar{ font-size:.78rem; letter-spacing:.1em; color:var(--marfil-2);
+    text-decoration:none; cursor:pointer; background:none; border:none; padding:0;
+    font-family:inherit; }
+  .sesion-entrar:hover{ color:var(--oro-claro); }
+  #sesion-chip[hidden]{ display:none; }  /* display:grid de abajo pisaría el [hidden] del UA */
+  #sesion-chip{ width:30px; height:30px; flex:none; border-radius:50%; display:grid;
+    place-items:center; font-family:'Cinzel',serif; font-size:.82rem; color:#1a1305;
+    background:radial-gradient(circle at 40% 35%, #F2DD93, #C99B43);
+    box-shadow:0 0 14px -3px rgba(242,221,147,.7); cursor:pointer; border:none; }
+  #sesion-menu{ position:absolute; top:calc(100% + 8px); right:0; padding:12px 14px;
+    border-radius:10px; background:linear-gradient(180deg, rgba(15,21,38,.98), rgba(9,13,24,.99));
+    border:1px solid var(--panel-borde); box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
+    font-size:.8rem; color:var(--marfil-2); display:none; flex-direction:column;
+    align-items:stretch; min-width:210px; z-index:30; }
+  #sesion-menu[data-abierto]{ display:flex; }
+  #sesion-menu .sesion-correo{ color:var(--marfil); word-break:break-all; }
+  #sesion-salir{ margin-top:6px; padding:8px 10px; border-radius:8px; cursor:pointer;
+    font-size:.74rem; letter-spacing:.06em; font-family:inherit;
+    color:var(--marfil-2); background:rgba(231,163,143,.08); border:1px solid rgba(231,163,143,.4); }
+  #sesion-salir:hover{ color:#E7A38F; border-color:rgba(231,163,143,.7); background:rgba(231,163,143,.16); }
+
+  /* ---- Modal de auth (reutiliza .onb / .onb-panel) ---- */
+  body.auth-abierto{ overflow:hidden; }
+  .onb--auth .onb-panel{ max-width:440px; position:relative; }
+  .onb--auth .onb-cuerpo{ padding:8px 30px 26px; }
+  .auth-sub{ font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1.05rem;
+    color:var(--marfil-2); margin:0 0 18px; text-align:center; }
+  #auth-google{ display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
+    padding:11px; border-radius:10px; cursor:pointer; font-family:inherit; font-size:.9rem;
+    color:var(--marfil); background:rgba(255,255,255,.04); border:1px solid rgba(217,184,95,.32); }
+  #auth-google:hover{ border-color:var(--oro-claro); color:var(--oro-claro);
+    background:rgba(242,221,147,.06); }
+  #auth-google svg{ width:18px; height:18px; }
+  .auth-sep{ display:flex; align-items:center; gap:12px; margin:16px 0; font-size:.74rem;
+    letter-spacing:.1em; color:var(--tenue); }
+  .auth-sep::before, .auth-sep::after{ content:""; flex:1; height:1px;
+    background:rgba(217,184,95,.22); }
+  #auth-form{ display:flex; flex-direction:column; gap:12px; }
+  .auth-campo{ display:flex; flex-direction:column; gap:5px; }
+  .auth-campo label{ font-size:.72rem; letter-spacing:.08em; color:var(--marfil-2); }
+  #auth-email, #auth-pass{ width:100%; padding:10px 12px; border-radius:8px; font-family:inherit;
+    font-size:.92rem; color:var(--marfil); background:rgba(217,184,95,.05);
+    border:1px solid rgba(217,184,95,.28); transition:border-color .2s, box-shadow .2s; }
+  #auth-email:focus, #auth-pass:focus{ outline:none; border-color:var(--oro-claro);
+    box-shadow:0 0 0 3px rgba(242,221,147,.15); }
+  #auth-submit{ margin-top:4px; padding:11px; border-radius:10px; cursor:pointer;
+    font-family:'Cinzel',serif; font-size:.82rem; letter-spacing:.12em;
+    color:#1a1305; border:1px solid #F2DD93;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F); }
+  #auth-submit:hover{ filter:brightness(1.06); }
+  #auth-msg{ margin:0; min-height:1em; font-size:.8rem; color:#E7A38F; text-align:center; }
+  #auth-msg[data-ok]{ color:var(--cian-claro); }
+  .auth-links{ display:flex; flex-direction:column; gap:8px; margin-top:14px;
+    font-size:.78rem; color:var(--marfil-2); }
+  .auth-links button{ background:none; border:none; padding:0; cursor:pointer;
+    font-family:inherit; font-size:inherit; color:var(--marfil-2); text-decoration:underline;
+    text-underline-offset:3px; text-decoration-color:rgba(217,184,95,.4); }
+  .auth-links button:hover{ color:var(--oro-claro); }
+  #auth-cerrar{ position:absolute; top:14px; right:16px; }
+
   .sello{ width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center;
     font-family:'Cinzel',serif; font-size:.72rem; }
   .sello.t1{ color:#3a2c08; background:radial-gradient(circle at 40% 35%, #F2DD93, #C99B43);
@@ -592,6 +690,8 @@
     .tema h3{ font-size:1rem; letter-spacing:.14em; }
     .tema-ctrls{ flex:0 0 100%; justify-content:flex-end; }
     .sec-btn, .card-ctrl-btn{ width:30px; height:30px; }
+    .soc-grupo{ gap:6px; }
+    .soc-btn svg{ width:14px; height:14px; }
     .restaurar{ right:14px; bottom:14px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
     .actualizar{ right:14px; bottom:58px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
     .seccion-titulo{ margin:16px 0 4px; }
@@ -601,6 +701,9 @@
     .meandro{ height:12px; }
     .barra .fila{ justify-content:center; position:relative; padding:12px 0; }
     .menu-icon{ position:absolute; right:0; top:50%; transform:translateY(-50%); }
+    /* Sesión a la izquierda de la hamburguesa (44px + aire); con la fila
+       centrada, el margin-left:auto la empujaría justo debajo del icono. */
+    .sesion{ position:absolute; right:54px; top:50%; transform:translateY(-50%); margin-left:0; }
     nav.menu{ right:0; }
     .marca{ font-size:1.2rem; letter-spacing:.18em; }
     .marca-sub{ font-size:.7rem; }
@@ -622,6 +725,17 @@
       <span class="marca">SIBYLLA</span>
       <span class="marca-sub">quod est · quod erit</span>
     </div>
+    {# Sesión (Fase social): oculta hasta que social.js carga Firebase
+       (body.social-on). Fuera de nav.menu para verse en móvil sin abrir
+       la hamburguesa. El estado Entrar↔chip lo toggla onAuthStateChanged. #}
+    <span class="sesion" id="sesion">
+      <button type="button" class="sesion-entrar" id="sesion-entrar">{{ t.auth_enter }}</button>
+      <button type="button" id="sesion-chip" aria-haspopup="true" aria-expanded="false" aria-label="" hidden></button>
+      <div id="sesion-menu">
+        <span class="sesion-correo" id="sesion-correo"></span>
+        <button type="button" id="sesion-salir">{{ t.auth_logout }}</button>
+      </div>
+    </span>
     <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-hidden="true">
     <label for="menu-toggle" class="menu-icon" aria-label="Abrir menú" role="button" tabindex="0">
       <span></span><span></span><span></span>
@@ -803,6 +917,38 @@
         <button type="button" id="onb-estandar" class="boton fantasma">{{ t.onb_standard }}</button>
       </div>
       <p class="onb-nota">{{ t.onb_note }}</p>
+    </div>
+  </div>
+</div>
+
+{# Modal de auth (Fase social): reutiliza .onb/.onb-panel. El subtítulo cambia
+   según el motivo (votar / comentar) vía data-vote/data-comment. Oculto por
+   defecto; social.js lo abre al pulsar un botón social sin sesión. #}
+<div id="auth" class="onb onb--auth" role="dialog" aria-modal="true" aria-labelledby="auth-titulo" hidden>
+  <div class="onb-panel">
+    <div class="meandro" aria-hidden="true"></div>
+    <div class="onb-cuerpo">
+      <button type="button" class="sec-btn" id="auth-cerrar" aria-label="{{ t.auth_close }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <h2 id="auth-titulo" class="onb-titulo">{{ t.auth_title }}</h2>
+      <p id="auth-sub" class="auth-sub" data-vote="{{ t.auth_sub_vote }}" data-comment="{{ t.auth_sub_comment }}">{{ t.auth_sub_vote }}</p>
+      <button type="button" id="auth-google"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg> {{ t.auth_google }}</button>
+      <div class="auth-sep">{{ t.auth_or }}</div>
+      <form id="auth-form" novalidate>
+        <div class="auth-campo">
+          <label for="auth-email">{{ t.auth_email }}</label>
+          <input id="auth-email" type="email" autocomplete="email" required>
+        </div>
+        <div class="auth-campo">
+          <label for="auth-pass">{{ t.auth_password }}</label>
+          <input id="auth-pass" type="password" autocomplete="current-password" required minlength="6">
+        </div>
+        <p id="auth-msg" role="alert" hidden></p>
+        <button type="submit" id="auth-submit">{{ t.auth_signin }}</button>
+      </form>
+      <div class="auth-links">
+        <button type="button" id="auth-alternar">{{ t.auth_to_signup }}</button>
+        <button type="button" id="auth-olvide">{{ t.auth_forgot }}</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1480,5 +1626,28 @@
   setTimeout(check, 15000);
 })();
 </script>
+{# ---- Fase social: datos para social.js (módulo ES) ----
+   #social-i18n lleva los textos ES (social_*/auth_*) y la firebaseConfig.
+   La config NO es secreto (identifica el proyecto; la seguridad vive en las
+   reglas de Firestore + dominios autorizados) y va commiteada, a diferencia
+   de las claves de .env. social.js la lee al arrancar; si gstatic falla o el
+   navegador no soporta módulos ES, el sitio queda como hoy (sin social). #}
+{%- set social_texts = {
+  "social_like": t.social_like, "social_dislike": t.social_dislike,
+  "social_comments": t.social_comments, "social_gate_hint": t.social_gate_hint,
+  "social_comments_soon": t.social_comments_soon, "social_vote_error": t.social_vote_error,
+  "auth_title": t.auth_title, "auth_sub_vote": t.auth_sub_vote, "auth_sub_comment": t.auth_sub_comment,
+  "auth_google": t.auth_google, "auth_or": t.auth_or, "auth_email": t.auth_email,
+  "auth_password": t.auth_password, "auth_signin": t.auth_signin, "auth_signup": t.auth_signup,
+  "auth_to_signup": t.auth_to_signup, "auth_to_signin": t.auth_to_signin, "auth_forgot": t.auth_forgot,
+  "auth_reset_sent": t.auth_reset_sent, "auth_close": t.auth_close, "auth_enter": t.auth_enter,
+  "auth_logout": t.auth_logout, "auth_err_invalid_email": t.auth_err_invalid_email,
+  "auth_err_wrong": t.auth_err_wrong, "auth_err_email_in_use": t.auth_err_email_in_use,
+  "auth_err_weak_password": t.auth_err_weak_password, "auth_err_popup": t.auth_err_popup,
+  "auth_err_network": t.auth_err_network, "auth_err_too_many": t.auth_err_too_many,
+  "auth_err_generic": t.auth_err_generic
+} -%}
+<script type="application/json" id="social-i18n">{{ {"texts": social_texts, "config": {"apiKey": "AIzaSyCVa11offl3SebRwlK5ZP7viP9vHPiMp0U", "authDomain": "sibylla-a81d2.firebaseapp.com", "projectId": "sibylla-a81d2", "storageBucket": "sibylla-a81d2.firebasestorage.app", "messagingSenderId": "490666060572", "appId": "1:490666060572:web:aee8d022b4de2781ee68d9"}} | tojson }}</script>
+<script type="module" src="social.js?v={{ build_v }}"></script>
 </body>
 </html>
