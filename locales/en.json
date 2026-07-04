@@ -48,6 +48,8 @@
     "nav_present": "What's happening",
     "nav_github": "GitHub",
     "nav_about": "About",
+    "about_heading": "About Sibylla",
+    "about_text": "Sibylla is a news reader, not an outlet: it gathers verified sources on Chilean current affairs, science and technology, filters out the noise and ranks what remains by the reliability of each source. It does not republish content: every card links to the original article, and the code that generates this page is open source.",
     "hero_eyebrow": "Reads · filters · ranks · anticipates",
     "hero_heading": "DECODING TOMORROW",
     "hero_subtitle": "Sibylla gathers the most reliable science and technology sources, separates signal from noise, and shows you what is happening today — and what is brewing. Always linking to the original source.",

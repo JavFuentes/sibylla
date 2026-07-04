@@ -45,13 +45,15 @@
 
   "web": {
     "page_title": "Sibylla — Lo que está sucediendo. Lo que sucederá.",
-    "meta_description": "Sibylla reúne las fuentes más fiables de ciencia y tecnología, filtra la señal del ruido y te muestra lo que ocurre hoy en inteligencia artificial, medicina, espacio, física y más. Siempre con enlace a la fuente original.",
+    "meta_description": "Sibylla reúne las fuentes más fiables de la actualidad chilena, la ciencia y la tecnología, filtra la señal del ruido y te muestra lo que ocurre hoy en Chile, la inteligencia artificial, la medicina y la astronomía. Siempre con enlace a la fuente original.",
     "nav_present": "Lo que sucede",
     "nav_github": "GitHub",
     "nav_about": "Acerca",
+    "about_heading": "Acerca de Sibylla",
+    "about_text": "Sibylla es una lectora de noticias, no un medio: reúne fuentes verificadas de la actualidad chilena, la ciencia y la tecnología, descarta el ruido y ordena lo que queda según la confiabilidad de cada fuente. No republica contenido: cada tarjeta enlaza al artículo original, y el código que genera esta página es abierto.",
     "hero_eyebrow": "Lee · filtra · jerarquiza · anticipa",
     "hero_heading": "DESCIFRANDO EL MAÑANA",
-    "hero_subtitle": "Sibylla reúne las fuentes más fiables de ciencia y tecnología, separa la señal del ruido y te muestra lo que ocurre hoy — y lo que se está gestando. Siempre con enlace a la fuente original.",
+    "hero_subtitle": "Sibylla reúne las fuentes más fiables de la actualidad chilena, la ciencia y la tecnología, separa la señal del ruido y te muestra lo que ocurre hoy — y lo que se está gestando. Siempre con enlace a la fuente original.",
     "hero_cta": "Ver lo que sucede",
     "hero_how": "Cómo funciona",
     "hero_timestamp": "Última lectura · {date} · {count} señales en {sources} fuentes",
@@ -64,7 +66,7 @@
     "sec_restore": "Restaurar",
     "sec_update": "Actualizar",
     "section_heading": "Lo que está sucediendo",
-    "section_subtitle": "El pulso de hoy en ciencia y tecnología",
+    "section_subtitle": "El pulso de hoy en Chile, la ciencia y la tecnología",
     "observes": "Sibylla observa",
     "warns": "Sibylla advierte",
     "warn_text": "Lo marcado con sello dorado (I) viene de fuente primaria o revisada por pares. La plata (II) es periodismo; trátalo como contexto, no como verdad revelada. El verde (III) es agregador o discusión: señal débil, sin confirmar.",
@@ -90,8 +92,8 @@
     "net_sibylla": "Sibylla",
     "astro_heading": "Astronomía",
     "astro_subtitle": "Noticias de los cielos chilenos y las agencias espaciales del mundo",
-    "divulgacion_heading": "Divulgación",
-    "divulgacion_subtitle": "Lo último de tus canales de divulgación",
+    "divulgacion_heading": "Divulgación en español",
+    "divulgacion_subtitle": "Lo último de la divulgación científica en español",
     "sibylla_heading": "SIBYLLA",
     "video_label": "Video",
     "social_house_badge": "Sibylla",
@@ -111,7 +113,7 @@
     "feed_end": "Eso es todo lo que he leído por hoy. El presente no se detiene: vuelve más tarde.",
     "months": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"],
     "topics": {
-      "nacional": "Nacional",
+      "nacional": "Actualidad en Chile",
       "ai": "Frontera Digital",
       "computing": "Computación",
       "space": "Espacio",
@@ -124,7 +126,7 @@
       "general_science": "Ciencia",
       "general_tech": "Tecnología",
       "astronomia": "Astronomía",
-      "divulgacion": "Divulgación"
+      "divulgacion": "Divulgación en español"
     }
   }
 }

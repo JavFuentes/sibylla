@@ -437,6 +437,11 @@
   .apunte .dice p{ margin:0; font-family:'Cormorant Garamond',serif; font-style:italic;
     font-size:clamp(1.1rem,2.2vw,1.25rem); color:var(--marfil); line-height:1.4; }
 
+  /* ---- Acerca de Sibylla (ancla de "Acerca" y "Cómo funciona") ---- */
+  #acerca{ scroll-margin-top:86px; padding:26px 0 6px; }
+  .acerca-texto{ font-family:'Cormorant Garamond',serif; font-size:clamp(1.05rem,2vw,1.2rem);
+    color:var(--marfil-2); line-height:1.6; max-width:66ch; margin:14px auto 6px; text-align:center; }
+
   /* ================= Pie ================= */
   footer{ margin-top:64px; border-top:1px solid rgba(217,184,95,.16);
     background:linear-gradient(180deg, transparent, rgba(94,230,224,.03)); }
@@ -625,7 +630,7 @@
       <a href="#presente">{{ t.nav_present }}</a>
       <a href="#" id="nav-personalizar">{{ t.onb_edit }}</a>
       <a href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.nav_github }}</a>
-      <a href="#">{{ t.nav_about }}</a>
+      <a href="#acerca">{{ t.nav_about }}</a>
     </nav>
   </div>
 </header>
@@ -641,7 +646,7 @@
       <p class="bajada">{{ t.hero_subtitle }}</p>
       <div class="acciones">
         <a href="#presente" class="boton oro">{{ t.hero_cta }}</a>
-        <a href="#" class="boton fantasma">{{ t.hero_how }}</a>
+        <a href="#acerca" class="boton fantasma">{{ t.hero_how }}</a>
       </div>
       <div class="marca-tiempo">
         <span class="pulso" aria-hidden="true"></span>
@@ -755,6 +760,14 @@
       <div id="feed-fin" hidden>{{ apunte(t.observes, t.feed_end, 'neutro') }}</div>
     </div>
 
+  </section>
+
+  <!-- ===================== Acerca de Sibylla ===================== -->
+  <div class="meandro" aria-hidden="true" style="margin:8px 0;"></div>
+  <section id="acerca">
+    <div class="seccion-titulo"><h2>{{ t.about_heading }}</h2></div>
+    <p class="acerca-texto">{{ t.about_text }}</p>
+    {{ apunte(t.warns, t.warn_text) }}
   </section>
 
 </main>

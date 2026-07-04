@@ -120,8 +120,8 @@ correcto: preferimos no fusionar a fusionar de más. Subir de nivel requiere una
 ## Web (ver `web.py`)
 
 > 📑 **Reglas de cada sección en un solo lugar:** [SECCIONES.md](SECCIONES.md)
-> resume, por sección (Nacional, Frontera Digital, Medicina, Astronomía,
-> Divulgación, RRSS),
+> resume, por sección (Actualidad en Chile, Frontera Digital, Medicina,
+> Astronomía, Divulgación en español, RRSS),
 > **qué fuentes** la alimentan, **cómo se eligen las 6 tarjetas** y **en qué
 > orden**, con un apéndice de "dónde editar cada regla". Empieza por ahí si vas a
 > tocar la selección o el alcance de una sección.

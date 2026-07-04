@@ -19,11 +19,11 @@ de arriba abajo:
 
 | # | Sección | Tema interno | Cómo se selecciona | Archivo de la lógica |
 |---|---------|--------------|--------------------|----------------------|
-| 1 | **Nacional** | `nacional` | Embudo heurístico + juez LLM + cuota | `sibylla/nacional.py` |
+| 1 | **Actualidad en Chile** (tema `nacional`) | `nacional` | Embudo heurístico + juez LLM + cuota | `sibylla/nacional.py` |
 | 2 | **Frontera Digital** | `ai` *(renombre pendiente)* | Motor temático (score → diversify → top 6) | `sibylla/pipeline.py` |
 | 3 | **Medicina** | `medicine` | Motor temático (score → diversify → top 6) | `sibylla/pipeline.py` |
 | 4 | **Astronomía** | `astronomia` | Selección curada con cupos reservados | `sibylla/web.py` |
-| 5 | **Divulgación** | `divulgacion` | 1 video por canal, 6 más recientes | `sibylla/web.py` |
+| 5 | **Divulgación en español** | `divulgacion` | 1 video por canal, 6 más recientes | `sibylla/web.py` |
 | 6 | **SIBYLLA** (publicaciones propias) | `sibylla` | Archivos de `publicaciones/`, por fecha | `sibylla/publicaciones.py` |
 | 7 | **RRSS** ("Voces de la red") | — (redes) | Slots por red + house cards | `sibylla/web.py` |
 
@@ -249,9 +249,10 @@ documentadas en `config/sources.yaml` pero **no entran** (no exponen RSS/Atom).
 
 ---
 
-## 4. Nacional
+## 4. Nacional (en portada: «Actualidad en Chile»)
 
-> **Tema interno:** `nacional`. Selección editorial en `sibylla/nacional.py`
+> **Tema interno:** `nacional` (etiqueta visible `web.topics.nacional` en
+> `locales/es.json`). Selección editorial en `sibylla/nacional.py`
 > (se ejecuta en `cli.py` **antes** de construir la web).
 
 A diferencia de los temas temáticos, aquí "relevancia" no es coincidencia de
@@ -292,9 +293,10 @@ Cada fuente trae `scope: national | regional` (alimenta la cuota regional).
 
 ---
 
-## 5. Divulgación
+## 5. Divulgación (en portada: «Divulgación en español»)
 
-> **Bloque especial** (`#divulgacion`). Lógica en `web._select_divulgacion`
+> **Bloque especial** (`#divulgacion`; etiqueta visible `divulgacion_heading`
+> en `locales/es.json`). Lógica en `web._select_divulgacion`
 > (`sibylla/web.py`). Tests: `tests/test_divulgacion.py`.
 
 **Fuentes posibles:** 38 canales de YouTube curados, cada uno como fuente RSS Atom
