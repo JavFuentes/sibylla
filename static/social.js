@@ -7,10 +7,11 @@
 const SDK = '10.12.0';
 const G = `https://www.gstatic.com/firebasejs/${SDK}`;
 const LEIDAS_KEY = 'sibylla_leidas';
-const CONTEOS_KEY = 'sibylla_conteos_v2';
-const CONTEOS_TTL = 30 * 60 * 1000;
 const LEIDAS_MAX = 500;
 const COMMENTS_PAGE = 20;
+// Ventana durante la cual una tarjeta conserva su conteo optimista tras un voto
+// o comentario propio, para no parpadear mientras la Cloud Function confirma.
+const CONTEOS_HOLD_MS = 5000;
 
 function readJson(id) {
   const el = document.getElementById(id);
@@ -92,6 +93,7 @@ function mapearError(code, TXT) {
   let currentUser = null;
   const miVoto = new Map();
   const conteos = new Map();
+  const holdHasta = new Map();
   const enVuelo = new Set();
   const commentState = new Map();
   let yaReordenado = false;
@@ -113,29 +115,12 @@ function mapearError(code, TXT) {
     return String(tpl || '').replace(/\{(\w+)\}/g, (_m, k) => vals[k] != null ? String(vals[k]) : '');
   }
 
-  const numCache = (() => {
-    let cache = null;
-    try { cache = JSON.parse(sessionStorage.getItem(CONTEOS_KEY) || 'null'); } catch (e) { cache = null; }
-    return {
-      get() { return cache && (Date.now() - cache.ts) < CONTEOS_TTL ? (cache.val || {}) : null; },
-      set(val) {
-        cache = { val, ts: Date.now() };
-        try { sessionStorage.setItem(CONTEOS_KEY, JSON.stringify(cache)); } catch (e) {}
-      },
-    };
-  })();
-
   function todosCardIds() {
     return Array.prototype.map.call(document.querySelectorAll('.soc-grupo[data-card]'), (g) => g.getAttribute('data-card'));
   }
   function setConteosBulk(raw) {
     const vals = raw || {};
     todosCardIds().forEach((id) => conteos.set(id, norm(vals[id])));
-  }
-  function conteosObject() {
-    const out = {};
-    conteos.forEach((v, k) => { out[k] = norm(v); });
-    return out;
   }
   function pintarConteo(cardId, val) {
     if (val) conteos.set(cardId, norm(val));
@@ -157,25 +142,52 @@ function mapearError(code, TXT) {
   setConteosBulk(horneados);
   pintarTodos();
 
-  async function cargarConteosFrescos() {
-    const cacheado = numCache.get();
-    if (cacheado) {
-      setConteosBulk(cacheado);
-      pintarTodos();
-      return cacheado;
-    }
+  let unsubConteos = null;
+  let primeraInstantanea = true;
+
+  // Aplica una foto del documento agregado. No pisa las tarjetas con un voto o
+  // comentario propio aún «en hold»: durante CONTEOS_HOLD_MS conservan su valor
+  // optimista, así se evita el parpadeo mientras la Cloud Function recalcula y
+  // confirma el conteo real. El resto se refresca al instante.
+  function aplicarInstantanea(raw) {
+    const vals = raw || {};
+    const ahora = Date.now();
+    todosCardIds().forEach((id) => {
+      const hold = holdHasta.get(id);
+      if (hold && hold > ahora) return;
+      if (hold) holdHasta.delete(id);
+      conteos.set(id, norm(vals[id]));
+      pintarConteo(id);
+    });
+  }
+
+  function suscribirConteos() {
+    if (unsubConteos) return;
+    // Tope de 2 s para el reorden: si la primera foto tarda (red lenta), los
+    // números sí se refrescan pero NO se reordena — nunca mover tarjetas cuando
+    // el usuario ya está leyendo. Las fotos siguientes solo actualizan conteos.
+    const inicio = Date.now();
     try {
-      const snap = await fsApi.getDoc(fsApi.doc(db, 'agregados', 'conteos'));
-      const data = snap.exists() ? (snap.data() || {}) : {};
-      setConteosBulk(data);
-      pintarTodos();
-      const obj = conteosObject();
-      numCache.set(obj);
-      return obj;
+      unsubConteos = fsApi.onSnapshot(
+        fsApi.doc(db, 'agregados', 'conteos'),
+        (snap) => {
+          aplicarInstantanea(snap.exists() ? (snap.data() || {}) : {});
+          if (primeraInstantanea) {
+            primeraInstantanea = false;
+            if (Date.now() - inicio <= 2000) reordenarSiHaceFalta();
+          }
+        },
+        (e) => { console.warn('[sibylla/social] conteos en vivo:', (e && e.code) || e); }
+      );
     } catch (e) {
-      console.warn('[sibylla/social] conteos agregados:', (e && e.code) || e);
-      return null;
+      console.warn('[sibylla/social] no se pudo suscribir a conteos:', e);
     }
+  }
+
+  function desuscribirConteos() {
+    if (!unsubConteos) return;
+    try { unsubConteos(); } catch (e) {}
+    unsubConteos = null;
   }
 
   function modoAleatorioActivo() {
@@ -238,13 +250,15 @@ function mapearError(code, TXT) {
     }, wait);
   }
 
-  // Tope de 2 s: si los conteos frescos llegan más tarde (red lenta), NO se
-  // reordena — nunca mover tarjetas cuando el usuario ya está leyendo. Los
-  // números sí se refrescan igual.
-  const inicioConteos = Date.now();
-  cargarConteosFrescos().then((fresh) => {
-    if (fresh && Date.now() - inicioConteos <= 2000) reordenarSiHaceFalta();
-  });
+  // La suscripción en vivo solo existe con la pestaña visible: al ocultarla se
+  // corta (no gastar lecturas de fondo) y al volver se reengancha con la foto
+  // actual del documento agregado.
+  function gestionVisibilidadConteos() {
+    if (document.visibilityState === 'visible') suscribirConteos();
+    else desuscribirConteos();
+  }
+  document.addEventListener('visibilitychange', gestionVisibilidadConteos);
+  gestionVisibilidadConteos();
 
   function desbloquearGrupo(grupo) {
     grupo.querySelectorAll('.soc-btn.is-locked').forEach((b) => {
@@ -295,6 +309,7 @@ function mapearError(code, TXT) {
     if (nuevo === 1) proy.l++; else if (nuevo === -1) proy.d++;
     pintarVotoPropio(grupo, nuevo);
     pintarConteo(cardId, proy);
+    holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
 
     try {
       const ref = fsApi.doc(db, 'votes', `${cardId}_${uid}`);
@@ -305,8 +320,8 @@ function mapearError(code, TXT) {
         await fsApi.setDoc(ref, { card: cardId, uid, value: nuevo, ts: fsApi.serverTimestamp() });
         miVoto.set(cardId, nuevo);
       }
-      numCache.set(conteosObject());
     } catch (e) {
+      holdHasta.delete(cardId);
       pintarVotoPropio(grupo, previo);
       pintarConteo(cardId, base);
       alert(TXT.social_vote_error);
@@ -541,7 +556,7 @@ function mapearError(code, TXT) {
         await batch.commit();
         renderComentario(panel, ref.id, { uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date() }, true);
         const cur = norm(conteos.get(cardId)); cur.c++;
-        pintarConteo(cardId, cur); numCache.set(conteosObject());
+        pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
         ta.value = ''; count.textContent = '0/500';
       } catch (err) {
         toast(panel, err && err.code === 'permission-denied' ? TXT.social_comment_rate : TXT.social_comment_error);
@@ -555,7 +570,7 @@ function mapearError(code, TXT) {
       await fsApi.deleteDoc(fsApi.doc(db, 'comments', item.dataset.comment));
       item.remove();
       const cur = norm(conteos.get(cardId)); cur.c = Math.max(0, cur.c - 1);
-      pintarConteo(cardId, cur); numCache.set(conteosObject());
+      pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
     } catch (e) { toast(panel, TXT.social_comment_error); }
   }
   async function reportarComentario(panel, item) {
@@ -697,6 +712,11 @@ function mapearError(code, TXT) {
   const sesionCorreo = document.getElementById('sesion-correo');
   const sesionMenu = document.getElementById('sesion-menu');
   const sesionSalir = document.getElementById('sesion-salir');
+  const sesionApodo = document.getElementById('sesion-apodo');
+  const sesionApodoForm = document.getElementById('sesion-apodo-form');
+  const sesionApodoInput = document.getElementById('sesion-apodo-input');
+  const sesionApodoMsg = document.getElementById('sesion-apodo-msg');
+  const NICK_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000; // 1 cambio de apodo al mes
 
   async function cargarMisVotos(user) {
     miVoto.clear();
@@ -754,6 +774,7 @@ function mapearError(code, TXT) {
     if (!sesionMenu) return;
     sesionMenu.removeAttribute('data-abierto');
     if (sesionChip) sesionChip.setAttribute('aria-expanded', 'false');
+    if (sesionApodoForm) sesionApodoForm.hidden = true;
   }
   authApi.onAuthStateChanged(auth, pintarSesion);
   sesionEntrar.addEventListener('click', () => abrirAuth('vote'));
@@ -767,4 +788,74 @@ function mapearError(code, TXT) {
     if (sesionMenu && sesionMenu.hasAttribute('data-abierto') && !e.target.closest('#sesion')) cerrarSesionMenu();
   });
   sesionSalir.addEventListener('click', () => { authApi.signOut(auth).catch(() => {}); cerrarSesionMenu(); });
+
+  // ---- Cambiar apodo (una vez al mes) ----
+  // El límite lo refuerza la regla de Firestore sobre users/{uid}.lastNickChangeAt
+  // (gate de 30 días en servidor); aquí solo espejamos el estado en la UI.
+  function apodoValido(name) {
+    return name.length >= 2 && name.length <= 40 && !/https?:|www\.|\.com\b/i.test(name);
+  }
+  async function ultimoCambioApodo(user) {
+    try {
+      const snap = await fsApi.getDoc(fsApi.doc(db, 'users', user.uid));
+      const ts = snap.exists() ? snap.data().lastNickChangeAt : null;
+      return ts && ts.toMillis ? ts.toMillis() : null;
+    } catch (e) { console.warn('[sibylla/social] apodo:', (e && e.code) || e); return null; }
+  }
+  function bloqueoApodo(ultimo) {
+    if (!ultimo || Date.now() - ultimo >= NICK_COOLDOWN_MS) return null;
+    const fecha = new Date(ultimo + NICK_COOLDOWN_MS).toLocaleDateString();
+    return format(TXT.auth_nick_locked, { date: fecha });
+  }
+  function msgApodo(texto) {
+    if (!sesionApodoMsg) return;
+    if (texto) { sesionApodoMsg.textContent = texto; sesionApodoMsg.hidden = false; }
+    else { sesionApodoMsg.hidden = true; }
+  }
+  if (sesionApodo && sesionApodoForm && sesionApodoInput) {
+    const btnApodo = sesionApodoForm.querySelector('button[type="submit"]');
+    sesionApodo.addEventListener('click', async () => {
+      if (!currentUser) return;
+      if (!sesionApodoForm.hidden) { sesionApodoForm.hidden = true; return; }
+      msgApodo(null);
+      sesionApodoInput.value = currentUser.displayName || '';
+      sesionApodoInput.disabled = false;
+      if (btnApodo) btnApodo.disabled = false;
+      sesionApodoForm.hidden = false;
+      sesionApodoInput.focus();
+      const bloqueo = bloqueoApodo(await ultimoCambioApodo(currentUser));
+      if (bloqueo) {
+        msgApodo(bloqueo);
+        sesionApodoInput.disabled = true;
+        if (btnApodo) btnApodo.disabled = true;
+      }
+    });
+    sesionApodoForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentUser) return;
+      const name = sesionApodoInput.value.trim().replace(/\s+/g, ' ');
+      if (!apodoValido(name)) { msgApodo(TXT.social_nick_error); return; }
+      const bloqueo = bloqueoApodo(await ultimoCambioApodo(currentUser));
+      if (bloqueo) { msgApodo(bloqueo); return; }
+      if (btnApodo) btnApodo.disabled = true;
+      try {
+        // Primero el doc de Firestore: la regla users/{uid}.lastNickChangeAt
+        // aplica el gate de 30 días en servidor. Si lo rechaza (muy pronto),
+        // NO llegamos a updateProfile, así que el apodo no cambia sin registro.
+        await fsApi.setDoc(fsApi.doc(db, 'users', currentUser.uid),
+          { lastNickChangeAt: fsApi.serverTimestamp() }, { merge: true });
+        await authApi.updateProfile(currentUser, { displayName: name });
+        await currentUser.getIdToken(true);
+        currentUser = auth.currentUser;
+        pintarSesion(currentUser);
+        sesionApodoForm.hidden = true;
+      } catch (err) {
+        const code = err && err.code;
+        console.warn('[sibylla/social] cambiar apodo:', code || err);
+        msgApodo(code === 'permission-denied'
+          ? bloqueoApodo(await ultimoCambioApodo(currentUser)) || TXT.social_nick_error
+          : TXT.social_nick_error);
+      } finally { if (btnApodo) btnApodo.disabled = false; }
+    });
+  }
 })();
