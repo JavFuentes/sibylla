@@ -173,7 +173,7 @@
     -webkit-background-clip:text; background-clip:text; color:transparent; }
   .marca-sub{ display:block; font-family:'Cormorant Garamond',serif; font-style:italic;
     font-size:.82rem; letter-spacing:.1em; color:var(--marfil-2); margin-top:-1px; }
-  nav.menu{ display:flex; align-items:center; gap:28px; }
+  nav.menu{ display:flex; align-items:center; gap:28px; margin-left:auto; }
   nav.menu a{ color:var(--marfil-2); text-decoration:none; font-size:.8rem; letter-spacing:.14em;
     text-transform:uppercase; transition:color .2s; }
   nav.menu a:hover{ color:var(--oro-claro); }
@@ -477,20 +477,23 @@
   @media (prefers-reduced-motion:reduce){ .social-velo, .social-velo.is-out, .social-velo-glifo{ animation:none; } }
 
   /* ---- Sesión en el header ---- */
-  .sesion{ display:none; align-items:center; gap:10px; margin-left:auto; position:relative; }
+  /* order:3 + nav.menu{margin-left:auto} colocan el avatar a la DERECHA de
+     ACERCA (rightmost). En móvil se restaura order:0 + margin-left:auto. */
+  .sesion{ display:none; align-items:center; gap:10px; margin-left:22px; order:3; position:relative; }
   body.social-on .sesion{ display:inline-flex; }
   .sesion-entrar{ font-size:.78rem; letter-spacing:.1em; color:var(--marfil-2);
     text-decoration:none; cursor:pointer; background:none; border:none; padding:0;
     font-family:inherit; }
   .sesion-entrar:hover{ color:var(--oro-claro); }
   #sesion-chip[hidden]{ display:none; }  /* display:grid de abajo pisaría el [hidden] del UA */
-  #sesion-chip{ width:32px; height:32px; flex:none; border-radius:50%; display:grid;
-    place-items:center; overflow:hidden; font-family:'Cinzel',serif; font-size:.82rem; color:var(--oro-claro);
+  #sesion-chip{ width:40px; height:40px; aspect-ratio:1; flex:none; border-radius:50%; display:grid;
+    place-items:center; overflow:hidden; font-family:'Cinzel',serif; font-size:.95rem; color:var(--oro-claro);
     background:#0B0F1C; border:1px solid rgba(217,184,95,.55);
     box-shadow:0 0 14px -5px rgba(242,221,147,.8), inset 0 0 0 1px rgba(8,11,20,.8);
     cursor:pointer; }
   #sesion-chip:hover{ border-color:rgba(242,221,147,.9); box-shadow:0 0 18px -4px rgba(242,221,147,.9); }
-  #sesion-chip img{ width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
+  /* object-fit:cover + object-position:center → la foto llena el círculo sin deformarse a elipse. */
+  #sesion-chip img{ width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%; display:block; }
   #sesion-menu{ position:absolute; top:calc(100% + 8px); right:0; padding:12px 14px;
     border-radius:10px; background:linear-gradient(180deg, rgba(15,21,38,.98), rgba(9,13,24,.99));
     border:1px solid var(--panel-borde); box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
@@ -500,6 +503,24 @@
   #sesion-menu .sesion-nombre{ color:var(--oro-claro); font-family:'Cinzel',serif;
     font-size:.78rem; letter-spacing:.06em; margin-bottom:3px; }
   #sesion-menu .sesion-correo{ color:var(--marfil); word-break:break-all; }
+  /* ---- Cambiar apodo (una vez al mes) ---- */
+  #sesion-apodo{ margin-top:8px; padding:0; text-align:left; cursor:pointer; background:none;
+    border:none; font-family:inherit; font-size:.76rem; letter-spacing:.04em; color:var(--cian);
+    transition:color .2s; }
+  #sesion-apodo:hover{ color:var(--cian-claro); }
+  #sesion-apodo-form{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+  #sesion-apodo-form[hidden]{ display:none; }
+  #sesion-apodo-input{ padding:7px 9px; border-radius:8px; font-family:inherit; font-size:.78rem;
+    color:var(--marfil); background:rgba(8,11,20,.6); border:1px solid var(--panel-borde); }
+  #sesion-apodo-input:focus{ outline:none; border-color:rgba(94,230,224,.6); }
+  #sesion-apodo-input:disabled{ opacity:.5; }
+  #sesion-apodo-form .sesion-apodo-hint{ margin:0; font-size:.68rem; color:var(--tenue); }
+  #sesion-apodo-form .sesion-apodo-msg{ margin:0; font-size:.7rem; color:#E7A38F; }
+  #sesion-apodo-form .sesion-apodo-msg[hidden]{ display:none; }
+  #sesion-apodo-form button[type="submit"]{ padding:7px 10px; border-radius:8px; cursor:pointer;
+    font-family:inherit; font-size:.74rem; letter-spacing:.06em; color:var(--noche);
+    background:linear-gradient(180deg,#F2DD93,#D9B85F); border:none; font-weight:600; }
+  #sesion-apodo-form button[type="submit"]:disabled{ opacity:.5; cursor:default; }
   #sesion-salir{ margin-top:6px; padding:8px 10px; border-radius:8px; cursor:pointer;
     font-size:.74rem; letter-spacing:.06em; font-family:inherit;
     color:var(--marfil-2); background:rgba(231,163,143,.08); border:1px solid rgba(231,163,143,.4); }
@@ -706,7 +727,10 @@
     .rejilla{ grid-template-columns:1fr; }
     .barra .fila{ position:relative; }
     .menu-icon{ display:flex; }
-    nav.menu{ display:none; position:absolute; top:calc(100% + 6px); right:0;
+    /* En móvil el avatar vuelve a la izquierda de la hamburguesa (order:0 +
+       margin-left:auto) y el nav es un desplegable absoluto. */
+    .sesion{ order:0; margin-left:auto; }
+    nav.menu{ display:none; position:absolute; top:calc(100% + 6px); right:0; margin-left:0;
       background:rgba(13,19,34,.96); border:1px solid var(--panel-borde);
       border-radius:var(--radio); padding:14px 20px; flex-direction:column; gap:14px;
       min-width:200px; backdrop-filter:blur(12px); z-index:20; }
@@ -778,6 +802,13 @@
       <div id="sesion-menu">
         <span class="sesion-nombre" id="sesion-nombre"></span>
         <span class="sesion-correo" id="sesion-correo"></span>
+        <button type="button" id="sesion-apodo">{{ t.auth_change_nick }}</button>
+        <form id="sesion-apodo-form" hidden>
+          <input type="text" id="sesion-apodo-input" minlength="2" maxlength="40" autocomplete="off" placeholder="{{ t.social_nick_hint }}">
+          <p class="sesion-apodo-hint">{{ t.auth_nick_edit_hint }}</p>
+          <span class="sesion-apodo-msg" id="sesion-apodo-msg" hidden></span>
+          <button type="submit">{{ t.social_nick_save }}</button>
+        </form>
         <button type="button" id="sesion-salir">{{ t.auth_logout }}</button>
       </div>
     </span>
@@ -1697,7 +1728,8 @@
   "social_verify_needed": t.social_verify_needed, "social_verify_sent": t.social_verify_sent,
   "social_verify_resend": t.social_verify_resend, "social_nick_label": t.social_nick_label,
   "social_nick_hint": t.social_nick_hint, "social_nick_save": t.social_nick_save,
-  "social_nick_error": t.social_nick_error,
+  "social_nick_error": t.social_nick_error, "auth_change_nick": t.auth_change_nick,
+  "auth_nick_edit_hint": t.auth_nick_edit_hint, "auth_nick_locked": t.auth_nick_locked,
   "auth_title": t.auth_title, "auth_sub_vote": t.auth_sub_vote, "auth_sub_comment": t.auth_sub_comment,
   "auth_google": t.auth_google, "auth_or": t.auth_or, "auth_email": t.auth_email,
   "auth_password": t.auth_password, "auth_signin": t.auth_signin, "auth_signup": t.auth_signup,

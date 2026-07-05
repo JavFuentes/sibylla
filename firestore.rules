@@ -93,15 +93,21 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt'])
+        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt', 'lastNickChangeAt'])
         && (!('lastCommentAt' in request.resource.data) || request.resource.data.lastCommentAt == request.time)
-        && (!('lastReportAt' in request.resource.data) || request.resource.data.lastReportAt == request.time);
+        && (!('lastReportAt' in request.resource.data) || request.resource.data.lastReportAt == request.time)
+        && (!('lastNickChangeAt' in request.resource.data) || request.resource.data.lastNickChangeAt == request.time);
       allow update: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt'])
+        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt', 'lastNickChangeAt'])
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastCommentAt'])
             || request.resource.data.lastCommentAt == request.time)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastReportAt'])
-            || request.resource.data.lastReportAt == request.time);
+            || request.resource.data.lastReportAt == request.time)
+        // Apodo: solo se puede (re)escribir si pasaron 30 días desde el último cambio.
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastNickChangeAt'])
+            || (request.resource.data.lastNickChangeAt == request.time
+                && (!('lastNickChangeAt' in resource.data)
+                    || resource.data.lastNickChangeAt < request.time - duration.value(30, 'd'))));
     }
 
     // Conteos pre-agregados: los mantiene la Cloud Function con Admin SDK.
