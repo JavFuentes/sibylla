@@ -61,7 +61,7 @@
     {% if c.has_resumen %}<button type="button" class="btn-mini btn-resumen" aria-expanded="false">{{ t.btn_resumen }}</button>{% endif %}
     {% if c.url %}<a class="btn-mini btn-original" href="{{ c.url }}" target="_blank" rel="noopener">{{ t.btn_original }}</a>{% endif %}
     <span class="soc-grupo" data-card="{{ c.id }}">
-      <button type="button" class="sec-btn soc-btn soc-like is-locked" data-vote="1" aria-pressed="false" aria-label="{{ t.social_like }}" title="{{ t.social_gate_hint }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg><span class="soc-num" data-num="like"></span></button><button type="button" class="sec-btn soc-btn soc-dislike is-locked" data-vote="-1" aria-pressed="false" aria-label="{{ t.social_dislike }}" title="{{ t.social_gate_hint }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg><span class="soc-num" data-num="dislike"></span></button><button type="button" class="sec-btn soc-btn soc-com" aria-expanded="false" aria-label="{{ t.social_comments }}" title="{{ t.social_comments }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+      <button type="button" class="sec-btn soc-btn soc-like is-locked" data-vote="1" aria-pressed="false" aria-label="{{ t.social_like }}" title="{{ t.social_gate_hint }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg><span class="soc-num" data-num="like"></span></button><button type="button" class="sec-btn soc-btn soc-dislike is-locked" data-vote="-1" aria-pressed="false" aria-label="{{ t.social_dislike }}" title="{{ t.social_gate_hint }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z"/></svg><span class="soc-num" data-num="dislike"></span></button><button type="button" class="sec-btn soc-btn soc-com" aria-expanded="false" aria-label="{{ t.social_comments }}" title="{{ t.social_comments }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="soc-num" data-num="comments"></span></button>
     </span>
   </div>
   {% if c.has_resumen %}<div class="resumen-panel" hidden>{{ c.resumen }}</div>{% endif %}
@@ -428,14 +428,53 @@
     background:linear-gradient(180deg,#F2DD93,#D9B85F); border-color:#F2DD93; }
   .soc-dislike[aria-pressed="true"]{ color:#2a120b;
     background:linear-gradient(180deg,#E7A38F,#C97B62); border-color:#E7A38F; }
-  /* Comentarios = futuro → hover cian */
   .soc-com:hover{ color:var(--cian-claro); border-color:rgba(94,230,224,.6);
     background:rgba(94,230,224,.10); }
-  .comentarios-panel{ margin-top:12px; padding:14px 16px; border-radius:10px;
-    font-size:.9rem; line-height:1.6; color:var(--cian-claro); font-style:italic;
-    background:linear-gradient(180deg, rgba(94,230,224,.06), rgba(94,230,224,.02));
+  .comentarios-panel{ margin-top:12px; padding:14px 16px; border-radius:12px;
+    font-size:.9rem; line-height:1.6; color:var(--marfil-2);
+    background:linear-gradient(180deg, rgba(94,230,224,.07), rgba(94,230,224,.025));
     border:1px solid rgba(94,230,224,.28); }
   .comentarios-panel[hidden]{ display:none; }
+  .comentarios-panel h5{ margin:0 0 12px; font-family:'Cinzel',serif; font-size:.82rem;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--cian-claro); }
+  .comentarios-lista{ display:flex; flex-direction:column; gap:12px; }
+  .comentario{ padding:11px 12px; border-radius:10px; background:rgba(255,255,255,.025);
+    border:1px solid rgba(255,255,255,.07); }
+  .comentario-meta{ display:flex; justify-content:space-between; gap:12px; align-items:baseline;
+    margin-bottom:6px; color:var(--tenue); font-size:.74rem; }
+  .comentario-meta strong{ font-family:'Cinzel',serif; color:var(--oro-claro); font-weight:500; }
+  .comentario-texto{ margin:0; color:var(--marfil); white-space:pre-wrap; overflow-wrap:anywhere; }
+  .comentario-acciones{ display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
+  .comentario-acciones button, .comentarios-more, .nick-form button, .comentario-form button{
+    cursor:pointer; border:1px solid rgba(217,184,95,.34); color:var(--marfil-2);
+    background:rgba(217,184,95,.06); border-radius:8px; padding:7px 10px;
+    font:inherit; font-size:.74rem; letter-spacing:.04em; }
+  .comentario-acciones button:hover, .comentarios-more:hover, .nick-form button:hover, .comentario-form button:hover{
+    color:var(--oro-claro); border-color:rgba(242,221,147,.6); }
+  .comentarios-empty, .comentarios-aviso, .comentarios-toast{ margin:10px 0 0; color:var(--cian-claro);
+    font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1rem; }
+  .comentarios-more{ margin-top:12px; }
+  .comentarios-form-wrap{ margin-top:14px; padding-top:12px; border-top:1px solid rgba(94,230,224,.18); }
+  .comentario-form, .nick-form{ display:grid; gap:9px; }
+  .comentario-form textarea, .nick-form input{ width:100%; box-sizing:border-box; border-radius:10px;
+    border:1px solid rgba(217,184,95,.28); background:rgba(8,11,20,.7); color:var(--marfil);
+    padding:10px 12px; font:inherit; resize:vertical; }
+  .comentario-form textarea{ min-height:96px; }
+  .comentario-form textarea:focus, .nick-form input:focus{ outline:2px solid rgba(94,230,224,.45); outline-offset:2px; }
+  .comentario-count{ justify-self:end; color:var(--tenue); font-size:.72rem; }
+  .social-velo{ position:absolute; inset:0; z-index:20; display:flex; align-items:center;
+    justify-content:center; gap:12px; min-height:260px; border-radius:20px;
+    color:var(--oro-claro); font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1.25rem; background:rgba(8,11,20,.72); backdrop-filter:blur(6px);
+    animation:socialVeloIn .18s ease-out both; }
+  #secciones{ position:relative; }
+  .social-velo.is-out{ animation:socialVeloOut .2s ease-in both; }
+  .social-velo-glifo{ font-style:normal; font-size:1.5rem; filter:drop-shadow(0 0 10px rgba(242,221,147,.55));
+    animation:socialPulse 1.4s ease-in-out infinite; }
+  @keyframes socialVeloIn{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes socialVeloOut{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes socialPulse{ 0%,100%{ transform:scale(.92) rotate(0deg); opacity:.75; } 50%{ transform:scale(1.08) rotate(22deg); opacity:1; } }
+  @media (prefers-reduced-motion:reduce){ .social-velo, .social-velo.is-out, .social-velo-glifo{ animation:none; } }
 
   /* ---- Sesión en el header ---- */
   .sesion{ display:none; align-items:center; gap:10px; margin-left:auto; position:relative; }
@@ -445,16 +484,21 @@
     font-family:inherit; }
   .sesion-entrar:hover{ color:var(--oro-claro); }
   #sesion-chip[hidden]{ display:none; }  /* display:grid de abajo pisaría el [hidden] del UA */
-  #sesion-chip{ width:30px; height:30px; flex:none; border-radius:50%; display:grid;
-    place-items:center; font-family:'Cinzel',serif; font-size:.82rem; color:#1a1305;
-    background:radial-gradient(circle at 40% 35%, #F2DD93, #C99B43);
-    box-shadow:0 0 14px -3px rgba(242,221,147,.7); cursor:pointer; border:none; }
+  #sesion-chip{ width:32px; height:32px; flex:none; border-radius:50%; display:grid;
+    place-items:center; overflow:hidden; font-family:'Cinzel',serif; font-size:.82rem; color:var(--oro-claro);
+    background:#0B0F1C; border:1px solid rgba(217,184,95,.55);
+    box-shadow:0 0 14px -5px rgba(242,221,147,.8), inset 0 0 0 1px rgba(8,11,20,.8);
+    cursor:pointer; }
+  #sesion-chip:hover{ border-color:rgba(242,221,147,.9); box-shadow:0 0 18px -4px rgba(242,221,147,.9); }
+  #sesion-chip img{ width:100%; height:100%; object-fit:cover; border-radius:50%; display:block; }
   #sesion-menu{ position:absolute; top:calc(100% + 8px); right:0; padding:12px 14px;
     border-radius:10px; background:linear-gradient(180deg, rgba(15,21,38,.98), rgba(9,13,24,.99));
     border:1px solid var(--panel-borde); box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
     font-size:.8rem; color:var(--marfil-2); display:none; flex-direction:column;
     align-items:stretch; min-width:210px; z-index:30; }
   #sesion-menu[data-abierto]{ display:flex; }
+  #sesion-menu .sesion-nombre{ color:var(--oro-claro); font-family:'Cinzel',serif;
+    font-size:.78rem; letter-spacing:.06em; margin-bottom:3px; }
   #sesion-menu .sesion-correo{ color:var(--marfil); word-break:break-all; }
   #sesion-salir{ margin-top:6px; padding:8px 10px; border-radius:8px; cursor:pointer;
     font-size:.74rem; letter-spacing:.06em; font-family:inherit;
@@ -732,6 +776,7 @@
       <button type="button" class="sesion-entrar" id="sesion-entrar">{{ t.auth_enter }}</button>
       <button type="button" id="sesion-chip" aria-haspopup="true" aria-expanded="false" aria-label="" hidden></button>
       <div id="sesion-menu">
+        <span class="sesion-nombre" id="sesion-nombre"></span>
         <span class="sesion-correo" id="sesion-correo"></span>
         <button type="button" id="sesion-salir">{{ t.auth_logout }}</button>
       </div>
@@ -1276,12 +1321,18 @@
   var FEED_LOTE=8;
   var feedCola=[];    /* tarjetas aún no reveladas */
   var feedObs=null;
-  /* Registro del hogar de cada tarjeta, capturado antes de mover nada. */
-  var HOGAR=blocks().map(function(b){
-    var rej=b.querySelector('.rejilla');
-    return { rejilla:rej,
-             cartas:rej ? Array.prototype.slice.call(rej.querySelectorAll('.carta')) : [] };
-  });
+  /* Registro del hogar de cada tarjeta, capturado antes de mover nada. La isla
+     social puede reordenar tarjetas una vez; expone un hook para refrescarlo. */
+  var HOGAR=[];
+  function captureHomes(){
+    HOGAR=blocks().map(function(b){
+      var rej=b.querySelector('.rejilla');
+      return { rejilla:rej,
+               cartas:rej ? Array.prototype.slice.call(rej.querySelectorAll('.carta')) : [] };
+    });
+  }
+  captureHomes();
+  window.SibyllaSocialRefreshHomes=captureHomes;
 
   function currentMode(){
     var p=loadPrefs();
@@ -1636,6 +1687,17 @@
   "social_like": t.social_like, "social_dislike": t.social_dislike,
   "social_comments": t.social_comments, "social_gate_hint": t.social_gate_hint,
   "social_comments_soon": t.social_comments_soon, "social_vote_error": t.social_vote_error,
+  "social_orden_cargando": t.social_orden_cargando, "social_comments_title": t.social_comments_title,
+  "social_comment_placeholder": t.social_comment_placeholder, "social_comment_send": t.social_comment_send,
+  "social_comment_empty": t.social_comment_empty, "social_comment_more": t.social_comment_more,
+  "social_comment_count_aria": t.social_comment_count_aria, "social_comment_delete": t.social_comment_delete,
+  "social_comment_delete_confirm": t.social_comment_delete_confirm, "social_comment_report": t.social_comment_report,
+  "social_comment_report_confirm": t.social_comment_report_confirm, "social_comment_reported": t.social_comment_reported,
+  "social_comment_error": t.social_comment_error, "social_comment_rate": t.social_comment_rate,
+  "social_verify_needed": t.social_verify_needed, "social_verify_sent": t.social_verify_sent,
+  "social_verify_resend": t.social_verify_resend, "social_nick_label": t.social_nick_label,
+  "social_nick_hint": t.social_nick_hint, "social_nick_save": t.social_nick_save,
+  "social_nick_error": t.social_nick_error,
   "auth_title": t.auth_title, "auth_sub_vote": t.auth_sub_vote, "auth_sub_comment": t.auth_sub_comment,
   "auth_google": t.auth_google, "auth_or": t.auth_or, "auth_email": t.auth_email,
   "auth_password": t.auth_password, "auth_signin": t.auth_signin, "auth_signup": t.auth_signup,
@@ -1647,7 +1709,8 @@
   "auth_err_network": t.auth_err_network, "auth_err_too_many": t.auth_err_too_many,
   "auth_err_generic": t.auth_err_generic
 } -%}
-<script type="application/json" id="social-i18n">{{ {"texts": social_texts, "config": {"apiKey": "AIzaSyCVa11offl3SebRwlK5ZP7viP9vHPiMp0U", "authDomain": "sibylla-a81d2.firebaseapp.com", "projectId": "sibylla-a81d2", "storageBucket": "sibylla-a81d2.firebasestorage.app", "messagingSenderId": "490666060572", "appId": "1:490666060572:web:aee8d022b4de2781ee68d9"}} | tojson }}</script>
+<script type="application/json" id="social-conteos">{{ social_conteos | tojson }}</script>
+<script type="application/json" id="social-i18n">{{ {"texts": social_texts, "config": {"apiKey": "AIzaSyCVa11offl3SebRwlK5ZP7viP9vHPiMp0U", "authDomain": "sibylla-a81d2.firebaseapp.com", "projectId": "sibylla-a81d2", "storageBucket": "sibylla-a81d2.firebasestorage.app", "messagingSenderId": "490666060572", "appId": "1:490666060572:web:aee8d022b4de2781ee68d9", "appCheckSiteKey": ""}} | tojson }}</script>
 <script type="module" src="social.js?v={{ build_v }}"></script>
 </body>
 </html>

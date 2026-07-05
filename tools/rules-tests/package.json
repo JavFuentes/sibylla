@@ -1,0 +1,12 @@
+{
+  "name": "sibylla-rules-tests",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test test-rules.js"
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^10.12.0"
+  }
+}

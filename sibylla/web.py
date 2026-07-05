@@ -499,6 +499,19 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
     return card
 
 
+def _puntaje_social_card(card: dict, conteos: dict[str, dict]) -> int:
+    """Puntaje social de una tarjeta renderizada: likes - dislikes + 2*comentarios."""
+    vals = conteos.get(card.get("id"), {}) if conteos else {}
+    return int(vals.get("l", 0) or 0) - int(vals.get("d", 0) or 0) + 2 * int(vals.get("c", 0) or 0)
+
+
+def _ordenar_cards_por_conteos(cards: list[dict], conteos: dict[str, dict] | None) -> None:
+    """Ordena in-place por interacción social, conservando empates editoriales."""
+    if not conteos:
+        return
+    cards.sort(key=lambda c: _puntaje_social_card(c, conteos), reverse=True)
+
+
 # =============================================================================
 # Selección curada de temas (Frontera Digital, Medicina) — 1 tarjeta por fuente
 # =============================================================================
@@ -1009,10 +1022,11 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
                    translations: dict | None = None,
                    social_items: list[NewsItem] | None = None,
                    astro_items: list[NewsItem] | None = None,
-                    divulgacion_items: list[NewsItem] | None = None,
-                    sibylla_items: list[NewsItem] | None = None,
-                    resumenes: dict | None = None,
-                    build_v: int | None = None) -> dict:
+                   divulgacion_items: list[NewsItem] | None = None,
+                   sibylla_items: list[NewsItem] | None = None,
+                   resumenes: dict | None = None,
+                   build_v: int | None = None,
+                   social_conteos: dict[str, dict] | None = None) -> dict:
     """Construye el contexto que recibe la plantilla.
 
     `items` son los ítems normales (temáticos). `social_items` son los ítems
@@ -1041,6 +1055,8 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
 
     grupos = _agrupar(items, topics, max_por_tema, topic_labels, months, no_date,
                       translations, resumenes)
+    for grupo in grupos:
+        _ordenar_cards_por_conteos(grupo["cards"], social_conteos)
     observa = t(tr, "web.voice", count=total_all, sources=n_fuentes)
     ts = _instante(ahora, months)
     hero_ts = t(tr, "web.hero_timestamp", date=ts, count=total_all, sources=n_fuentes)
@@ -1049,11 +1065,13 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
     astro_cards: list[dict] = []
     if astro_items:
         astro_cards = [_tarjeta(it, months, no_date, translations, resumenes) for it in astro_items]
+        _ordenar_cards_por_conteos(astro_cards, social_conteos)
 
     # Tarjetas de divulgación. No se traducen ni resumen: son videos en español.
     divulgacion_cards: list[dict] = []
     if divulgacion_items:
         divulgacion_cards = [_tarjeta(it, months, no_date, is_video=True) for it in divulgacion_items]
+        _ordenar_cards_por_conteos(divulgacion_cards, social_conteos)
 
     # Tarjetas de publicaciones propias (sección SIBYLLA). Ya vienen en español:
     # no se traducen ni piden resumen al LLM; el cuerpo del archivo Markdown
@@ -1063,11 +1081,13 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         pub_bodies = {it.dedup_key: it.extra["body"]
                       for it in sibylla_items if it.extra.get("body")}
         sibylla_cards = [_tarjeta(it, months, no_date, None, pub_bodies) for it in sibylla_items]
+        _ordenar_cards_por_conteos(sibylla_cards, social_conteos)
 
     # Tarjetas sociales.
     social_cards: list[dict] = []
     if social_items:
         social_cards = [_tarjeta(it, months, no_date, translations, resumenes) for it in social_items]
+        _ordenar_cards_por_conteos(social_cards, social_conteos)
 
     # Datos de idioma (el sitio es monolingüe; se conservan por el molde del código).
     lang_label = LANG_LABELS.get(lang, lang.upper())
@@ -1105,6 +1125,7 @@ def build_context(items: list[NewsItem], topics: list[str], meta: dict,
         "divulgacion_cards": divulgacion_cards,
         "sibylla_cards": sibylla_cards,
         "social_cards": social_cards,
+        "social_conteos": social_conteos or {},
         "observa": observa,
         "t": tw,
         "site_url": site_url,
@@ -1125,7 +1146,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 divulgacion_items: list[NewsItem] | None = None,
                 sibylla_items: list[NewsItem] | None = None,
                 resumenes: dict | None = None,
-                build_v: int | None = None) -> str:
+                build_v: int | None = None,
+                social_conteos: dict[str, dict] | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
@@ -1136,7 +1158,8 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
     return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
                                         is_landing, translations, social_items,
                                         astro_items, divulgacion_items,
-                                        sibylla_items, resumenes, build_v))
+                                        sibylla_items, resumenes, build_v,
+                                        social_conteos))
 
 
 def _render_pub_page(it: NewsItem, site_url: str, build_v: int) -> str:
@@ -1347,6 +1370,11 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                                            social_top, astro_top)
     resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
 
+    # Conteos sociales pre-agregados (1 lectura REST pública). Si falla, el
+    # orden editorial queda intacto y el cliente hidrata lo que pueda.
+    from .social_sync import fetch_conteos
+    social_conteos = fetch_conteos()
+
     # Marca de build (única fuente de verdad): se planta en el HTML (meta
     # x-build) y en web/build.json; el cliente compara ambas para detectar un
     # redeploy y mostrar el botón "Actualizar".
@@ -1379,7 +1407,8 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                         social_items=social_top, astro_items=astro_top,
                         divulgacion_items=divulgacion_top,
                         sibylla_items=sibylla_items,
-                        resumenes=resumenes, build_v=build_v)
+                        resumenes=resumenes, build_v=build_v,
+                        social_conteos=social_conteos)
     out = SITE_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
     paths.append(out)

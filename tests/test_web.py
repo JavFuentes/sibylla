@@ -19,6 +19,7 @@ from sibylla.web import (
     _select_social,
     _snippet,
     _tarjeta,
+    build_context,
     build_stellar_news_payload,
 )
 
@@ -384,3 +385,38 @@ def test_select_social_house_recencia_ignora_engagement():
     nuevo_sin_likes = _house("mastodon", NEW, likes=0, reposts=0, title="nuevo")
     sel = _select_social([], [viejo_viral, nuevo_sin_likes], {"shuffle": False}, "seed")
     assert sel[0].title == "nuevo"
+
+
+# ---------------------------------------------------------------------------
+# Orden social horneado
+# ---------------------------------------------------------------------------
+def test_build_context_orden_social_mas_votada_primero():
+    a = _item(title="A", url="https://a.example")
+    b = _item(title="B", url="https://b.example")
+    conteos = {_card_id(b): {"l": 4, "d": 0, "c": 1}}
+    ctx = build_context([a, b], ["ai"], {}, social_conteos=conteos)
+    assert [c["title"] for c in ctx["grupos"][0]["cards"]] == ["B", "A"]
+
+
+def test_build_context_orden_social_mas_rechazada_ultima():
+    a = _item(title="A", url="https://a.example")
+    b = _item(title="B", url="https://b.example")
+    c = _item(title="C", url="https://c.example")
+    conteos = {_card_id(a): {"l": 0, "d": 5, "c": 0}, _card_id(c): {"l": 1, "d": 0, "c": 0}}
+    ctx = build_context([a, b, c], ["ai"], {}, social_conteos=conteos)
+    assert [card["title"] for card in ctx["grupos"][0]["cards"]] == ["C", "B", "A"]
+
+
+def test_build_context_orden_social_empate_conserva_editorial():
+    a = _item(title="A", url="https://a.example")
+    b = _item(title="B", url="https://b.example")
+    conteos = {_card_id(a): {"l": 1, "d": 0, "c": 0}, _card_id(b): {"l": 1, "d": 0, "c": 0}}
+    ctx = build_context([a, b], ["ai"], {}, social_conteos=conteos)
+    assert [c["title"] for c in ctx["grupos"][0]["cards"]] == ["A", "B"]
+
+
+def test_build_context_sin_conteos_conserva_editorial():
+    a = _item(title="A", url="https://a.example")
+    b = _item(title="B", url="https://b.example")
+    ctx = build_context([a, b], ["ai"], {})
+    assert [c["title"] for c in ctx["grupos"][0]["cards"]] == ["A", "B"]

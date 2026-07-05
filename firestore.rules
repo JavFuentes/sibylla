@@ -2,9 +2,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Votos: doc id = <cardId>_<uid>. Un voto por usuario y tarjeta por
-    // construcción del id. read público: lo requieren las aggregations de
-    // contadores y la carga de los votos propios (uid seudónimo, sin datos
-    // personales).
+    // construcción del id. Se conserva la decisión de Fase 1: votar no exige
+    // correo verificado.
     match /votes/{voteId} {
       allow read: if true;
       allow create: if request.auth != null
@@ -16,12 +15,6 @@ service cloud.firestore {
         && request.resource.data.card.size() <= 64
         && request.resource.data.value in [1, -1]
         && request.resource.data.ts == request.time;
-        // DECISIÓN Fase 1: verificación de correo NO obligatoria (comunidad
-        // inicial pequeña; Google llega verificado; exigirla al flujo email
-        // añade fricción). Para endurecer ante spam: descomentar la línea
-        // siguiente Y además implementar sendEmailVerification tras el
-        // registro + UX "revisa tu correo".
-        // && request.auth.token.email_verified == true
       allow update: if request.auth != null
         && resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['card', 'uid', 'value', 'ts'])
@@ -32,6 +25,91 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.uid == request.auth.uid;
     }
+
+    // Comentarios: lectura pública solo de visibles. Las queries de lista deben
+    // filtrar `oculto == false` para que las reglas puedan probarlo.
+    match /comments/{commentId} {
+      allow read: if resource.data.oculto == false;
+
+      allow create: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['card', 'uid', 'autor', 'texto', 'ts', 'reportes', 'oculto'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.card is string
+        && request.resource.data.card.size() >= 3
+        && request.resource.data.card.size() <= 64
+        && request.resource.data.texto is string
+        && request.resource.data.texto.size() >= 2
+        && request.resource.data.texto.size() <= 500
+        && request.resource.data.autor is string
+        && request.resource.data.autor == request.auth.token.name
+        && request.resource.data.autor.size() >= 2
+        && request.resource.data.autor.size() <= 40
+        && request.resource.data.reportes == 0
+        && request.resource.data.oculto == false
+        && request.resource.data.ts == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt == request.time
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('lastCommentAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt
+               < request.time - duration.value(30, 's'));
+
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+
+      allow update: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.uid != resource.data.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportes', 'oculto'])
+        && request.resource.data.reportes == resource.data.reportes + 1
+        && request.resource.data.oculto == (request.resource.data.reportes >= 3 || resource.data.oculto)
+        && !exists(/databases/$(database)/documents/reports/$(commentId + '_' + request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/reports/$(commentId + '_' + request.auth.uid));
+    }
+
+    // Reportes: ilegibles para clientes. Crear un reporte debe ocurrir junto al
+    // incremento del comentario y la marca de rate-limit del usuario.
+    match /reports/{reportId} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.resource.data.keys().hasOnly(['comment', 'uid', 'ts'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.comment is string
+        && reportId == request.resource.data.comment + '_' + request.auth.uid
+        && request.resource.data.ts == request.time
+        && exists(/databases/$(database)/documents/comments/$(request.resource.data.comment))
+        && get(/databases/$(database)/documents/comments/$(request.resource.data.comment)).data.uid != request.auth.uid
+        && getAfter(/databases/$(database)/documents/comments/$(request.resource.data.comment)).data.reportes
+           == get(/databases/$(database)/documents/comments/$(request.resource.data.comment)).data.reportes + 1
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastReportAt == request.time
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('lastReportAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastReportAt
+               < request.time - duration.value(10, 's'));
+    }
+
+    // Marcas de tiempo para rate-limit. Solo el dueño escribe, y cada campo que
+    // cambie debe valer request.time.
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt'])
+        && (!('lastCommentAt' in request.resource.data) || request.resource.data.lastCommentAt == request.time)
+        && (!('lastReportAt' in request.resource.data) || request.resource.data.lastReportAt == request.time);
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastCommentAt'])
+            || request.resource.data.lastCommentAt == request.time)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastReportAt'])
+            || request.resource.data.lastReportAt == request.time);
+    }
+
+    // Conteos pre-agregados: los mantiene la Cloud Function con Admin SDK.
+    match /agregados/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     match /{document=**} { allow read, write: if false; }
   }
 }
