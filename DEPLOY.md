@@ -209,3 +209,26 @@ Si tienes una máquina encendida (o un VPS), programa el build + subida con `cro
   Bluesky requiere credenciales gratuitas (app password) — sin ella
   simplemente se omite con `log.warning` y los fallbacks mantienen las 6 tarjetas.
 - No subas `output/` ni `data/` al hosting: no son parte del sitio.
+
+---
+
+## 6. App Check (fase social) — activo en Supervisión; enforcement PENDIENTE
+
+La web inicializa **App Check** con reCAPTCHA v3. La *Site key* pública viaja en
+el bloque `social-i18n` del template (`appCheckSiteKey`, activada 2026-07-05); el
+init está cableado en `static/social.js` (degrada en silencio si falla). Firestore
+está en modo **Supervisión** (mide peticiones verificadas vs no verificadas, **no
+bloquea**).
+
+> **PENDIENTE antes de pasar Firestore a "Aplicar" (Enforce):** el build lee
+> `agregados/conteos` de forma **anónima** por REST con la API key pública
+> (`sibylla/social_sync.py`) para hornear los conteos en el HTML. Con enforcement
+> activo esa lectura anónima se **bloquea** y el sitio se regenera sin números.
+> Para poder aplicar Enforce hay que **migrar esa lectura del build a una cuenta
+> de servicio** (Admin SDK o token de App Check de servidor). Hasta entonces,
+> dejar Firestore en **Supervisión**.
+
+- La CSP de `static/.htaccess` ya permite reCAPTCHA (`www.google.com`,
+  `www.gstatic.com` en `script-src`/`connect-src`/`frame-src`): no requiere cambios.
+- La *Secret key* de reCAPTCHA vive **solo** en la consola de App Check, nunca en
+  el repo.
