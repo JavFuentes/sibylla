@@ -490,10 +490,14 @@
     place-items:center; overflow:hidden; font-family:'Cinzel',serif; font-size:.95rem; color:var(--oro-claro);
     background:#0B0F1C; border:1px solid rgba(217,184,95,.55);
     box-shadow:0 0 14px -5px rgba(242,221,147,.8), inset 0 0 0 1px rgba(8,11,20,.8);
-    cursor:pointer; }
+    cursor:pointer; position:relative; }
   #sesion-chip:hover{ border-color:rgba(242,221,147,.9); box-shadow:0 0 18px -4px rgba(242,221,147,.9); }
-  /* object-fit:cover + object-position:center → la foto llena el círculo sin deformarse a elipse. */
-  #sesion-chip img{ width:100%; height:100%; object-fit:cover; object-position:center; border-radius:50%; display:block; }
+  /* La foto va en position:absolute para llenar el chip. Con el display:grid del
+     chip (que centra la inicial de reserva), un img width/height:100% resolvía
+     contra una pista auto colapsada (~26x36) → elipse flotando en el círculo.
+     inset:0 la ancla al borde interior; object-fit:cover la recorta al centro. */
+  #sesion-chip img{ position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; object-position:center; border-radius:50%; display:block; }
   #sesion-menu{ position:absolute; top:calc(100% + 8px); right:0; padding:12px 14px;
     border-radius:10px; background:linear-gradient(180deg, rgba(15,21,38,.98), rgba(9,13,24,.99));
     border:1px solid var(--panel-borde); box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
