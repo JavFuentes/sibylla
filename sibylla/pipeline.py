@@ -42,6 +42,7 @@ DEFAULT_FREE_SOURCES = [
     "yt_astrovlog", "yt_lahiperactina", "yt_alvamajo", "yt_javier_garcia",
     "yt_antroporamadivulgacion", "yt_deborahciencia",
     "yt_midudev",
+    "yt_historiageopolitica",
     # Social (gratis): una tarjeta por red en "Voces de la red"
     "mastodon", "bluesky",
 ]

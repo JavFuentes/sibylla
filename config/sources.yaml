@@ -1613,6 +1613,21 @@ sources:
     cost: free
     status: verified_2026-07-01
 
+  - id: yt_historiageopolitica
+    name: "Historia Geopolitica"
+    publisher: "YouTube"
+    tier: 3
+    type: rss
+    category: youtube
+    handle: "@HistoriaGeopolítica"
+    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCnZjF-jc2h8I1fKAce1vFog"
+    topics: [divulgacion]
+    lang: es
+    license: "solo miniatura + título + enlace al video"
+    access: open
+    cost: free
+    status: verified_2026-07-07
+
 # =============================================================================
 # Voces de la red — Configuración de lentes y cuentas propias
 # =============================================================================
