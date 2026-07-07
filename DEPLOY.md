@@ -25,19 +25,21 @@ equivalente), así que `pub/` se publica sin pasos extra.)
 > Desplegar = **regenerar** `web/` y **subir su contenido** a la raíz pública del
 > hosting. No hay nada que "compilar" en el servidor.
 
-### 1.1 Dashboard de métricas (personal, no se publica)
+### 1.1 Herramienta admin local (personal, no se publica)
 
-El dashboard muestra métricas de cada ejecución:
-- Historial de regeneraciones (fecha, temas, fuentes, ítems procesados)
-- Consumo de tokens por llamada LLM (summarize + traducciones por idioma)
-- Costo estimado en USD según precios actualizados de DeepSeek, OpenAI y Anthropic
+La herramienta admin local incluye el dashboard de métricas y páginas de
+administración del sitio. Hoy tiene dos secciones:
+- `/metricas`: historial de regeneraciones, consumo de tokens por llamada LLM
+  (summarize + traducciones por idioma) y costo estimado en USD
+- `/divulgacion`: ver, añadir y quitar canales de YouTube de la sección Divulgación
 
-Es una **herramienta de monitoreo personal**: no le interesa al visitante, así
+Es una **herramienta personal del operador**: no le interesa al visitante, así
 que **no se publica** en el sitio. El build del sitio (`--html`) **no** genera
-`dashboard.html`, y el deploy nunca lo sube.
+`dashboard.html`, y el deploy nunca lo sube. `--dashboard` sirve páginas desde
+un servidor local en `127.0.0.1` y no escribe `web/dashboard.html`.
 
-**Para verlo en local** (descarga el historial de producción del host, lo
-renderiza y lo abre en tu navegador):
+**Para abrirla en local** (descarga el historial de producción del host en modo
+best-effort, arranca el servidor y abre tu navegador):
 
 ```bash
 python -m sibylla.cli --dashboard
@@ -45,8 +47,14 @@ python -m sibylla.cli --dashboard
 
 Necesita en tu `.env` las credenciales SSH del host (`DEPLOY_HOST`,
 `DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_DATA_PATH` y, opcional, `DEPLOY_KEY_FILE`)
-— las mismas del deploy. Genera `web/dashboard.html` **sin reja de acceso** y lo
-abre.
+— las mismas del deploy — para poblar `/metricas` con el historial de producción.
+Si la descarga falla, `/metricas` muestra el historial local o vacío, y
+`/divulgacion` sigue funcionando.
+
+La gestión de canales de `/divulgacion` edita `config/sources.yaml` y
+`sibylla/pipeline.py` por cirugía de texto, muestra un banner de cambios
+pendientes de commit y **no commitea ni pushea**. Para resolver `@handle` usa
+`YOUTUBE_API_KEY` si está definida; sin clave, cae a scraping del HTML del canal.
 
 Los datos de cada ejecución se persisten en `data/runs.json` (ignorado por git).
 En CI el historial vive en el **host**, no en el cache de Actions: cada corrida

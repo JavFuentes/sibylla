@@ -43,7 +43,7 @@ Sibylla revisa cada cierto tiempo los temas que te interesan (**ciencia y tecnol
 - **Resumen con IA opcional y multi-proveedor:** Anthropic (Claude), OpenAI, OpenRouter, cualquier endpoint compatible o **Ollama** (local). Sin LLM, genera una lista determinista.
 - **Web estática monolingüe (español) con contenido localizado:** una sola página `index.html` enfocada en Chile. Los títulos y snippets de las tarjetas en otros idiomas se traducen al español con IA; cada tarjeta trae además un **botón "Resumen"** con un resumen en español generado por IA (abstract de papers, cuerpo de prensa extraído con trafilatura). Sin LLM, las tarjetas quedan en el idioma original de la fuente y sin botón de resumen.
 - **X / Twitter opcional** con **tope de presupuesto mensual duro** (es de pago por uso), aislado en su propia sección de redes sociales.
-- **Dashboard local de métricas:** `--dashboard` genera un panel con historial de ejecuciones y consumo/costo de tokens (lee `data/runs.json`).
+- **Herramienta admin local (`--dashboard`):** servidor en `http://127.0.0.1:8765` con `/metricas` (historial de ejecuciones y costo de tokens, descargado del host) y `/divulgacion` (ver, añadir y quitar canales de YouTube por `@handle`/URL/`UC…`). Solo edita archivos; el banner avisa de cambios pendientes de commit.
 - **SEO listo para producción:** favicons (con fondo transparente), `manifest`, `og:image`, `robots.txt` y `sitemap.xml`.
 
 ## Vista de la web
@@ -111,7 +111,8 @@ python -m sibylla.cli --topics ai,medicine --html --translate off
 # El resumen Markdown sí admite otros idiomas (la web siempre se genera en español)
 python -m sibylla.cli --topics space --lang en
 
-# Dashboard local de métricas (historial de ejecuciones + costo de tokens)
+# Herramienta admin local: /metricas (historial + costo) y /divulgacion (gestión
+# de canales de YouTube). Cierra con Ctrl+C.
 python -m sibylla.cli --dashboard
 ```
 

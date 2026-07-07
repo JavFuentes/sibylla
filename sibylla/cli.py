@@ -64,7 +64,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lang", default=None,
                         help="idioma del resumen y la web: es, en, it, pt (def. según config, SIBYLLA_LANG, o 'es')")
     parser.add_argument("--dashboard", action="store_true",
-                        help="abre el dashboard de métricas en local: descarga runs.json del host y lo muestra (no toca el sitio público)")
+                        help="arranca la herramienta admin local en http://127.0.0.1:8765 "
+                             "(métricas del host + gestión de canales de Divulgación); "
+                             "cierra con Ctrl+C")
+    parser.add_argument("--port", type=int, default=8765,
+                        help="puerto del servidor admin con --dashboard (def. 8765)")
     parser.add_argument("--apod-only", action="store_true",
                         help="genera y escribe SOLO web/apod-i18n.json (sin correr el pipeline de noticias); "
                              "para un cron temprano que corra apenas NASA publique el APOD del día, "
@@ -74,10 +78,11 @@ def main(argv: list[str] | None = None) -> int:
 
     _setup_logging(verbose=not args.quiet)
 
-    # Visor local del dashboard: no corre el pipeline, solo baja y abre métricas.
+    # Herramienta admin local: servidor en 127.0.0.1 con métricas + gestión de
+    # canales. No corre el pipeline.
     if args.dashboard:
-        from .dashboard import open_local_dashboard
-        return open_local_dashboard()
+        from .admin import serve
+        return serve(args.port)
 
     # Sidecar del APOD solo: no corre el pipeline de noticias (ver DEPLOY.md §4
     # y .github/workflows/regenerate-apod.yml).
@@ -198,8 +203,8 @@ def main(argv: list[str] | None = None) -> int:
     from .metrics import record_run
     record_run(record)
 
-    # El dashboard de métricas NO se genera aquí: es una herramienta de monitoreo
-    # local que se ve con `python -m sibylla.cli --dashboard` (lee data/runs.json).
+    # La herramienta admin local NO se genera aquí: se sirve con
+    # `python -m sibylla.cli --dashboard` (métricas + gestión de canales).
     return 0
 
 

@@ -21,8 +21,10 @@ sibylla/
   translate.py   # traduce tarjetas de la web (título+snippet) al español con LLM; cache en data/
   articles.py    # extrae el cuerpo de artículos de prensa (trafilatura) para los resúmenes; cache en data/
   resumen.py     # resumen en español por tarjeta (abstract de papers / cuerpo de prensa) con LLM; cache en data/
+  canales.py     # gestión de canales de YouTube (alta/baja en sources.yaml + pipeline.py); sin yaml.dump
+  admin.py       # servidor admin local (http.server): /metricas + /divulgacion (gestión de canales)
   cli.py         # punto de entrada: python -m sibylla.cli
-  templates/     # plantillas Jinja2 de la web (index.html.j2)
+  templates/     # plantillas Jinja2 (web: index.html.j2; admin: admin_base/dashboard/divulgacion .html.j2)
 config/
   sources.yaml   # registro curado de fuentes (tiers, acceso, costo)
   README.md      # documentación del registro y plan de presupuesto de X
@@ -67,10 +69,25 @@ web/             # sitio estático generado — ignorado por git
    Compite por las 3 tarjetas de agencia (máx. 1 por agencia, gana la más reciente).
 
 ### Añadir un canal a Divulgación
+
+**Vía dashboard admin (recomendada para canales sueltos):**
+1. `python -m sibylla.cli --dashboard` y abre `/divulgacion`.
+2. Pega la URL del canal, su `@handle` o el `UC…` directo (y un nombre opcional).
+   Con `YOUTUBE_API_KEY` se resuelve vía la API oficial; sin clave, por
+   scraping del HTML del canal. Siempre se verifica que tenga videos antes
+   de guardarlo. La herramienta edita `config/sources.yaml` y
+   `sibylla/pipeline.py` por cirugía de texto (sin `yaml.dump`, que
+   destruiría los comentarios) y muestra un banner de "cambios pendientes de
+   commit". **No commitea ni pushea**: llega a producción tras commit+push.
+3. La lógica vive en `sibylla/canales.py` (funciones puras testeables en
+   `tests/test_canales.py`) y el servidor en `sibylla/admin.py`.
+
+**Vía manual (editar archivos directamente):**
 1. Resuelve el `channel_id` del canal de YouTube (`UC...`) y verifica que el feed
    `https://www.youtube.com/feeds/videos.xml?channel_id=UC...` responda con entradas.
 2. En `config/sources.yaml`, añade una fuente `type: rss`, `category: youtube`,
-   `topics: [divulgacion]` y `lang: es`.
+   `topics: [divulgacion]` y `lang: es` (copia el formato de un bloque `yt_*`
+   existente; el dashboard genera exactamente ese formato).
 3. En `pipeline.py`, añade su `id` a `DEFAULT_FREE_SOURCES`.
 4. No hay que tocar `web.py`: `_select_divulgacion` toma 1 video por canal y
    muestra los 6 canales con video más reciente.

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+{#
+  Sibylla — base de la herramienta de administración local.
+  Estilos y chrome compartidos por todas las secciones (Métricas, Divulgación, …).
+  Cada página extiende esta base y rellena los bloques:
+    · titulo  — <title>
+    · styles  — <style> extra específico de la página (opcional)
+    · content — cuerpo del <main>
+    · scripts — <script> extra al pie (opcional)
+  Variables esperadas:
+    · activa     — 'metricas' | 'divulgacion' | … (resalta el link de la nav)
+    · git_dirty  — bool (muestra banner de cambios sin commitear; opcional)
+    · generado   — texto con la fecha/hora de generación (footer; opcional)
+    · aviso      — mensaje de aviso opcional (error/éxito de la operación anterior)
+    · aviso_tipo — 'ok' | 'error' (estilo del aviso; opcional)
+#}
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block titulo %}Sibylla · Admin{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#080B14">
+<style>
+  :root{
+    --obsidiana:#080B14; --noche:#0D1322; --panel:rgba(20,27,46,.55);
+    --panel-borde:rgba(217,184,95,.22); --marfil:#ECE4D2; --marfil-2:#C3BCA9;
+    --tenue:#8E8979; --oro:#D9B85F; --oro-claro:#F2DD93; --bronce:#9C7B3E;
+    --cian:#5EE6E0; --cian-claro:#A8F2EE; --tier1:#F2DD93; --tier2:#C7CEDB;
+    --tier3:#86B5A6; --radio:14px;
+    --verde:#86B5A6; --rojo:#E06060;
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; font-family:'Inter',system-ui,sans-serif; color:var(--marfil);
+    background:var(--obsidiana); -webkit-font-smoothing:antialiased; line-height:1.6;
+  }
+  .cielo{ position:fixed; inset:0; z-index:-1;
+    background:
+      radial-gradient(1100px 620px at 50% -8%, rgba(94,230,224,.10), transparent 60%),
+      radial-gradient(820px 520px at 82% 6%, rgba(217,184,95,.08), transparent 55%),
+      linear-gradient(180deg,#080B14, #0B1020 42%, #070A12);
+  }
+  .estrellas{ position:fixed; inset:0; z-index:-1; opacity:.55;
+    background-image:
+      radial-gradient(1.4px 1.4px at 24px 36px, rgba(255,255,255,.55), transparent),
+      radial-gradient(1.2px 1.2px at 130px 90px, rgba(255,255,255,.35), transparent),
+      radial-gradient(1px 1px at 200px 160px, rgba(94,230,224,.45), transparent),
+      radial-gradient(1.3px 1.3px at 300px 40px, rgba(255,255,255,.40), transparent);
+    background-size:420px 320px; background-repeat:repeat;
+  }
+  .lienzo-central{ max-width:1080px; margin:0 auto; padding:0 32px; }
+
+  /* Barra */
+  header.barra{ position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg, rgba(8,11,20,.92), rgba(8,11,20,.55));
+    backdrop-filter:blur(8px); border-bottom:1px solid rgba(217,184,95,.16); }
+  .barra .fila{ display:flex; align-items:center; justify-content:space-between; padding:16px 0; }
+  .marca{ font-family:'Cinzel',serif; font-weight:600; font-size:1.5rem; letter-spacing:.26em;
+    background:linear-gradient(180deg,#F2DD93,#D9B85F 55%,#9C7B3E);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .marca-sub{ display:block; font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:.82rem; letter-spacing:.1em; color:var(--marfil-2); }
+  nav.dash-nav{ display:flex; gap:28px; align-items:center; }
+  nav.dash-nav a{ color:var(--marfil-2); text-decoration:none; font-size:.8rem;
+    letter-spacing:.14em; text-transform:uppercase; transition:color .2s; }
+  nav.dash-nav a:hover{ color:var(--oro-claro); }
+  nav.dash-nav a.activo{ color:var(--oro-claro); }
+
+  /* Hero */
+  .hero{ padding:48px 0 32px; text-align:center; }
+  .hero h1{ font-family:'Cinzel',serif; font-weight:500; font-size:clamp(1.8rem,3.5vw,2.4rem);
+    margin:0 0 8px; color:var(--marfil); letter-spacing:.16em; }
+  .hero p{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--marfil-2);
+    margin:0 0 6px; font-size:1.05rem; }
+
+  /* Vacío */
+  .vacio{ text-align:center; padding:60px 0; color:var(--tenue); }
+  .vacio p{ font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1.1rem; }
+
+  /* Footer */
+  footer{ margin-top:64px; border-top:1px solid rgba(217,184,95,.16);
+    background:linear-gradient(180deg, transparent, rgba(94,230,224,.03)); }
+  .pie{ padding:40px 0 50px; text-align:center; }
+  .pie .marca{ font-size:1.1rem; }
+  .pie .lema{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--tenue);
+    font-size:.95rem; margin:16px 0 0; }
+
+  /* Responsive */
+  @media (max-width:860px){ }
+  @media (max-width:480px){
+    .lienzo-central{ padding:0 16px; }
+    .hero{ padding:32px 0 20px; }
+    .hero h1{ font-size:1.4rem; }
+  }
+
+  /* Banner de cambios sin commitear (admin) */
+  .git-banner{ margin:0 0 24px; padding:14px 18px; border-radius:var(--radio);
+    background:rgba(217,184,95,.08); border:1px solid rgba(217,184,95,.35);
+    color:var(--oro-claro); font-size:.84rem; line-height:1.5; }
+  .git-banner code{ background:rgba(217,184,95,.12); padding:1px 6px; border-radius:4px;
+    font-size:.78rem; }
+  .git-banner.dirty{ background:rgba(224,96,96,.08); border-color:rgba(224,96,96,.35);
+    color:#F2B0B0; }
+
+  /* Aviso (flash post-redirect) */
+  .aviso{ margin:0 0 24px; padding:12px 18px; border-radius:var(--radio); font-size:.84rem; }
+  .aviso.ok{ background:rgba(134,181,166,.10); border:1px solid rgba(134,181,166,.35);
+    color:#B6E0D2; }
+  .aviso.error{ background:rgba(224,96,96,.10); border:1px solid rgba(224,96,96,.35);
+    color:#F2B0B0; }
+
+  /* Barra de acciones de página + botón secundario (compartido) */
+  .acciones-pagina{ display:flex; justify-content:flex-end; margin:8px 0 16px; }
+  .btn-secundario{ background:var(--panel); border:1px solid var(--panel-borde);
+    color:var(--marfil-2); padding:8px 16px; border-radius:8px; cursor:pointer;
+    font-family:'Inter',sans-serif; font-size:.78rem; letter-spacing:.05em;
+    text-decoration:none; transition:.2s; display:inline-block; }
+  .btn-secundario:hover{ border-color:rgba(242,221,147,.5); color:var(--oro-claro); }
+
+  {% block styles %}{% endblock %}
+</style>
+</head>
+<body>
+<div class="cielo" aria-hidden="true"></div>
+<div class="estrellas" aria-hidden="true"></div>
+
+<header class="barra">
+  <div class="lienzo-central fila">
+    <div>
+      <span class="marca">SIBYLLA</span>
+      <span class="marca-sub">admin · herramienta local</span>
+    </div>
+    <nav class="dash-nav">
+      <a href="/metricas"{% if activa == 'metricas' %} class="activo"{% endif %}>Métricas</a>
+      <a href="/divulgacion"{% if activa == 'divulgacion' %} class="activo"{% endif %}>Divulgación</a>
+    </nav>
+  </div>
+</header>
+
+<main class="lienzo-central">
+  {% if git_dirty %}
+  <div class="git-banner dirty">
+    ⚠ Hay cambios sin commitear en <code>config/sources.yaml</code> o <code>sibylla/pipeline.py</code>.
+    Commitea y pushea para que lleguen al sitio público (el cron de CI los recogerá).
+  </div>
+  {% endif %}
+  {% if aviso %}
+  <div class="aviso {{ aviso_tipo }}">{{ aviso }}</div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+</main>
+
+<footer>
+  <div class="lienzo-central pie">
+    <span class="marca">SIBYLLA</span>
+    {% if generado %}<p class="lema">Generado {{ generado }}</p>{% endif %}
+  </div>
+</footer>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

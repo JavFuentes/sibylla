@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import tempfile
-import webbrowser
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -381,17 +379,22 @@ def _load_x_cap() -> int:
     return 300
 
 
-def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None) -> Path:
-    """Genera dashboard.html y devuelve la ruta.
+def _jinja_env() -> Environment:
+    """Environment Jinja2 compartido por el dashboard y la herramienta admin.
 
-    Es una herramienta de monitoreo personal: el HTML se muestra sin reja de
-    acceso. Siempre genera aunque no haya ejecuciones registradas (muestra
-    "sin datos").
-
-    `runs_path` permite renderizar desde un runs.json arbitrario; por defecto
-    usa data/runs.json (el historial local).
+    Mismo loader (TEMPLATES_DIR) y opciones (autoescape + trim/lstrip) siempre;
+    así las plantillas que extienden admin_base.html.j2 funcionan igual desde
+    el render estático que desde el servidor local.
     """
-    out_dir = out_dir or SITE_DIR
+    return Environment(
+        loader=FileSystemLoader(str(TEMPLATES_DIR)),
+        autoescape=select_autoescape(["html", "j2"]),
+        trim_blocks=True, lstrip_blocks=True,
+    )
+
+
+def _prepare_dashboard_context(runs_path: Path | None) -> dict:
+    """Calcula todas las variables que consume dashboard.html.j2."""
     raw_runs = load_runs(runs_path) if runs_path is not None else load_runs()
     runs = _dedup_runs(raw_runs)
     prep = _prep_runs(runs)
@@ -406,43 +409,60 @@ def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None)
     ahora_scl = _fmt_dt_full(ahora_utc)
     generado_utc = _format_dt(ahora_utc)
 
-    # Días del historial para la cabecera
     primer_dia = days[-1]["label"] if days else ""
     ultimo_dia = days[0]["label"] if days else ""
-
-    # Máximo costo diario para las barras de tendencia
     max_cost_day = max((d["cost_day"] for d in days), default=0) or 1
 
-    env = Environment(
-        loader=FileSystemLoader(str(TEMPLATES_DIR)),
-        autoescape=select_autoescape(["html", "j2"]),
-        trim_blocks=True, lstrip_blocks=True,
-    )
-    tmpl = env.get_template("dashboard.html.j2")
-    html = tmpl.render(
-        generado_utc=generado_utc,
-        generado=ahora_scl,
-        runs=prep,
-        days=days,
-        summary=summary,
-        max_token=max_token,
-        breakdown=breakdown,
-        x_budget=x_budget,
-        primer_dia=primer_dia,
-        ultimo_dia=ultimo_dia,
-        max_cost_day=max_cost_day,
-    )
+    return {
+        "generado_utc": generado_utc,
+        "generado": ahora_scl,
+        "runs": prep,
+        "days": days,
+        "summary": summary,
+        "max_token": max_token,
+        "breakdown": breakdown,
+        "x_budget": x_budget,
+        "primer_dia": primer_dia,
+        "ultimo_dia": ultimo_dia,
+        "max_cost_day": max_cost_day,
+    }
+
+
+def render_dashboard_html(runs_path: Path | None = None) -> str:
+    """Renderiza el dashboard a HTML en memoria (sin escribir a disco).
+
+    Lo usa el servidor admin (`sibylla.admin`) para servir /metricas sin pasar
+    por archivo, evitando que un deploy manual local suba el dashboard por
+    accidente a producción.
+    """
+    ctx = _prepare_dashboard_context(runs_path)
+    tmpl = _jinja_env().get_template("dashboard.html.j2")
+    return tmpl.render(**ctx)
+
+
+def render_dashboard(out_dir: Path | None = None, runs_path: Path | None = None) -> Path:
+    """Genera dashboard.html en disco y devuelve la ruta.
+
+    Es una herramienta de monitoreo personal: el HTML se muestra sin reja de
+    acceso. Siempre genera aunque no haya ejecuciones registradas (muestra
+    "sin datos").
+
+    `runs_path` permite renderizar desde un runs.json arbitrario; por defecto
+    usa data/runs.json (el historial local).
+    """
+    out_dir = out_dir or SITE_DIR
+    html = render_dashboard_html(runs_path)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / "dashboard.html"
     out.write_text(html, encoding="utf-8")
     return out
 
 
-# --- Visor local del dashboard (herramienta de monitoreo personal) ----------
+# --- Descarga del historial de producción -----------------------------------
 # El dashboard NO se publica en el sitio: las métricas no le interesan al
 # visitante. El historial de PRODUCCIÓN vive en el host (runs.json en
-# DEPLOY_DATA_PATH); este comando lo descarga por SSH, lo renderiza en local
-# (sin reja de acceso) y lo abre en el navegador.
+# DEPLOY_DATA_PATH); el servidor admin (sibylla.admin) lo descarga por SSH al
+# arrancar (best-effort) para servirlo en /metricas.
 
 def fetch_runs_from_host(dest: Path) -> None:
     """Descarga runs.json del host por scp usando las credenciales del .env.
@@ -450,6 +470,9 @@ def fetch_runs_from_host(dest: Path) -> None:
     Lee DEPLOY_HOST, DEPLOY_USER, DEPLOY_PORT (def. 22), DEPLOY_DATA_PATH
     (def. '.sibylla') y, opcionalmente, DEPLOY_KEY_FILE (ruta a la clave
     privada; si se omite, usa tu config SSH por defecto / el agente).
+
+    El llamador (servidor admin) atrapa SystemExit / CalledProcessError /
+    FileNotFoundError para mostrar un aviso y seguir sirviendo la herramienta.
     """
     host = os.getenv("DEPLOY_HOST")
     user = os.getenv("DEPLOY_USER")
@@ -470,32 +493,11 @@ def fetch_runs_from_host(dest: Path) -> None:
     subprocess.run(cmd, check=True)
 
 
-def open_local_dashboard() -> int:
-    """Descarga el historial de producción del host, lo renderiza y lo abre.
-
-    Pensado para correr en tu máquina (`python -m sibylla.cli --dashboard`).
-    Se renderiza SIN reja de acceso: es un instrumento de medición privado.
-    """
+if __name__ == "__main__":
+    # Acceso directo por compatibilidad (el flujo principal es `sibylla.cli
+    # --dashboard`, que arranca el servidor admin).
+    import webbrowser
     load_env()
-
-    with tempfile.TemporaryDirectory() as td:
-        runs_tmp = Path(td) / "runs.json"
-        print("→ Descargando historial de producción (runs.json) del host…")
-        try:
-            fetch_runs_from_host(runs_tmp)
-        except FileNotFoundError:
-            raise SystemExit("No encuentro el comando 'scp'. Instala el cliente OpenSSH.")
-        except subprocess.CalledProcessError:
-            raise SystemExit(
-                "No se pudo descargar runs.json del host. ¿Ya corrió el workflow al "
-                "menos una vez y existe DEPLOY_DATA_PATH/runs.json en el servidor?"
-            )
-        out = render_dashboard(runs_path=runs_tmp)
-
+    out = render_dashboard()
     print(f"✓ Dashboard generado en {out}")
     webbrowser.open(out.as_uri())
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(open_local_dashboard())
