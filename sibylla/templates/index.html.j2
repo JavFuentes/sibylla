@@ -481,10 +481,14 @@
      ACERCA (rightmost). En móvil se restaura order:0 + margin-left:auto. */
   .sesion{ display:none; align-items:center; gap:10px; margin-left:22px; order:3; position:relative; }
   body.social-on .sesion{ display:inline-flex; }
-  .sesion-entrar{ font-size:.78rem; letter-spacing:.1em; color:var(--marfil-2);
-    text-decoration:none; cursor:pointer; background:none; border:none; padding:0;
-    font-family:inherit; }
-  .sesion-entrar:hover{ color:var(--oro-claro); }
+  /* "Entrar" comparte la familia visual del chip de avatar (borde oro + glow):
+     el estado sin-sesión y el con-sesión ocupan el mismo hueco y ahora riman. */
+  .sesion-entrar{ font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--marfil-2); cursor:pointer; padding:7px 15px;
+    border-radius:999px; background:rgba(217,184,95,.05); border:1px solid rgba(217,184,95,.35);
+    transition:color .2s, border-color .2s, background .2s, box-shadow .2s; }
+  .sesion-entrar:hover{ color:var(--oro-claro); border-color:rgba(242,221,147,.85);
+    background:rgba(242,221,147,.08); box-shadow:0 0 16px -6px rgba(242,221,147,.75); }
   #sesion-chip[hidden]{ display:none; }  /* display:grid de abajo pisaría el [hidden] del UA */
   #sesion-chip{ width:40px; height:40px; aspect-ratio:1; flex:none; border-radius:50%; display:grid;
     place-items:center; overflow:hidden; font-family:'Cinzel',serif; font-size:.95rem; color:var(--oro-claro);
@@ -498,17 +502,28 @@
      inset:0 la ancla al borde interior; object-fit:cover la recorta al centro. */
   #sesion-chip img{ position:absolute; inset:0; width:100%; height:100%;
     object-fit:cover; object-position:center; border-radius:50%; display:block; }
-  #sesion-menu{ position:absolute; top:calc(100% + 8px); right:0; padding:12px 14px;
-    border-radius:10px; background:linear-gradient(180deg, rgba(15,21,38,.98), rgba(9,13,24,.99));
-    border:1px solid var(--panel-borde); box-shadow:0 20px 50px -20px rgba(0,0,0,.8);
+  #sesion-menu{ position:absolute; top:calc(100% + 12px); right:0; padding:15px 16px 14px;
+    border-radius:14px; background:linear-gradient(180deg, rgba(16,22,40,.98), rgba(9,13,24,.99));
+    border:1px solid var(--panel-borde);
+    box-shadow:0 24px 60px -22px rgba(0,0,0,.85), inset 0 1px 0 rgba(242,221,147,.06);
     font-size:.8rem; color:var(--marfil-2); display:none; flex-direction:column;
-    align-items:stretch; min-width:210px; z-index:30; }
-  #sesion-menu[data-abierto]{ display:flex; }
-  #sesion-menu .sesion-nombre{ color:var(--oro-claro); font-family:'Cinzel',serif;
-    font-size:.78rem; letter-spacing:.06em; margin-bottom:3px; }
-  #sesion-menu .sesion-correo{ color:var(--marfil); word-break:break-all; }
+    align-items:stretch; min-width:236px; z-index:30; }
+  #sesion-menu[data-abierto]{ display:flex; animation:sesionMenuIn .16s ease-out both; }
+  @keyframes sesionMenuIn{ from{ opacity:0; transform:translateY(-6px); } to{ opacity:1; transform:translateY(0); } }
+  @media (prefers-reduced-motion:reduce){ #sesion-menu[data-abierto]{ animation:none; } }
+  /* Cola que ancla el menú bajo el avatar (apunta al chip). */
+  #sesion-menu::before{ content:""; position:absolute; top:-6px; right:15px; width:11px; height:11px;
+    background:rgba(16,22,40,.98); border-top:1px solid var(--panel-borde);
+    border-left:1px solid var(--panel-borde); transform:rotate(45deg); }
+  #sesion-menu .sesion-nombre{ color:var(--oro-claro); font-family:'Cinzel',serif; font-weight:600;
+    font-size:.88rem; letter-spacing:.07em; }
+  #sesion-menu .sesion-correo{ color:var(--tenue); font-size:.74rem; letter-spacing:.02em;
+    word-break:break-all; margin-top:2px; }
+  /* Hairline dorada: separa identidad de acciones. */
+  #sesion-menu .sesion-sep{ height:1px; margin:13px 0 11px;
+    background:linear-gradient(90deg, transparent, rgba(217,184,95,.32), transparent); }
   /* ---- Cambiar apodo (una vez al mes) ---- */
-  #sesion-apodo{ margin-top:8px; padding:0; text-align:left; cursor:pointer; background:none;
+  #sesion-apodo{ margin-top:0; padding:0; text-align:left; cursor:pointer; background:none;
     border:none; font-family:inherit; font-size:.76rem; letter-spacing:.04em; color:var(--cian);
     transition:color .2s; }
   #sesion-apodo:hover{ color:var(--cian-claro); }
@@ -525,7 +540,7 @@
     font-family:inherit; font-size:.74rem; letter-spacing:.06em; color:var(--noche);
     background:linear-gradient(180deg,#F2DD93,#D9B85F); border:none; font-weight:600; }
   #sesion-apodo-form button[type="submit"]:disabled{ opacity:.5; cursor:default; }
-  #sesion-salir{ margin-top:6px; padding:8px 10px; border-radius:8px; cursor:pointer;
+  #sesion-salir{ margin-top:12px; padding:8px 10px; border-radius:8px; cursor:pointer;
     font-size:.74rem; letter-spacing:.06em; font-family:inherit;
     color:var(--marfil-2); background:rgba(231,163,143,.08); border:1px solid rgba(231,163,143,.4); }
   #sesion-salir:hover{ color:#E7A38F; border-color:rgba(231,163,143,.7); background:rgba(231,163,143,.16); }
@@ -806,6 +821,7 @@
       <div id="sesion-menu">
         <span class="sesion-nombre" id="sesion-nombre"></span>
         <span class="sesion-correo" id="sesion-correo"></span>
+        <div class="sesion-sep" aria-hidden="true"></div>
         <button type="button" id="sesion-apodo">{{ t.auth_change_nick }}</button>
         <form id="sesion-apodo-form" hidden>
           <input type="text" id="sesion-apodo-input" minlength="2" maxlength="40" autocomplete="off" placeholder="{{ t.social_nick_hint }}">
