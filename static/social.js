@@ -92,9 +92,12 @@ function mapearError(code, TXT) {
   let uid = null;
   let currentUser = null;
   const miVoto = new Map();
+  const miVotoComentario = new Map();
+  const comentariosVotosCargados = new Set();
   const conteos = new Map();
   const holdHasta = new Map();
   const enVuelo = new Set();
+  const enVueloComentario = new Set();
   const commentState = new Map();
   let yaReordenado = false;
   let registroReciente = false;
@@ -341,6 +344,7 @@ function mapearError(code, TXT) {
     if (h < 24) return `${h} h`;
     return `${Math.floor(h / 24)} d`;
   }
+
   function toast(panel, msg) {
     let el = panel.querySelector('.comentarios-toast');
     if (!el) {
@@ -354,33 +358,139 @@ function mapearError(code, TXT) {
     clearTimeout(el._timer);
     el._timer = setTimeout(() => { el.hidden = true; }, 3500);
   }
-  function renderComentario(panel, docId, data, prepend) {
-    const list = panel.querySelector('.comentarios-lista');
-    const empty = panel.querySelector('.comentarios-empty');
-    if (empty) empty.hidden = true;
+
+  function pintarVotoComentario(item, v) {
+    const like = item.querySelector('[data-action="comment-like"]');
+    const dislike = item.querySelector('[data-action="comment-dislike"]');
+    if (like) like.setAttribute('aria-pressed', String(v === 1));
+    if (dislike) dislike.setAttribute('aria-pressed', String(v === -1));
+  }
+
+  function pintarTodosVotosComentarios(panel) {
+    panel.querySelectorAll('.comentario').forEach((item) => {
+      pintarVotoComentario(item, miVotoComentario.get(item.dataset.comment));
+    });
+  }
+
+  async function cargarMisVotosComentarios(cardId) {
+    if (!uid || !cardId) return;
+    const key = `${uid}|${cardId}`;
+    if (comentariosVotosCargados.has(key)) return;
+    comentariosVotosCargados.add(key);
+    try {
+      const snap = await fsApi.getDocs(fsApi.query(
+        fsApi.collection(db, 'commentVotes'),
+        fsApi.where('uid', '==', uid),
+        fsApi.where('card', '==', cardId),
+      ));
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data && data.comment && (data.value === 1 || data.value === -1)) {
+          miVotoComentario.set(data.comment, data.value);
+        }
+      });
+    } catch (e) {
+      comentariosVotosCargados.delete(key);
+      console.warn('[sibylla/social] mis votos de comentarios:', (e && e.code) || e);
+    }
+  }
+
+  function crearBotonVotoComentario(docId, value, n) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'comentario-voto';
+    btn.dataset.action = value === 1 ? 'comment-like' : 'comment-dislike';
+    btn.dataset.vote = String(value);
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', format(
+      value === 1 ? TXT.social_comment_like_aria : TXT.social_comment_dislike_aria,
+      { n },
+    ));
+    const marca = document.createElement('span');
+    marca.setAttribute('aria-hidden', 'true');
+    marca.textContent = value === 1 ? '+' : '-';
+    const num = document.createElement('span');
+    num.className = 'comentario-voto-num';
+    num.dataset.num = value === 1 ? 'like' : 'dislike';
+    num.textContent = textoConteo(n);
+    btn.appendChild(marca);
+    btn.appendChild(num);
+    return btn;
+  }
+
+  function syncBotonRespuestas(item) {
+    const n = Math.max(0, Number(item.dataset.respuestas || 0) || 0);
+    let btn = item.querySelector(':scope > .comentario-rama > .comentario-respuestas-toggle');
+    const rama = item.querySelector(':scope > .comentario-rama');
+    if (!rama) return;
+    if (n <= 0) {
+      if (btn) btn.remove();
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'comentarios-more comentario-respuestas-toggle';
+      btn.dataset.action = 'toggle-replies';
+      btn.setAttribute('aria-expanded', 'false');
+      rama.insertBefore(btn, rama.firstChild);
+    }
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.textContent = open ? TXT.social_replies_hide : format(TXT.social_replies_show, { n });
+  }
+
+  function setRootReplyCount(panel, rootId, delta) {
+    const root = panel.querySelector(`.comentario[data-comment="${cssId(rootId)}"]`);
+    if (!root) return;
+    root.dataset.respuestas = String(Math.max(0, (Number(root.dataset.respuestas || 0) || 0) + delta));
+    syncBotonRespuestas(root);
+  }
+
+  function construirComentario(panel, docId, data) {
+    data = data || {};
+    const eliminado = data.eliminado === true;
+    const parent = typeof data.parent === 'string' ? data.parent : null;
+    const isRoot = !parent;
     const item = document.createElement('article');
-    item.className = 'comentario';
+    item.className = `comentario${parent ? ' comentario-respuesta' : ''}${eliminado ? ' comentario-eliminado' : ''}`;
     item.dataset.comment = docId;
+    item.dataset.parent = parent || '';
+    item.dataset.respuestas = String(Math.max(0, Number(data.respuestas || 0) || 0));
+    item.dataset.l = String(Math.max(0, Number(data.l || 0) || 0));
+    item.dataset.d = String(Math.max(0, Number(data.d || 0) || 0));
     const meta = document.createElement('div');
     meta.className = 'comentario-meta';
-    const autor = document.createElement('strong');
-    autor.textContent = data.autor || 'Sibylla';
     const fecha = document.createElement('span');
     fecha.textContent = fechaRel(data.ts);
-    meta.appendChild(autor);
+    if (!eliminado) {
+      const autor = document.createElement('strong');
+      autor.textContent = data.autor || 'Sibylla';
+      meta.appendChild(autor);
+    }
     meta.appendChild(fecha);
     const texto = document.createElement('p');
     texto.className = 'comentario-texto';
-    texto.textContent = data.texto || '';
+    texto.textContent = eliminado ? TXT.social_comment_deleted : (data.texto || '');
+    if (eliminado) texto.setAttribute('aria-label', TXT.social_comment_deleted);
     const acciones = document.createElement('div');
     acciones.className = 'comentario-acciones';
-    if (currentUser && data.uid === currentUser.uid) {
+    if (!eliminado) {
+      acciones.appendChild(crearBotonVotoComentario(docId, 1, Number(item.dataset.l)));
+      acciones.appendChild(crearBotonVotoComentario(docId, -1, Number(item.dataset.d)));
+      const reply = document.createElement('button');
+      reply.type = 'button';
+      reply.dataset.action = 'reply';
+      reply.textContent = TXT.social_reply;
+      reply.setAttribute('aria-expanded', 'false');
+      acciones.appendChild(reply);
+    }
+    if (!eliminado && currentUser && data.uid === currentUser.uid) {
       const del = document.createElement('button');
       del.type = 'button';
       del.dataset.action = 'delete';
       del.textContent = TXT.social_comment_delete;
       acciones.appendChild(del);
-    } else if (currentUser) {
+    } else if (!eliminado && currentUser) {
       const rep = document.createElement('button');
       rep.type = 'button';
       rep.dataset.action = 'report';
@@ -390,8 +500,39 @@ function mapearError(code, TXT) {
     item.appendChild(meta);
     item.appendChild(texto);
     item.appendChild(acciones);
-    if (prepend && list.firstChild) list.insertBefore(item, list.firstChild); else list.appendChild(item);
+    pintarVotoComentario(item, miVotoComentario.get(docId));
+    if (isRoot) {
+      const rama = document.createElement('div');
+      rama.className = 'comentario-rama';
+      const respuestas = document.createElement('div');
+      respuestas.className = 'comentario-respuestas';
+      respuestas.hidden = true;
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'comentarios-more comentario-respuestas-more';
+      more.dataset.action = 'more-replies';
+      more.textContent = TXT.social_comment_more;
+      more.hidden = true;
+      const formWrap = document.createElement('div');
+      formWrap.className = 'comentario-respuesta-form-wrap';
+      rama.appendChild(respuestas);
+      rama.appendChild(more);
+      rama.appendChild(formWrap);
+      item.appendChild(rama);
+      syncBotonRespuestas(item);
+    }
+    return item;
   }
+
+  function renderComentario(panel, docId, data, prepend) {
+    const list = panel.querySelector('.comentarios-lista');
+    const empty = panel.querySelector('.comentarios-empty');
+    if (empty) empty.hidden = true;
+    const item = construirComentario(panel, docId, data);
+    if (prepend && list.firstChild) list.insertBefore(item, list.firstChild); else list.appendChild(item);
+    return item;
+  }
+
   function crearPanel(carta, cardId) {
     const panel = document.createElement('div');
     panel.className = 'comentarios-panel';
@@ -418,7 +559,7 @@ function mapearError(code, TXT) {
     panel.appendChild(more);
     panel.appendChild(formWrap);
     carta.appendChild(panel);
-    commentState.set(cardId, { loaded: false, last: null, done: false, loading: false });
+    commentState.set(cardId, { loaded: false, last: null, done: false, loading: false, replies: new Map() });
     more.addEventListener('click', () => cargarComentarios(panel, cardId, true));
     panel.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-action]');
@@ -427,18 +568,25 @@ function mapearError(code, TXT) {
       if (!item) return;
       if (btn.dataset.action === 'delete') borrarComentario(panel, cardId, item);
       if (btn.dataset.action === 'report') reportarComentario(panel, item);
+      if (btn.dataset.action === 'reply') abrirRespuesta(panel, cardId, item, btn);
+      if (btn.dataset.action === 'toggle-replies') toggleRespuestas(panel, cardId, item, btn);
+      if (btn.dataset.action === 'more-replies') cargarRespuestas(panel, cardId, item.closest('.comentario').dataset.comment, true);
+      if (btn.dataset.action === 'comment-like' || btn.dataset.action === 'comment-dislike') votarComentario(panel, cardId, item, btn);
     });
     return panel;
   }
+
   async function cargarComentarios(panel, cardId, more) {
     const st = commentState.get(cardId);
     if (!st || st.loading || st.done && more) return;
     st.loading = true;
     try {
+      await cargarMisVotosComentarios(cardId);
       let q = fsApi.query(
         fsApi.collection(db, 'comments'),
         fsApi.where('card', '==', cardId),
         fsApi.where('oculto', '==', false),
+        fsApi.where('parent', '==', null),
         fsApi.orderBy('ts', 'desc'),
         fsApi.limit(COMMENTS_PAGE)
       );
@@ -447,6 +595,7 @@ function mapearError(code, TXT) {
           fsApi.collection(db, 'comments'),
           fsApi.where('card', '==', cardId),
           fsApi.where('oculto', '==', false),
+          fsApi.where('parent', '==', null),
           fsApi.orderBy('ts', 'desc'),
           fsApi.startAfter(st.last),
           fsApi.limit(COMMENTS_PAGE)
@@ -466,9 +615,80 @@ function mapearError(code, TXT) {
       st.loading = false;
     }
   }
+
+  async function cargarRespuestas(panel, cardId, rootId, more) {
+    const st = commentState.get(cardId);
+    if (!st) return;
+    if (!st.replies.has(rootId)) st.replies.set(rootId, { loaded: false, last: null, done: false, loading: false });
+    const rs = st.replies.get(rootId);
+    if (rs.loading || rs.done && more) return;
+    const root = panel.querySelector(`.comentario[data-comment="${cssId(rootId)}"]`);
+    if (!root) return;
+    const wrap = root.querySelector(':scope > .comentario-rama > .comentario-respuestas');
+    const moreBtn = root.querySelector(':scope > .comentario-rama > .comentario-respuestas-more');
+    rs.loading = true;
+    try {
+      await cargarMisVotosComentarios(cardId);
+      let q = fsApi.query(
+        fsApi.collection(db, 'comments'),
+        fsApi.where('parent', '==', rootId),
+        fsApi.where('oculto', '==', false),
+        fsApi.orderBy('ts', 'asc'),
+        fsApi.limit(COMMENTS_PAGE),
+      );
+      if (more && rs.last) {
+        q = fsApi.query(
+          fsApi.collection(db, 'comments'),
+          fsApi.where('parent', '==', rootId),
+          fsApi.where('oculto', '==', false),
+          fsApi.orderBy('ts', 'asc'),
+          fsApi.startAfter(rs.last),
+          fsApi.limit(COMMENTS_PAGE),
+        );
+      }
+      const snap = await fsApi.getDocs(q);
+      snap.forEach((d) => wrap.appendChild(construirComentario(panel, d.id, d.data())));
+      rs.last = snap.docs[snap.docs.length - 1] || rs.last;
+      rs.done = snap.size < COMMENTS_PAGE;
+      rs.loaded = true;
+      if (moreBtn) moreBtn.hidden = rs.done;
+      pintarTodosVotosComentarios(panel);
+    } catch (e) {
+      toast(panel, TXT.social_comment_error);
+      console.warn('[sibylla/social] respuestas:', (e && e.code) || e);
+    } finally {
+      rs.loading = false;
+    }
+  }
+
+  function toggleRespuestas(panel, cardId, item, btn) {
+    const wrap = item.querySelector(':scope > .comentario-rama > .comentario-respuestas');
+    if (!wrap) return;
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    wrap.hidden = open;
+    btn.textContent = open ? format(TXT.social_replies_show, { n: Number(item.dataset.respuestas || 0) || 0 }) : TXT.social_replies_hide;
+    if (!open) cargarRespuestas(panel, cardId, item.dataset.comment, false);
+  }
+
+  function abrirRespuesta(panel, cardId, item, btn) {
+    if (!currentUser) { abrirAuth('comment'); return; }
+    if (!currentUser.emailVerified) { toast(panel, TXT.social_verify_needed); return; }
+    if (!currentUser.displayName) { renderForm(panel, cardId); return; }
+    const rootId = item.dataset.parent || item.dataset.comment;
+    const root = panel.querySelector(`.comentario[data-comment="${cssId(rootId)}"]`);
+    if (!root) return;
+    const wrap = root.querySelector(':scope > .comentario-rama > .comentario-respuesta-form-wrap');
+    const respuestas = root.querySelector(':scope > .comentario-rama > .comentario-respuestas');
+    const toggle = root.querySelector(':scope > .comentario-rama > .comentario-respuestas-toggle');
+    if (respuestas) respuestas.hidden = false;
+    if (toggle) { toggle.setAttribute('aria-expanded', 'true'); toggle.textContent = TXT.social_replies_hide; }
+    renderReplyForm(panel, cardId, rootId, wrap, btn);
+  }
+
   function renderForm(panel, cardId) {
     const wrap = panel.querySelector('.comentarios-form-wrap');
-    wrap.innerHTML = '';
+    wrap.replaceChildren();
     if (!currentUser) return;
     if (!currentUser.emailVerified) {
       const msg = document.createElement('p');
@@ -551,10 +771,11 @@ function mapearError(code, TXT) {
           ts: fsApi.serverTimestamp(),
           reportes: 0,
           oculto: false,
+          parent: null,
         });
         batch.set(fsApi.doc(db, 'users', currentUser.uid), { lastCommentAt: fsApi.serverTimestamp() }, { merge: true });
         await batch.commit();
-        renderComentario(panel, ref.id, { uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date() }, true);
+        renderComentario(panel, ref.id, { uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date(), parent: null }, true);
         const cur = norm(conteos.get(cardId)); cur.c++;
         pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
         ta.value = ''; count.textContent = '0/500';
@@ -564,11 +785,137 @@ function mapearError(code, TXT) {
     });
     wrap.appendChild(form);
   }
+
+  function renderReplyForm(panel, cardId, rootId, wrap, opener) {
+    if (!wrap) return;
+    const existing = wrap.querySelector('.comentario-form');
+    if (existing) { wrap.replaceChildren(); if (opener) opener.setAttribute('aria-expanded', 'false'); return; }
+    wrap.replaceChildren();
+    const form = document.createElement('form');
+    form.className = 'comentario-form comentario-reply-form';
+    const ta = document.createElement('textarea');
+    ta.maxLength = 500;
+    ta.minLength = 2;
+    ta.placeholder = TXT.social_reply_placeholder;
+    const count = document.createElement('span');
+    count.className = 'comentario-count';
+    count.textContent = '0/500';
+    ta.addEventListener('input', () => { count.textContent = `${ta.value.length}/500`; });
+    const btn = document.createElement('button');
+    btn.type = 'submit';
+    btn.textContent = TXT.social_reply_send;
+    form.appendChild(ta);
+    form.appendChild(count);
+    form.appendChild(btn);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const texto = ta.value.trim();
+      if (texto.length < 2) return;
+      btn.disabled = true;
+      try {
+        const ref = fsApi.doc(fsApi.collection(db, 'comments'));
+        const batch = fsApi.writeBatch(db);
+        batch.set(ref, {
+          card: cardId,
+          uid: currentUser.uid,
+          autor: currentUser.displayName,
+          texto,
+          ts: fsApi.serverTimestamp(),
+          reportes: 0,
+          oculto: false,
+          parent: rootId,
+        });
+        batch.set(fsApi.doc(db, 'users', currentUser.uid), { lastCommentAt: fsApi.serverTimestamp() }, { merge: true });
+        await batch.commit();
+        const root = panel.querySelector(`.comentario[data-comment="${cssId(rootId)}"]`);
+        const respuestas = root && root.querySelector(':scope > .comentario-rama > .comentario-respuestas');
+        if (respuestas) {
+          respuestas.hidden = false;
+          respuestas.appendChild(construirComentario(panel, ref.id, {
+            uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date(), parent: rootId,
+          }));
+        }
+        setRootReplyCount(panel, rootId, 1);
+        const cur = norm(conteos.get(cardId)); cur.c++;
+        pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
+        ta.value = ''; count.textContent = '0/500';
+        wrap.replaceChildren();
+        if (opener) opener.setAttribute('aria-expanded', 'false');
+      } catch (err) {
+        toast(panel, err && err.code === 'permission-denied' ? TXT.social_comment_rate : TXT.social_comment_error);
+      } finally { btn.disabled = false; }
+    });
+    wrap.appendChild(form);
+    if (opener) opener.setAttribute('aria-expanded', 'true');
+    setTimeout(() => ta.focus(), 0);
+  }
+
+  async function votarComentario(panel, cardId, item, btn) {
+    if (!uid) { abrirAuth('vote'); return; }
+    const commentId = item.dataset.comment;
+    const value = Number(btn.dataset.vote);
+    if (!commentId || (value !== 1 && value !== -1) || enVueloComentario.has(commentId)) return;
+    enVueloComentario.add(commentId);
+    const previo = miVotoComentario.get(commentId);
+    const nuevo = previo === value ? 0 : value;
+    const base = { l: Number(item.dataset.l || 0) || 0, d: Number(item.dataset.d || 0) || 0 };
+    const proy = { l: base.l, d: base.d };
+    if (previo === 1) proy.l--; else if (previo === -1) proy.d--;
+    if (nuevo === 1) proy.l++; else if (nuevo === -1) proy.d++;
+    actualizarConteosComentario(item, proy);
+    pintarVotoComentario(item, nuevo);
+    try {
+      const ref = fsApi.doc(db, 'commentVotes', `${commentId}_${uid}`);
+      if (nuevo === 0) {
+        await fsApi.deleteDoc(ref);
+        miVotoComentario.delete(commentId);
+      } else {
+        await fsApi.setDoc(ref, { comment: commentId, card: cardId, uid, value: nuevo, ts: fsApi.serverTimestamp() });
+        miVotoComentario.set(commentId, nuevo);
+      }
+    } catch (e) {
+      actualizarConteosComentario(item, base);
+      pintarVotoComentario(item, previo);
+      toast(panel, TXT.social_comment_vote_error);
+      console.warn('[sibylla/social] voto comentario:', (e && e.code) || e);
+    } finally {
+      enVueloComentario.delete(commentId);
+    }
+  }
+
+  function actualizarConteosComentario(item, vals) {
+    item.dataset.l = String(Math.max(0, vals.l || 0));
+    item.dataset.d = String(Math.max(0, vals.d || 0));
+    const like = item.querySelector('[data-num="like"]');
+    const dislike = item.querySelector('[data-num="dislike"]');
+    if (like) like.textContent = textoConteo(Number(item.dataset.l));
+    if (dislike) dislike.textContent = textoConteo(Number(item.dataset.d));
+    const likeBtn = item.querySelector('[data-action="comment-like"]');
+    const dislikeBtn = item.querySelector('[data-action="comment-dislike"]');
+    if (likeBtn) likeBtn.setAttribute('aria-label', format(TXT.social_comment_like_aria, { n: Number(item.dataset.l) }));
+    if (dislikeBtn) dislikeBtn.setAttribute('aria-label', format(TXT.social_comment_dislike_aria, { n: Number(item.dataset.d) }));
+  }
+
   async function borrarComentario(panel, cardId, item) {
     if (!confirm(TXT.social_comment_delete_confirm)) return;
     try {
-      await fsApi.deleteDoc(fsApi.doc(db, 'comments', item.dataset.comment));
-      item.remove();
+      const respuestas = Number(item.dataset.respuestas || 0) || 0;
+      const parent = item.dataset.parent || '';
+      if (!parent && respuestas > 0) {
+        await fsApi.updateDoc(fsApi.doc(db, 'comments', item.dataset.comment), { eliminado: true, texto: '', autor: '' });
+        const nuevo = construirComentario(panel, item.dataset.comment, {
+          uid: currentUser.uid, texto: '', autor: '', ts: new Date(), parent: null,
+          eliminado: true, respuestas,
+        });
+        const ramaVieja = item.querySelector(':scope > .comentario-rama');
+        const ramaNueva = nuevo.querySelector(':scope > .comentario-rama');
+        if (ramaVieja && ramaNueva) ramaNueva.replaceChildren(...Array.from(ramaVieja.childNodes));
+        item.replaceWith(nuevo);
+      } else {
+        await fsApi.deleteDoc(fsApi.doc(db, 'comments', item.dataset.comment));
+        item.remove();
+        if (parent) setRootReplyCount(panel, parent, -1);
+      }
       const cur = norm(conteos.get(cardId)); cur.c = Math.max(0, cur.c - 1);
       pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
     } catch (e) { toast(panel, TXT.social_comment_error); }
@@ -591,6 +938,8 @@ function mapearError(code, TXT) {
         tx.set(fsApi.doc(db, 'users', currentUser.uid), { lastReportAt: fsApi.serverTimestamp() }, { merge: true });
       });
       item.remove();
+      const parent = item.dataset.parent || '';
+      if (parent) setRootReplyCount(panel, parent, -1);
       toast(panel, TXT.social_comment_reported);
     } catch (e) {
       if (e && e.code === 'permission-denied') toast(panel, TXT.social_comment_reported);
@@ -611,6 +960,7 @@ function mapearError(code, TXT) {
     if (mostrar) {
       const st = commentState.get(cardId);
       if (st && !st.loaded) cargarComentarios(panel, cardId, false);
+      else cargarMisVotosComentarios(cardId).then(() => pintarTodosVotosComentarios(panel));
       renderForm(panel, cardId);
       const ta = panel.querySelector('textarea');
       if (ta) setTimeout(() => ta.focus(), 0);
@@ -749,6 +1099,8 @@ function mapearError(code, TXT) {
     currentUser = user || null;
     uid = user ? user.uid : null;
     if (user) {
+      miVotoComentario.clear();
+      comentariosVotosCargados.clear();
       sesionEntrar.hidden = true;
       sesionChip.hidden = false;
       pintarAvatar(user);
@@ -760,14 +1112,20 @@ function mapearError(code, TXT) {
       registroReciente = false;
       document.querySelectorAll('.comentarios-panel:not([hidden])').forEach((panel) => {
         const carta = panel.closest('.carta');
-        if (carta) renderForm(panel, carta.id);
+        if (carta) {
+          cargarMisVotosComentarios(carta.id).then(() => pintarTodosVotosComentarios(panel));
+          renderForm(panel, carta.id);
+        }
       });
     } else {
       sesionEntrar.hidden = false;
       sesionChip.hidden = true;
       cerrarSesionMenu();
       miVoto.clear();
+      miVotoComentario.clear();
+      comentariosVotosCargados.clear();
       document.querySelectorAll('.soc-grupo').forEach((g) => pintarVotoPropio(g, undefined));
+      document.querySelectorAll('.comentarios-panel').forEach((panel) => pintarTodosVotosComentarios(panel));
     }
   }
   function cerrarSesionMenu() {

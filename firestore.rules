@@ -33,7 +33,7 @@ service cloud.firestore {
 
       allow create: if request.auth != null
         && request.auth.token.email_verified == true
-        && request.resource.data.keys().hasOnly(['card', 'uid', 'autor', 'texto', 'ts', 'reportes', 'oculto'])
+        && request.resource.data.keys().hasOnly(['card', 'uid', 'autor', 'texto', 'ts', 'reportes', 'oculto', 'parent'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.card is string
         && request.resource.data.card.size() >= 3
@@ -47,6 +47,17 @@ service cloud.firestore {
         && request.resource.data.autor.size() <= 40
         && request.resource.data.reportes == 0
         && request.resource.data.oculto == false
+        && 'parent' in request.resource.data
+        && (request.resource.data.parent == null
+            || (request.resource.data.parent is string
+                && exists(/databases/$(database)/documents/comments/$(request.resource.data.parent))
+                && get(/databases/$(database)/documents/comments/$(request.resource.data.parent)).data.card
+                   == request.resource.data.card
+                && (!('parent' in get(/databases/$(database)/documents/comments/$(request.resource.data.parent)).data)
+                    || get(/databases/$(database)/documents/comments/$(request.resource.data.parent)).data.parent == null)
+                && get(/databases/$(database)/documents/comments/$(request.resource.data.parent)).data.oculto == false
+                && (!('eliminado' in get(/databases/$(database)/documents/comments/$(request.resource.data.parent)).data)
+                    || get(/databases/$(database)/documents/comments/$(request.resource.data.parent)).data.eliminado == false)))
         && request.resource.data.ts == request.time
         && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt == request.time
         && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -54,16 +65,50 @@ service cloud.firestore {
             || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt
                < request.time - duration.value(30, 's'));
 
-      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid
+        && (!('respuestas' in resource.data) || resource.data.respuestas == 0);
 
+      allow update: if (
+          request.auth != null
+          && request.auth.token.email_verified == true
+          && request.auth.uid != resource.data.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportes', 'oculto'])
+          && request.resource.data.reportes == resource.data.reportes + 1
+          && request.resource.data.oculto == (request.resource.data.reportes >= 3 || resource.data.oculto)
+          && !exists(/databases/$(database)/documents/reports/$(commentId + '_' + request.auth.uid))
+          && existsAfter(/databases/$(database)/documents/reports/$(commentId + '_' + request.auth.uid))
+        ) || (
+          request.auth != null
+          && request.auth.uid == resource.data.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eliminado', 'texto', 'autor'])
+          && request.resource.data.eliminado == true
+          && request.resource.data.texto == ''
+          && request.resource.data.autor == ''
+        );
+    }
+
+    // Votos en comentarios: un voto por usuario por comentario. No exige correo
+    // verificado, igual que los votos de tarjeta.
+    match /commentVotes/{voteId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['comment', 'card', 'uid', 'value', 'ts'])
+        && request.resource.data.uid == request.auth.uid
+        && voteId == request.resource.data.comment + '_' + request.auth.uid
+        && request.resource.data.value in [1, -1]
+        && request.resource.data.ts == request.time
+        && exists(/databases/$(database)/documents/comments/$(request.resource.data.comment))
+        && get(/databases/$(database)/documents/comments/$(request.resource.data.comment)).data.card
+           == request.resource.data.card;
       allow update: if request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.uid != resource.data.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportes', 'oculto'])
-        && request.resource.data.reportes == resource.data.reportes + 1
-        && request.resource.data.oculto == (request.resource.data.reportes >= 3 || resource.data.oculto)
-        && !exists(/databases/$(database)/documents/reports/$(commentId + '_' + request.auth.uid))
-        && existsAfter(/databases/$(database)/documents/reports/$(commentId + '_' + request.auth.uid));
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['comment', 'card', 'uid', 'value', 'ts'])
+        && request.resource.data.comment == resource.data.comment
+        && request.resource.data.card == resource.data.card
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.value in [1, -1]
+        && request.resource.data.ts == request.time;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
     // Reportes: ilegibles para clientes. Crear un reporte debe ocurrir junto al

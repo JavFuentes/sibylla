@@ -6,7 +6,7 @@
   },
   "main": "index.js",
   "scripts": {
-    "check": "node --check index.js && node --check seed.js",
+    "check": "node --check index.js && node --check seed.js && node --check backfill-hilos.js",
     "seed": "node seed.js"
   },
   "dependencies": {

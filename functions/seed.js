@@ -25,12 +25,20 @@ async function countVotes(card) {
 }
 
 async function countComments(card) {
-  const snap = await db.collection('comments')
+  const visibles = await db.collection('comments')
     .where('card', '==', card)
     .where('oculto', '==', false)
     .count()
     .get();
-  return Number((snap.data() || {}).count || 0);
+  const eliminados = await db.collection('comments')
+    .where('card', '==', card)
+    .where('oculto', '==', false)
+    .where('eliminado', '==', true)
+    .count()
+    .get();
+  return Math.max(0,
+    Number((visibles.data() || {}).count || 0) -
+    Number((eliminados.data() || {}).count || 0));
 }
 
 async function collectCards(collection) {
