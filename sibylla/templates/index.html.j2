@@ -895,9 +895,9 @@
       <div class="bloque" data-topic="{{ g.id }}">
         <div class="tema" data-topic="{{ g.id }}"><h3>{{ g.label }}</h3><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in g.cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -909,9 +909,9 @@
       <div class="bloque bloque-especial" id="astronomia" data-topic="astronomia">
         <div class="tema" data-topic="astronomia"><h3>{{ t.astro_heading }}</h3><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in astro_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -923,9 +923,9 @@
       <div class="bloque bloque-especial" id="divulgacion" data-topic="divulgacion">
         <div class="tema" data-topic="divulgacion"><h3>{{ t.divulgacion_heading }}</h3><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in divulgacion_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -950,9 +950,9 @@
       <div class="bloque bloque-especial" id="voces" data-topic="social">
         <div class="tema" data-topic="social"><h3>{{ t.social_topic_label }}</h3><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in social_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
