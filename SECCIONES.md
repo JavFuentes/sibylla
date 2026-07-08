@@ -236,12 +236,20 @@ documentadas en `config/sources.yaml` pero **no entran** (no exponen RSS/Atom).
    viejas si faltan; solo repite agencia como último recurso.
 3. **Relleno cruzado:** si un bloque no llena sus 3, el otro toma los cupos
    sobrantes — siempre se mantienen 6.
+4. **Tarjeta APOD:** tras el paso anterior, la tarjeta más antigua de las 6 se
+   reemplaza por la *Astronomy Picture of the Day* de NASA (ver `apod.py`).
+   Si NASA no responde, la sección queda con las 6 noticias normales.
 
 **Orden de las tarjetas:**
 
 - Tarjeta **1** = chilena más reciente.
 - Tarjeta **2** = agencia más reciente.
-- Tarjetas **3–6** = aleatorias con **semilla por día** (estables dentro del día).
+- Tarjetas **3–6** = aleatorias con **semilla por día**; una de ellas es el APOD.
+
+**Nota Stellar-View:** la tarjeta APOD **no se envía** a `stellar-news.json`; la
+app ya muestra la foto del día vía `apod-i18n.json` y su tercera card espera una
+*noticia* de astronomía distinta. El filtro vive en `build_all_sites` (`web.py`) y
+tiene una guardia extra en `_select_stellar_featured`.
 
 > Añadir una fuente: ver "Añadir una fuente a la sección Astronomía" en
 > [AGENTS.md](AGENTS.md) (toca `sources.yaml`, `DEFAULT_FREE_SOURCES` y los sets

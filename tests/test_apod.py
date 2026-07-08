@@ -14,7 +14,7 @@ import requests
 
 import sibylla.apod as apod_mod
 import sibylla.web as web_mod
-from sibylla.apod import build_apod_i18n, fetch_apod
+from sibylla.apod import APOD_SOURCE_ID, build_apod_card, build_apod_i18n, fetch_apod
 from sibylla.web import write_apod_sidecar
 
 _APOD = {
@@ -224,3 +224,62 @@ def test_write_apod_sidecar_sin_apod_no_escribe_nada(monkeypatch, tmp_path):
     assert write_apod_sidecar(translate=False) is None
     assert not (tmp_path / "apod-i18n.json").exists()
     assert not (tmp_path / "apod-i18n").exists()
+
+
+# ---------------------------------------------------------------------------
+# build_apod_card
+# ---------------------------------------------------------------------------
+_PAYLOAD_EN = {
+    "schema": "cl.sibylla.apod_i18n.v1",
+    "generated_at": "2026-06-30T07:17:00Z",
+    "date": "2026-06-30",
+    "title": {"en": "A Galaxy Far Far Away"},
+    "explanation": {"en": "Long English explanation of the picture."},
+}
+
+
+def test_build_apod_card_imagen_basico():
+    """Dia de imagen: source_id correcto, url en formato apYYMMDD.html, imagen del APOD."""
+    from datetime import datetime, timezone
+    card = build_apod_card(_APOD, _PAYLOAD_EN)
+    assert card is not None
+    assert card.source_id == APOD_SOURCE_ID
+    assert card.source_name == "NASA APOD"
+    assert card.tier == 1
+    assert card.url == "https://apod.nasa.gov/apod/ap260630.html"
+    assert card.image == _APOD["url"]
+    assert card.title == "A Galaxy Far Far Away"
+    assert "astronomia" in card.topics
+    assert card.published == datetime(2026, 6, 30, tzinfo=timezone.utc)
+
+
+def test_build_apod_card_video_con_thumbnail():
+    """Dia de video con thumbnail_url: image usa el thumbnail."""
+    apod_video = {**_APOD, "media_type": "video",
+                  "thumbnail_url": "https://i.ytimg.com/vi/abc/hq.jpg"}
+    card = build_apod_card(apod_video, _PAYLOAD_EN)
+    assert card is not None
+    assert card.image == "https://i.ytimg.com/vi/abc/hq.jpg"
+
+
+def test_build_apod_card_video_sin_thumbnail():
+    """Dia de video sin thumbnail: image es None (degrada al placeholder CSS)."""
+    apod_video = {**_APOD, "media_type": "video"}
+    card = build_apod_card(apod_video, _PAYLOAD_EN)
+    assert card is not None
+    assert card.image is None
+
+
+def test_build_apod_card_dedup_key_estable():
+    """dedup_key se basa en la URL (canonical): apod:date no colisiona con noticias."""
+    card = build_apod_card(_APOD, _PAYLOAD_EN)
+    assert card is not None
+    # La URL canonicalizada determina el dedup_key; el mismo APOD siempre da el mismo key.
+    assert card.dedup_key == build_apod_card(_APOD, _PAYLOAD_EN).dedup_key
+
+
+def test_build_apod_card_datos_malformados_devuelve_none():
+    """Si el payload no tiene 'en' en title, devuelve None sin lanzar."""
+    malo = {"title": {}, "explanation": {"en": "x"}}
+    result = build_apod_card(_APOD, malo)
+    assert result is None

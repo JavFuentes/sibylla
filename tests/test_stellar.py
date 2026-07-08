@@ -178,6 +178,30 @@ def test_record_recorta_a_max():
     assert out[-1]["id"] == "nuevo"
 
 
+# ---------------------------------------------------------------------------
+# Exclusion de APOD: nunca puede ser la destacada de Stellar-View
+# ---------------------------------------------------------------------------
+def test_apod_excluido_de_stellar_aunque_tenga_imagen():
+    """Una tarjeta APOD (source_id='apod') no puede salir destacada aunque tenga imagen,
+    que es el criterio de mayor peso en _select_stellar_featured."""
+    from sibylla.apod import APOD_SOURCE_ID
+    apod_item = _item(APOD_SOURCE_ID, image=IMG)
+    esa_item = _item("esa", image=IMG)
+    # APOD tiene imagen al igual que esa, pero debe quedar excluida
+    result = _select_stellar_featured([apod_item, esa_item], {}, today=_TODAY)
+    assert result is not None
+    assert result.source_id != APOD_SOURCE_ID
+    assert result.source_id == "esa"
+
+
+def test_apod_excluido_pool_con_solo_apod_devuelve_none():
+    """Si el unico item en el pool es APOD, devuelve None (no hay candidatos validos)."""
+    from sibylla.apod import APOD_SOURCE_ID
+    apod_item = _item(APOD_SOURCE_ID, image=IMG)
+    result = _select_stellar_featured([apod_item], {}, today=_TODAY)
+    assert result is None
+
+
 def test_select_muta_historial_via_payload():
     # build_stellar_news_payload debe registrar la destacada in place.
     from sibylla.web import build_stellar_news_payload

@@ -28,7 +28,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .apod import build_apod_i18n, fetch_apod
+from .apod import APOD_SOURCE_ID, build_apod_card, build_apod_i18n, fetch_apod
 from .config import ROOT, get_google_verification, get_nasa_api_key, get_site_url, load_env, load_social_config
 from .i18n import load_translations, t
 from .models import NewsItem
@@ -861,6 +861,11 @@ def _select_stellar_featured(
     y ese item sigue en el pool, se reutiliza para que una segunda corrida del
     dia (el cron tardio o un workflow_dispatch manual) no cambie lo ya publicado.
     """
+    # La tarjeta APOD no es candidata a destacada: Stellar-View ya muestra el APOD
+    # directamente (apod-i18n.json); la tercera card de la app espera una *noticia*
+    # de astronomía distinta. Este filtro es la guardia de seguridad; el caller
+    # también excluye APOD antes de pasar la lista (doble protección).
+    astro_items = [it for it in astro_items if it.source_id != APOD_SOURCE_ID]
     if not astro_items:
         return None
     history = history or []
@@ -993,7 +998,12 @@ def _write_apod_i18n_archive(payload: dict) -> Path:
     return out
 
 
-def write_apod_sidecar(*, translate: bool = True, tracker: list[dict] | None = None) -> Path | None:
+def write_apod_sidecar(
+    *,
+    translate: bool = True,
+    tracker: list[dict] | None = None,
+    payload: dict | None = None,
+) -> Path | None:
     """Genera y escribe `apod-i18n.json` + su copia historica, sin tocar el resto del sitio.
 
     NASA publica el APOD ~2-3 AM Chile, pero el build completo (`build_all_sites`)
@@ -1001,17 +1011,25 @@ def write_apod_sidecar(*, translate: bool = True, tracker: list[dict] | None = N
     un cron aparte, mas temprano, para achicar a minutos la ventana en la que
     Stellar-View muestra el APOD de hoy en ingles (ver sibylla/apod.py). Idempotente:
     el build de las 11 vuelve a escribir el mismo archivo sin duplicar trabajo raro
-    (y su copia historica, con el mismo nombre de archivo por fecha)."""
-    # Se auto-suficiente en .env: `--apod-only` (cli.py) llega aqui SIN pasar por
-    # run_pipeline (que es quien normalmente carga el .env). En CI no hace falta
-    # (las vars ya vienen inyectadas por el workflow), pero en corridas/pruebas
-    # locales sin esto NASA_API_KEY y el proveedor LLM quedan sin configurar.
-    load_env()
-    apod_data = fetch_apod(get_nasa_api_key())
-    if apod_data is None:
-        return None
-    SITE_DIR.mkdir(parents=True, exist_ok=True)
-    payload = build_apod_i18n(apod_data, translate=translate, tracker=tracker)
+    (y su copia historica, con el mismo nombre de archivo por fecha).
+
+    Si se pasa `payload` (ya construido por `build_all_sites`), se reutiliza sin
+    volver a llamar a NASA ni al LLM. Sin `payload` (corrida independiente via
+    `--apod-only`), lo obtiene y traduce desde cero."""
+    if payload is None:
+        # Corrida independiente (--apod-only): carga .env, baja y traduce el APOD.
+        # Se auto-suficiente en .env: `--apod-only` llega aqui SIN pasar por
+        # run_pipeline (que es quien normalmente carga el .env). En CI no hace falta
+        # (las vars ya vienen inyectadas por el workflow), pero en corridas locales
+        # sin esto NASA_API_KEY y el proveedor LLM quedan sin configurar.
+        load_env()
+        apod_data = fetch_apod(get_nasa_api_key())
+        if apod_data is None:
+            return None
+        SITE_DIR.mkdir(parents=True, exist_ok=True)
+        payload = build_apod_i18n(apod_data, translate=translate, tracker=tracker)
+    else:
+        SITE_DIR.mkdir(parents=True, exist_ok=True)
     _write_apod_i18n_archive(payload)
     return _write_apod_i18n(payload)
 
@@ -1335,13 +1353,23 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     divulgacion_raw = [it for it in items if _is_divulgacion(it)]
     social_raw = [it for it in items if _is_social(it)]
 
-    # Seleccionar 6 tarjetas de astronomía.
+    # Seleccionar 6 tarjetas de astronomía (sin el APOD aún: se inyecta después).
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     astro_top = _select_astronomia(astro_raw, today) if astro_raw else []
     divulgacion_top = _select_divulgacion(divulgacion_raw) if divulgacion_raw else []
     if "divulgacion" in topics:
         log.info("Divulgación: %s videos recibidos, %s tarjetas seleccionadas",
                  len(divulgacion_raw), len(divulgacion_top))
+
+    # APOD del día: se descarga una vez aquí y se reutiliza para (a) la tarjeta
+    # de la sección Astronomía y (b) apod-i18n.json (sidecar de Stellar-View).
+    # La traducción comparte el cache translations.json con el resto del build.
+    apod_data = fetch_apod(get_nasa_api_key())
+    apod_payload = None
+    apod_card = None
+    if apod_data is not None:
+        apod_payload = build_apod_i18n(apod_data, translate=translate, tracker=translate_tracker)
+        apod_card = build_apod_card(apod_data, apod_payload)
 
     # Fetch house posts (cuentas propias de Sibylla) y seleccionar 6 tarjetas.
     from .fetchers import fetch_house_posts
@@ -1356,6 +1384,8 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     sibylla_items = load_publicaciones()
 
     # Traducción de tarjetas (título + snippet) al español si hay LLM.
+    # El APOD NO entra aquí: ya viene traducido de build_apod_i18n (mismo LLM,
+    # mismo cache); inyectarlo aquí gastaría tokens de más para el mismo texto.
     translations = None
     if translate:
         by_lang = _build_translations(normal_items, topics, max_por_tema,
@@ -1365,10 +1395,43 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
         translations = by_lang.get("es")
 
     # Resúmenes en español de las tarjetas renderizadas (botón "Resumen" + acordeón).
+    # Igual que con traducciones: el APOD se inyecta después con su explicación ES.
     from .resumen import build_resumenes
     rendered_for_resumen = _rendered_items(normal_items, topics, max_por_tema,
                                            social_top, astro_top)
     resumenes = build_resumenes(rendered_for_resumen, tracker=translate_tracker)
+
+    # Inyectar tarjeta APOD en la sección Astronomía: reemplaza la más antigua,
+    # o rellena si hay menos de 6. La sección de Stellar-View recibe las tarjetas
+    # SIN el APOD (la app ya muestra el APOD aparte vía apod-i18n.json; la
+    # tercera card de la app espera una noticia distinta).
+    if apod_card is not None:
+        if len(astro_top) >= ASTRO_MAX_TOTAL:
+            oldest_i = min(
+                range(len(astro_top)),
+                key=lambda i: astro_top[i].published or datetime.min.replace(tzinfo=timezone.utc),
+            )
+            log.info(
+                "APOD: reemplaza '%s' (%s) en la sección Astronomía.",
+                astro_top[oldest_i].source_id,
+                astro_top[oldest_i].published,
+            )
+            astro_top[oldest_i] = apod_card
+        else:
+            astro_top.append(apod_card)
+        # Inyectar traducción y resumen en ES desde el payload ya construido
+        # (cero llamadas LLM extra; si no hay ES, la tarjeta cae al inglés original).
+        if apod_payload:
+            es_title = apod_payload["title"].get("es")
+            es_explanation = apod_payload["explanation"].get("es")
+            if es_title:
+                translations = translations or {}
+                translations[apod_card.dedup_key] = {
+                    "title": es_title,
+                    "snippet": _snippet(es_explanation or ""),
+                }
+            if es_explanation:
+                resumenes[apod_card.dedup_key] = es_explanation
 
     # Conteos sociales pre-agregados (1 lectura REST pública). Si falla, el
     # orden editorial queda intacto y el cliente hidrata lo que pueda.
@@ -1421,8 +1484,12 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # publica a la web: evita repetir la misma noticia dia tras dia. Si no
     # existe (host nuevo), arranca vacio y no penaliza repeticiones.
     stellar_history = _load_stellar_history()
+    # Stellar-View recibe las tarjetas de astronomía SIN el APOD: la app ya
+    # muestra la foto del día vía apod-i18n.json; su tercera card espera una
+    # noticia distinta. _select_stellar_featured lleva además su propia guardia.
+    stellar_astro = [it for it in astro_top if it.source_id != APOD_SOURCE_ID]
     stellar_payload = build_stellar_news_payload(
-        astro_top,
+        stellar_astro,
         site_url=site_url,
         generated_at=ahora,
         translations=translations,
@@ -1438,12 +1505,15 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     _save_stellar_history(stellar_history)
 
     # JSON público para Stellar-View: traducción es/it del APOD de HOY, más su
-    # copia histórica en apod-i18n/<fecha>.json (ver sibylla/apod.py). Si la
-    # API de NASA falla, se omiten ambos archivos en esta corrida y la app cae
-    # al inglés (nunca rompe el build). Normalmente ya los dejó escritos el
-    # cron temprano de regenerate-apod.yml; esto los re-escribe (idempotente)
-    # por si NASA cambió algo o ese cron falló.
-    apod_path = write_apod_sidecar(translate=translate, tracker=translate_tracker)
+    # copia histórica en apod-i18n/<fecha>.json (ver sibylla/apod.py). Se
+    # reutiliza el payload ya construido arriba (sin llamar de nuevo a NASA ni
+    # al LLM). Si la API de NASA falló, apod_payload es None y write_apod_sidecar
+    # lo reintenta desde cero (puede salir bien si fue un fallo transitorio).
+    # Normalmente el cron temprano de regenerate-apod.yml ya dejó escrito el
+    # archivo; esto lo re-escribe (idempotente). Nunca rompe el build.
+    apod_path = write_apod_sidecar(
+        translate=translate, tracker=translate_tracker, payload=apod_payload
+    )
     if apod_path is not None:
         paths.append(apod_path)
 

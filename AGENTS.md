@@ -273,6 +273,27 @@ Tras los temas principales, antes de "Voces de la red", se muestra la sección
 4. **Orden:** tarjeta **1 = chilena más reciente**, tarjeta **2 = agencia más
    reciente**, posiciones **3–6 aleatorias** (semilla por día → estable).
 
+#### Tarjeta APOD
+
+Cada build inyecta la *Astronomy Picture of the Day* de NASA como tarjeta extra en
+la sección. La tarjeta **reemplaza la más antigua** de las 6 seleccionadas por
+`_select_astronomia`; si hay menos de 6, rellena. Nunca rompe el build: si NASA
+no responde, la sección queda con las 6 noticias normales.
+
+- `apod.py`: `build_apod_card(apod, payload) → NewsItem | None` construye la tarjeta
+  desde la respuesta de la API de NASA y el payload ya traducido. `source_id = "apod"`
+  (fuera de `ASTRO_SOURCE_IDS`) para que el pipeline no lo recoja por RSS.
+- `web.py` (`build_all_sites`): llama a `fetch_apod` + `build_apod_i18n` una sola vez;
+  reutiliza el payload para (a) construir la tarjeta y (b) escribir `apod-i18n.json`.
+  Inyecta el título y la explicación en ES desde el payload (sin token LLM extra).
+- **Stellar-View**: la tarjeta APOD se **excluye** de `stellar-news.json` (filtro en
+  `build_all_sites` y guardia en `_select_stellar_featured`). La app ya muestra la foto
+  del día vía `apod-i18n.json`; su tercera card espera una noticia distinta.
+- `static/placeholder-apod.png`: fallback visual para los días que el APOD es un video
+  sin miniatura (infrecuente). La tarjeta casi siempre tiene imagen real.
+- Tests: `tests/test_apod.py` cubre `build_apod_card`; `tests/test_stellar.py` cubre
+  la exclusión de APOD de la selección de Stellar-View.
+
 #### Integración
 
 - `fetchers.py`: `TOPIC_CONFIG['astronomia'] = {}` (pass-through, como `nacional`).

@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 
 import requests
 
+from .models import NewsItem
 from .net import safe_error
 from .translate import load_cache, save_cache, translate_cards
 
@@ -31,6 +32,10 @@ log = logging.getLogger("sibylla")
 
 APOD_URL = "https://api.nasa.gov/planetary/apod"
 APOD_I18N_SCHEMA = "cl.sibylla.apod_i18n.v1"
+# source_id reservado para la tarjeta APOD dentro de la sección Astronomía.
+# Debe estar FUERA de ASTRO_SOURCE_IDS (web.py) para que el pipeline no lo procese:
+# la tarjeta se construye desde la API de NASA, no desde el fetch de fuentes RSS.
+APOD_SOURCE_ID = "apod"
 
 # 'en' es el original de NASA (no requiere traduccion).
 APOD_I18N_LANGS = ("es", "it")
@@ -111,3 +116,37 @@ def build_apod_i18n(apod: dict, *, translate: bool, tracker: list[dict] | None =
             payload["explanation"][lang] = got["snippet"]
     save_cache(cache)
     return payload
+
+
+def build_apod_card(apod: dict, payload: dict) -> NewsItem | None:
+    """Convierte el APOD del día en un NewsItem para la sección Astronomía.
+
+    El título y snippet que muestra la web se inyectan en ES desde `payload`
+    en `build_all_sites` (web.py), sin llamar al LLM de nuevo. Aquí solo se
+    ponen los valores originales en inglés como base (y como fallback si falla
+    la inyección). Devuelve None ante cualquier dato malformado.
+
+    `apod`    — respuesta cruda de la API de NASA (ver `fetch_apod`).
+    `payload` — resultado de `build_apod_i18n` (tiene title/explanation en "en").
+    """
+    try:
+        date_obj = datetime.strptime(apod["date"], "%Y-%m-%d")
+        apod_url = f"https://apod.nasa.gov/apod/ap{date_obj.strftime('%y%m%d')}.html"
+        image = (
+            apod["url"] if apod.get("media_type") == "image"
+            else apod.get("thumbnail_url")
+        )
+        return NewsItem(
+            title=payload["title"]["en"],
+            url=apod_url,
+            source_id=APOD_SOURCE_ID,
+            source_name="NASA APOD",
+            tier=1,
+            topics=["astronomia"],
+            published=datetime(date_obj.year, date_obj.month, date_obj.day, tzinfo=timezone.utc),
+            summary=payload["explanation"]["en"],
+            image=image,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo construir la tarjeta APOD (%s); se omite de la sección Astronomía.", exc)
+        return None
