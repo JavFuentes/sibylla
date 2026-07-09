@@ -1,0 +1,67 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "commentVotes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "comment", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "card", "order": "ASCENDING" },
+        { "fieldPath": "oculto", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "card", "order": "ASCENDING" },
+        { "fieldPath": "oculto", "order": "ASCENDING" },
+        { "fieldPath": "parent", "order": "ASCENDING" },
+        { "fieldPath": "ts", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "card", "order": "ASCENDING" },
+        { "fieldPath": "oculto", "order": "ASCENDING" },
+        { "fieldPath": "ts", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "parent", "order": "ASCENDING" },
+        { "fieldPath": "oculto", "order": "ASCENDING" },
+        { "fieldPath": "eliminado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "parent", "order": "ASCENDING" },
+        { "fieldPath": "oculto", "order": "ASCENDING" },
+        { "fieldPath": "ts", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "votes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "card", "order": "ASCENDING" },
+        { "fieldPath": "value", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
