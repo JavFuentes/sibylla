@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sibylla · Codebase Graph</title>
+<style>
+  :root{
+    --obsidian:#060914;
+    --deep:#09111c;
+    --panel:#071923;
+    --panel-2:#0b2230;
+    --line:rgba(169,242,238,.12);
+    --text:#e9e2cf;
+    --muted:#81909b;
+    --gold:#d9b85f;
+    --gold-soft:#f2dd93;
+    --cyan:#5ee6e0;
+    --cyan-soft:#a8f2ee;
+    --violet:#b05cff;
+    --rose:#ff668f;
+    --orange:#ff9654;
+    --green:#42d989;
+    --blue:#68a7ff;
+    --grey:#92a0ad;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ width:100%; height:100%; margin:0; overflow:hidden; }
+  body{
+    color:var(--text);
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(900px 720px at 62% 48%, rgba(94,230,224,.12), transparent 58%),
+      radial-gradient(560px 520px at 74% 26%, rgba(176,92,255,.14), transparent 56%),
+      radial-gradient(840px 640px at 40% 80%, rgba(217,184,95,.08), transparent 58%),
+      linear-gradient(135deg,#050712 0%, #080d19 44%, #050813 100%);
+  }
+
+  .grain{
+    position:fixed; inset:0; pointer-events:none; opacity:.18; mix-blend-mode:screen;
+    background-image:
+      radial-gradient(1px 1px at 16px 24px, rgba(255,255,255,.34), transparent),
+      radial-gradient(1px 1px at 140px 92px, rgba(94,230,224,.32), transparent),
+      radial-gradient(1px 1px at 260px 44px, rgba(217,184,95,.32), transparent),
+      radial-gradient(1px 1px at 340px 214px, rgba(255,255,255,.24), transparent);
+    background-size:380px 260px;
+  }
+
+  .app{ height:100%; display:grid; grid-template-rows:44px minmax(0,1fr); }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:18px;
+    height:44px; padding:0 14px 0 16px;
+    background:rgba(5,20,27,.86); border-bottom:1px solid rgba(94,230,224,.11);
+    backdrop-filter:blur(14px);
+  }
+  .brand{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .dot{ width:7px; height:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 18px var(--cyan); }
+  .brand strong{ font-size:13px; letter-spacing:.02em; font-weight:650; white-space:nowrap; }
+  .tabs{ display:flex; gap:6px; margin-left:18px; }
+  .tab{ font-size:12px; color:#6fb4ac; padding:7px 12px; border-radius:7px; }
+  .tab.active{ color:#27d7c5; background:rgba(39,215,197,.12); }
+  .query{
+    margin-left:auto; min-width:300px; max-width:520px; width:34vw; height:28px;
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:0 10px 0 13px; border-radius:8px;
+    color:#798b95; font-size:10px; letter-spacing:.09em; text-transform:uppercase;
+    background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.035);
+  }
+  .query b{ color:#14d09f; font-weight:500; text-transform:none; letter-spacing:.02em; }
+  .x{ opacity:.45; }
+
+  .layout{ min-height:0; display:grid; grid-template-columns:260px minmax(0,1fr); }
+  aside{
+    position:relative; padding:16px 12px 14px;
+    background:rgba(6,25,32,.78); border-right:1px solid rgba(94,230,224,.12);
+    overflow:hidden;
+  }
+  aside:after{
+    content:""; position:absolute; right:-42px; top:0; width:64px; height:100%; pointer-events:none;
+    background:linear-gradient(90deg, rgba(94,230,224,.08), transparent);
+  }
+
+  .side-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:17px; }
+  .side-title{ color:#96a5ae; font-size:11px; letter-spacing:.18em; text-transform:uppercase; }
+  .side-toggle{ color:#2bd3bd; font-size:10px; letter-spacing:.04em; }
+  .side-toggle span{ color:#60727c; margin:0 6px; }
+
+  .section{ margin:0 0 22px; }
+  .section h2{ margin:0 0 10px; color:#748590; font-size:11px; font-weight:500; letter-spacing:.04em; }
+  .chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:5px; min-height:22px; padding:3px 7px;
+    color:#c1ccd1; border:1px solid rgba(164,185,198,.17); border-radius:6px;
+    background:rgba(255,255,255,.045); font-size:10px; line-height:1;
+  }
+  .chip i{ width:5px; height:5px; border-radius:50%; background:var(--c); box-shadow:0 0 12px var(--c); }
+  .chip b{ color:var(--c); font-weight:700; }
+  .chip em{ color:#64747e; font-style:normal; }
+
+  .search{
+    width:100%; height:33px; border-radius:8px; border:1px solid rgba(164,185,198,.15);
+    background:rgba(255,255,255,.055); color:#81909b; display:flex; align-items:center;
+    padding:0 12px; font-size:12px; margin:16px 0 13px;
+  }
+  .tree{ border-top:1px solid rgba(255,255,255,.05); padding-top:8px; }
+  .tree-row{ display:grid; grid-template-columns:10px 1fr auto; gap:6px; align-items:center; height:28px; color:#9ba7ad; font-size:12px; }
+  .tree-row.active{ margin:0 -12px; padding:0 12px; background:rgba(255,255,255,.055); color:#d7dfdf; }
+  .tree-row .caret{ color:#60727c; font-size:10px; }
+  .tree-row .count{ color:#4f606a; font-size:10px; }
+
+  main{ position:relative; min-width:0; overflow:hidden; }
+  .stats{
+    position:absolute; top:18px; left:18px; z-index:3; display:flex; align-items:center; gap:14px;
+    color:#778893; font-family:"SFMono-Regular", Consolas, monospace; font-size:11px;
+  }
+  .stats b{ color:#bdc9c7; font-weight:400; }
+  .refresh{
+    position:absolute; top:16px; right:16px; z-index:3; height:34px; padding:0 13px;
+    border-radius:8px; border:1px solid rgba(255,255,255,.06); color:#d9e2df;
+    background:rgba(255,255,255,.035); font-size:13px; display:grid; place-items:center;
+  }
+  .signature{
+    position:absolute; left:28px; bottom:24px; z-index:3; width:min(360px,calc(100% - 56px));
+    padding:16px 17px 15px; border-radius:18px;
+    background:linear-gradient(180deg,rgba(8,18,32,.72),rgba(7,13,24,.58));
+    border:1px solid rgba(217,184,95,.18); box-shadow:0 22px 70px rgba(0,0,0,.3);
+    backdrop-filter:blur(14px);
+  }
+  .signature .eyebrow{ color:var(--gold); font-size:10px; letter-spacing:.18em; text-transform:uppercase; }
+  .signature h1{ margin:6px 0 8px; font-family:Georgia, "Times New Roman", serif; font-weight:500; font-size:26px; line-height:1.05; letter-spacing:.01em; }
+  .signature p{ margin:0; color:#aab3ad; font-size:12px; line-height:1.55; }
+  .signature strong{ color:#eae3cf; font-weight:600; }
+
+  canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  svg.labels{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+  .label text{ font-size:10px; fill:#dfe7de; paint-order:stroke; stroke:#050914; stroke-width:3.8px; stroke-linejoin:round; letter-spacing:.01em; }
+  .label.major text{ font-size:12px; font-weight:700; fill:#fff7d8; }
+  .label .tag{ font-size:8px; fill:#7f8f96; text-transform:uppercase; letter-spacing:.11em; }
+
+  @media (max-width:900px){
+    .layout{ grid-template-columns:1fr; }
+    aside{ display:none; }
+    .query{ display:none; }
+    .signature{ bottom:18px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *,*:before,*:after{ animation:none !important; transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="dot"></span><strong>Codebase Memory</strong><nav class="tabs" aria-label="Vista"><span class="tab active">Graph</span><span class="tab">Projects</span><span class="tab">Control</span></nav></div>
+    <div class="query"><span>GRAPH</span><b>C-Users-jfuen-Desktop-Sibylla</b><span class="x">×</span></div>
+  </header>
+  <div class="layout">
+    <aside>
+      <div class="side-head"><div class="side-title">Filters</div><div class="side-toggle">All <span>|</span> None</div></div>
+      <section class="section">
+        <h2>Nodes</h2>
+        <div class="chips" id="nodeChips"></div>
+      </section>
+      <section class="section">
+        <h2>Edges</h2>
+        <div class="chips" id="edgeChips"></div>
+      </section>
+      <section class="section">
+        <h2>Vista</h2>
+        <div class="chip" style="--c:var(--cyan)"><i></i><b>Show labels</b></div>
+        <div class="search">Search...</div>
+        <div class="tree" id="tree"></div>
+      </section>
+    </aside>
+    <main>
+      <canvas id="graph" aria-label="Grafo visual del proyecto Sibylla"></canvas>
+      <svg class="labels" id="labels" aria-hidden="true"></svg>
+      <div class="stats"><span><b>1.896</b> nodes</span><span>/</span><span><b>5.149</b> edges</span><span>· curated view</span></div>
+      <div class="refresh">Refresh</div>
+      <div class="signature">
+        <div class="eyebrow">Sibylla · Architecture Map</div>
+        <h1>Un oráculo estático con ingesta viva.</h1>
+        <p>Vista curada desde <strong>codebase-memory-mcp</strong>: pipeline, fuentes, IA, web, administración y tests, reducidos a una constelación legible para README.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const palette = {
+  core: '#f2dd93', ingest: '#5ee6e0', process: '#42d989', ai: '#b05cff', web: '#68a7ff',
+  admin: '#ff9654', data: '#ff668f', test: '#92a0ad', config: '#d9b85f', source: '#7de6a9'
+};
+
+const meta = {
+  nodes: { Function:611, Variable:722, Section:173, Route:111, File:85, Module:84, Method:62, Class:22, Folder:13, Package:8 },
+  edges: { DEFINES:1674, CALLS:1161, USAGE:1024, TESTS:334, WRITES:258, IMPORTS:163, SEMANTICALLY_RELATED:175, FILE_CHANGES_WITH:118, HTTP_CALLS:6 }
+};
+
+const nodes = [
+  {id:'Sibylla', label:'Sibylla', type:'core', group:'core', size:25, fixed:true, x:.53, y:.51, tag:'project'},
+  {id:'cli.py', label:'cli.py', type:'entry', group:'core', size:15, x:.40, y:.36, tag:'entry'},
+  {id:'models.py', label:'models.py', type:'module', group:'core', size:18, x:.48, y:.35, tag:'NewsItem'},
+  {id:'config.py', label:'config.py', type:'module', group:'config', size:12, x:.36, y:.52},
+  {id:'i18n.py', label:'i18n.py', type:'module', group:'config', size:10, x:.64, y:.34},
+  {id:'net.py', label:'net.py', type:'module', group:'core', size:10, x:.32, y:.43},
+
+  {id:'fetchers.py', label:'fetchers.py', type:'module', group:'ingest', size:22, x:.30, y:.28, tag:'611 funcs'},
+  {id:'articles.py', label:'articles.py', type:'module', group:'ingest', size:12, x:.23, y:.40},
+  {id:'apod.py', label:'apod.py', type:'module', group:'ingest', size:11, x:.18, y:.29},
+  {id:'canales.py', label:'canales.py', type:'module', group:'ingest', size:13, x:.25, y:.61, tag:'YouTube'},
+  {id:'social_sync.py', label:'social_sync.py', type:'module', group:'ingest', size:10, x:.19, y:.50},
+  {id:'sources.yaml', label:'sources.yaml', type:'config', group:'config', size:17, x:.20, y:.72, tag:'fuentes'},
+
+  {id:'pipeline.py', label:'pipeline.py', type:'module', group:'process', size:24, x:.50, y:.56, tag:'orquesta'},
+  {id:'cluster.py', label:'cluster.py', type:'module', group:'process', size:13, x:.42, y:.66},
+  {id:'nacional.py', label:'nacional.py', type:'module', group:'process', size:15, x:.57, y:.69, tag:'Chile'},
+  {id:'digest.py', label:'digest.py', type:'module', group:'process', size:12, x:.69, y:.60},
+  {id:'summarize.py', label:'summarize.py', type:'module', group:'ai', size:12, x:.70, y:.48},
+  {id:'llm.py', label:'llm.py', type:'module', group:'ai', size:20, x:.76, y:.36, tag:'LLM'},
+  {id:'translate.py', label:'translate.py', type:'module', group:'ai', size:14, x:.77, y:.50},
+  {id:'resumen.py', label:'resumen.py', type:'module', group:'ai', size:14, x:.78, y:.62},
+
+  {id:'web.py', label:'web.py', type:'module', group:'web', size:24, x:.60, y:.27, tag:'HTML'},
+  {id:'templates', label:'templates', type:'folder', group:'web', size:18, x:.70, y:.20},
+  {id:'index.html.j2', label:'index.html.j2', type:'template', group:'web', size:12, x:.78, y:.18},
+  {id:'pub.html.j2', label:'pub.html.j2', type:'template', group:'web', size:8, x:.84, y:.24},
+  {id:'publicaciones.py', label:'publicaciones.py', type:'module', group:'web', size:13, x:.66, y:.74, tag:'SIBYLLA'},
+  {id:'admin.py', label:'admin.py', type:'module', group:'admin', size:17, x:.43, y:.82, tag:'dashboard'},
+  {id:'dashboard.py', label:'dashboard.py', type:'module', group:'admin', size:12, x:.33, y:.80},
+  {id:'metrics.py', label:'metrics.py', type:'module', group:'admin', size:12, x:.50, y:.86},
+
+  {id:'tests', label:'tests', type:'folder', group:'test', size:19, x:.82, y:.78, tag:'24 files'},
+  {id:'test_models.py', label:'test_models.py', type:'test', group:'test', size:9, x:.88, y:.70},
+  {id:'test_pipeline.py', label:'test_pipeline.py', type:'test', group:'test', size:9, x:.88, y:.80},
+  {id:'test_web.py', label:'test_web.py', type:'test', group:'test', size:9, x:.79, y:.88},
+  {id:'test_nacional.py', label:'test_nacional.py', type:'test', group:'test', size:8, x:.72, y:.84},
+  {id:'workflows', label:'workflows', type:'folder', group:'config', size:12, x:.55, y:.12},
+
+  {id:'fetch_youtube', label:'fetch_youtube', type:'function', group:'ingest', size:8, x:.12, y:.55},
+  {id:'fetch_bluesky', label:'fetch_bluesky', type:'function', group:'ingest', size:8, x:.13, y:.45},
+  {id:'fetch_mastodon', label:'fetch_mastodon', type:'function', group:'ingest', size:8, x:.14, y:.36},
+  {id:'fetch_hackernews', label:'fetch_hackernews', type:'function', group:'ingest', size:8, x:.26, y:.18},
+  {id:'fetch_pubmed', label:'fetch_pubmed', type:'function', group:'ingest', size:8, x:.36, y:.17},
+  {id:'fetch_arxiv', label:'fetch_arxiv', type:'function', group:'ingest', size:8, x:.46, y:.18},
+  {id:'is_relevant', label:'is_relevant', type:'function', group:'process', size:9, x:.38, y:.25},
+  {id:'classify_topics', label:'classify_topics', type:'function', group:'process', size:8, x:.39, y:.20},
+  {id:'NewsItem', label:'NewsItem', type:'class', group:'core', size:12, x:.52, y:.30},
+  {id:'LLMProvider', label:'LLMProvider', type:'class', group:'ai', size:11, x:.86, y:.42},
+  {id:'OpenAICompatibleProvider', label:'OpenAICompatibleProvider', type:'class', group:'ai', size:9, x:.90, y:.51},
+  {id:'build_all_sites', label:'build_all_sites', type:'function', group:'web', size:9, x:.56, y:.18},
+  {id:'run_pipeline', label:'run_pipeline', type:'function', group:'process', size:10, x:.48, y:.62},
+  {id:'fetch_source', label:'fetch_source', type:'function', group:'ingest', size:9, x:.26, y:.35},
+  {id:'cluster_stories', label:'cluster_stories', type:'function', group:'process', size:8, x:.41, y:.73},
+  {id:'juez_nacional', label:'juez_nacional', type:'function', group:'process', size:8, x:.62, y:.78},
+  {id:'render_digest', label:'render_digest', type:'function', group:'process', size:8, x:.73, y:.68},
+  {id:'translate_cards', label:'translate_cards', type:'function', group:'ai', size:8, x:.84, y:.58},
+  {id:'build_resumenes', label:'build_resumenes', type:'function', group:'ai', size:8, x:.86, y:.66}
+];
+
+const edges = [
+  ['Sibylla','cli.py','entry'], ['Sibylla','models.py','defines'], ['Sibylla','pipeline.py','orchestrates'], ['Sibylla','web.py','renders'],
+  ['cli.py','pipeline.py','calls'], ['cli.py','web.py','calls'], ['cli.py','admin.py','calls'], ['cli.py','config.py','imports'],
+  ['config.py','sources.yaml','loads'], ['fetchers.py','sources.yaml','configures'], ['pipeline.py','sources.yaml','selects'],
+  ['models.py','NewsItem','defines'], ['fetchers.py','NewsItem','returns'], ['pipeline.py','NewsItem','passes'], ['web.py','NewsItem','formats'],
+  ['pipeline.py','fetchers.py','calls'], ['pipeline.py','cluster.py','calls'], ['pipeline.py','nacional.py','calls'], ['pipeline.py','models.py','uses'],
+  ['fetchers.py','fetch_source','defines'], ['fetchers.py','fetch_youtube','defines'], ['fetchers.py','fetch_bluesky','defines'], ['fetchers.py','fetch_mastodon','defines'],
+  ['fetchers.py','fetch_hackernews','defines'], ['fetchers.py','fetch_pubmed','defines'], ['fetchers.py','fetch_arxiv','defines'], ['fetchers.py','is_relevant','calls'], ['fetchers.py','classify_topics','calls'],
+  ['fetch_youtube','canales.py','related'], ['fetch_bluesky','social_sync.py','related'], ['fetch_mastodon','social_sync.py','related'], ['articles.py','resumen.py','feeds'], ['apod.py','web.py','injects'],
+  ['cluster.py','cluster_stories','defines'], ['pipeline.py','run_pipeline','defines'], ['run_pipeline','fetch_source','calls'], ['run_pipeline','cluster_stories','calls'],
+  ['nacional.py','juez_nacional','defines'], ['nacional.py','llm.py','calls'], ['nacional.py','models.py','uses'],
+  ['digest.py','render_digest','defines'], ['summarize.py','llm.py','calls'], ['summarize.py','digest.py','fallback'],
+  ['llm.py','LLMProvider','defines'], ['llm.py','OpenAICompatibleProvider','defines'], ['translate.py','llm.py','calls'], ['resumen.py','llm.py','calls'],
+  ['translate.py','translate_cards','defines'], ['resumen.py','build_resumenes','defines'], ['translate_cards','LLMProvider','uses'], ['build_resumenes','LLMProvider','uses'],
+  ['web.py','build_all_sites','defines'], ['web.py','templates','renders'], ['templates','index.html.j2','contains'], ['templates','pub.html.j2','contains'], ['web.py','translate.py','uses'], ['web.py','resumen.py','uses'], ['web.py','publicaciones.py','uses'],
+  ['admin.py','dashboard.py','uses'], ['admin.py','canales.py','uses'], ['admin.py','metrics.py','uses'], ['dashboard.py','metrics.py','reads'],
+  ['tests','test_models.py','contains'], ['tests','test_pipeline.py','contains'], ['tests','test_web.py','contains'], ['tests','test_nacional.py','contains'],
+  ['test_models.py','models.py','tests'], ['test_pipeline.py','pipeline.py','tests'], ['test_web.py','web.py','tests'], ['test_nacional.py','nacional.py','tests'],
+  ['workflows','cli.py','runs'], ['workflows','web.py','deploys']
+];
+
+const nodeById = new Map(nodes.map(n => [n.id, n]));
+const linkData = edges.map(([a,b,t]) => ({source:nodeById.get(a), target:nodeById.get(b), type:t})).filter(e => e.source && e.target);
+
+function phaseFor(id){
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return (hash % 6283) / 1000;
+}
+
+for (const n of nodes){ n.vx = 0; n.vy = 0; n.phase = phaseFor(n.id); }
+
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+const labels = document.getElementById('labels');
+let w = 0, h = 0, dpr = 1, t = 0;
+
+function resize(){
+  const rect = canvas.getBoundingClientRect();
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  w = rect.width; h = rect.height;
+  canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  for (const n of nodes){
+    n.px = n.x * w;
+    n.py = n.y * h;
+    n.tx = n.x * w;
+    n.ty = n.y * h;
+  }
+}
+
+function physics(){
+  for (const n of nodes){
+    const pull = n.fixed ? .08 : .018;
+    n.vx += (n.tx - n.px) * pull;
+    n.vy += (n.ty - n.py) * pull;
+  }
+  for (let i=0;i<nodes.length;i++){
+    for (let j=i+1;j<nodes.length;j++){
+      const a = nodes[i], b = nodes[j];
+      let dx = b.px - a.px, dy = b.py - a.py;
+      let dist2 = dx*dx + dy*dy + .01;
+      const min = (a.size + b.size + 16);
+      if (dist2 < min*min){
+        const dist = Math.sqrt(dist2), force = (min - dist) * .006;
+        dx /= dist; dy /= dist;
+        a.vx -= dx * force; a.vy -= dy * force;
+        b.vx += dx * force; b.vy += dy * force;
+      }
+    }
+  }
+  for (const e of linkData){
+    const a = e.source, b = e.target;
+    const dx = b.px - a.px, dy = b.py - a.py;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const target = 118 + (a.size + b.size) * 1.3;
+    const force = (dist - target) * .0007;
+    const fx = dx / dist * force, fy = dy / dist * force;
+    if (!a.fixed){ a.vx += fx; a.vy += fy; }
+    if (!b.fixed){ b.vx -= fx; b.vy -= fy; }
+  }
+  for (const n of nodes){
+    n.vx *= .84; n.vy *= .84;
+    n.px += n.vx; n.py += n.vy;
+  }
+}
+
+function glowLine(a,b,color,alpha,width){
+  const grad = ctx.createLinearGradient(a.px,a.py,b.px,b.py);
+  grad.addColorStop(0, color.replace(')',`, ${alpha})`).replace('rgb','rgba'));
+  grad.addColorStop(1, 'rgba(255,255,255,.02)');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(a.px,a.py);
+  const mx = (a.px + b.px)/2, my = (a.py + b.py)/2;
+  ctx.quadraticCurveTo(mx + (b.py-a.py)*.035, my - (b.px-a.px)*.035, b.px,b.py);
+  ctx.stroke();
+}
+
+function hexToRgb(hex){
+  const n = parseInt(hex.slice(1),16);
+  return `rgb(${(n>>16)&255},${(n>>8)&255},${n&255})`;
+}
+
+function draw(){
+  t += .012;
+  physics(); physics();
+  ctx.clearRect(0,0,w,h);
+
+  const bg = ctx.createRadialGradient(w*.57,h*.49,40,w*.57,h*.49,Math.max(w,h)*.58);
+  bg.addColorStop(0,'rgba(94,230,224,.085)'); bg.addColorStop(.35,'rgba(176,92,255,.045)'); bg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0,0,w,h);
+
+  ctx.globalCompositeOperation = 'lighter';
+  for (const e of linkData){
+    const ca = hexToRgb(palette[e.source.group] || '#8fa');
+    const isMain = e.source.size > 17 || e.target.size > 17;
+    glowLine(e.source, e.target, ca, isMain ? .18 : .09, isMain ? 1.1 : .55);
+  }
+  for (const e of linkData.filter((_,i) => i % 4 === 0)){
+    const p = (Math.sin(t*1.2 + e.source.phase) + 1) / 2;
+    const x = e.source.px + (e.target.px - e.source.px) * p;
+    const y = e.source.py + (e.target.py - e.source.py) * p;
+    ctx.fillStyle = 'rgba(168,242,238,.45)';
+    ctx.beginPath(); ctx.arc(x,y,1.2,0,Math.PI*2); ctx.fill();
+  }
+
+  for (const n of nodes){
+    const color = palette[n.group] || '#fff';
+    const pulse = Math.sin(t*2 + n.phase) * .7;
+    const r = n.size + pulse;
+    const halo = ctx.createRadialGradient(n.px,n.py,0,n.px,n.py,r*5.2);
+    halo.addColorStop(0, color + 'dd'); halo.addColorStop(.18, color + '55'); halo.addColorStop(1, color + '00');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(n.px,n.py,r*5.2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(n.px,n.py,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.beginPath(); ctx.arc(n.px-r*.25,n.py-r*.32,Math.max(1.1,r*.25),0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  renderLabels();
+  requestAnimationFrame(draw);
+}
+
+function renderLabels(){
+  const important = nodes.filter(n => n.size >= 13 || n.tag || ['fetch_youtube','is_relevant','NewsItem','LLMProvider','run_pipeline','build_all_sites'].includes(n.id));
+  labels.innerHTML = important.map(n => {
+    const major = n.size >= 18 ? ' major' : '';
+    const dy = -n.size - 9;
+    const tag = n.tag ? `<text class="tag" x="${n.px.toFixed(1)}" y="${(n.py + dy + 12).toFixed(1)}" text-anchor="middle">${n.tag}</text>` : '';
+    return `<g class="label${major}"><text x="${n.px.toFixed(1)}" y="${(n.py + dy).toFixed(1)}" text-anchor="middle">${n.label}</text>${tag}</g>`;
+  }).join('');
+}
+
+function initSidebar(){
+  const nodeChips = document.getElementById('nodeChips');
+  nodeChips.innerHTML = Object.entries(meta.nodes).map(([k,v]) => {
+    const color = k === 'Function' ? palette.ingest : k === 'Class' ? palette.ai : k === 'File' || k === 'Module' ? palette.web : k === 'Route' ? palette.gold : '#7f91a0';
+    return `<span class="chip" style="--c:${color}"><i></i><b>${k}</b><em>${v.toLocaleString('es-CL')}</em></span>`;
+  }).join('');
+  const edgeChips = document.getElementById('edgeChips');
+  edgeChips.innerHTML = Object.entries(meta.edges).map(([k,v]) => `<span class="chip" style="--c:#7f91a0">${k.toLowerCase().replaceAll('_',' ')} <em>${v.toLocaleString('es-CL')}</em></span>`).join('');
+  const tree = document.getElementById('tree');
+  const rows = [
+    ['sibylla', 24, true], ['config', 1, false], ['templates', 5, false], ['tests', 24, false], ['locales', 4, false], ['workflows', 4, false], ['publicaciones', 1, false]
+  ];
+  tree.innerHTML = rows.map(([name,count,active]) => `<div class="tree-row${active ? ' active' : ''}"><span class="caret">›</span><span>${name}</span><span class="count">${count}</span></div>`).join('');
+}
+
+window.addEventListener('resize', resize);
+initSidebar();
+resize();
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
