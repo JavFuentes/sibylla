@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+import sibylla.web as web_mod
 from sibylla.models import NewsItem
 from sibylla.web import (
     STELLAR_NEWS_SCHEMA,
@@ -21,6 +22,7 @@ from sibylla.web import (
     _tarjeta,
     build_context,
     build_stellar_news_payload,
+    render_html,
 )
 
 # --- helpers ---------------------------------------------------------------
@@ -420,3 +422,25 @@ def test_build_context_sin_conteos_conserva_editorial():
     b = _item(title="B", url="https://b.example")
     ctx = build_context([a, b], ["ai"], {})
     assert [c["title"] for c in ctx["grupos"][0]["cards"]] == ["A", "B"]
+
+
+# ---------------------------------------------------------------------------
+# Modal Acerca
+# ---------------------------------------------------------------------------
+def test_render_html_incluye_modal_acerca():
+    html = render_html([_item(title="A", url="https://a.example")], ["ai"], {}, build_v=1)
+    assert 'id="acerca"' in html
+
+
+def test_copy_static_assets_publica_acerca_grafo(tmp_path, monkeypatch):
+    static_dir = tmp_path / "static"
+    site_dir = tmp_path / "web"
+    static_dir.mkdir()
+    site_dir.mkdir()
+    (static_dir / "acerca-grafo.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(web_mod, "STATIC_DIR", static_dir)
+    monkeypatch.setattr(web_mod, "SITE_DIR", site_dir)
+
+    paths = web_mod._copy_static_assets()
+
+    assert site_dir / "acerca-grafo.html" in paths

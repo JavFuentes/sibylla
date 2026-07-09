@@ -651,11 +651,6 @@
   .apunte .dice p{ margin:0; font-family:'Cormorant Garamond',serif; font-style:italic;
     font-size:clamp(1.1rem,2.2vw,1.25rem); color:var(--marfil); line-height:1.4; }
 
-  /* ---- Acerca de Sibylla (ancla de "Acerca" y "Cómo funciona") ---- */
-  #acerca{ scroll-margin-top:86px; padding:26px 0 6px; }
-  .acerca-texto{ font-family:'Cormorant Garamond',serif; font-size:clamp(1.05rem,2vw,1.2rem);
-    color:var(--marfil-2); line-height:1.6; max-width:66ch; margin:14px auto 6px; text-align:center; }
-
   /* ================= Pie ================= */
   footer{ margin-top:64px; border-top:1px solid rgba(217,184,95,.16);
     background:linear-gradient(180deg, transparent, rgba(94,230,224,.03)); }
@@ -747,6 +742,22 @@
     background:rgba(94,230,224,.10);
     box-shadow:0 10px 26px -14px rgba(94,230,224,.55), inset 0 0 20px rgba(94,230,224,.05); }
   .onb-modo[aria-pressed="true"] .onb-modo-nombre{ color:var(--cian-claro); }
+  /* ---- Modal Acerca: versión visitante del README + grafo del código real ---- */
+  .onb--acerca .onb-panel{ max-width:760px; position:relative; }
+  .onb--acerca .onb-cuerpo{ padding:8px 30px 28px; }
+  #acerca-cerrar{ position:absolute; top:14px; right:16px; }
+  .acerca-lista{ margin:18px 0 0; padding:0; display:grid; gap:10px; list-style:none; }
+  .acerca-lista li{ position:relative; padding-left:22px; font-family:'Cormorant Garamond',serif;
+    font-size:1.05rem; color:var(--marfil-2); line-height:1.38; }
+  .acerca-lista li::before{ content:""; position:absolute; left:0; top:.58em; width:7px; height:7px;
+    border-radius:50%; background:var(--oro); box-shadow:0 0 12px rgba(217,184,95,.65); }
+  .acerca-grafo{ margin:22px 0 8px; }
+  .acerca-grafo-marco{ position:relative; aspect-ratio:16/9; overflow:hidden; border-radius:16px;
+    border:1px solid rgba(217,184,95,.22); background:rgba(8,11,20,.55);
+    box-shadow:inset 0 0 30px rgba(94,230,224,.04); }
+  .acerca-grafo-marco iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; pointer-events:none; }
+  .acerca-nota{ margin:8px 0 0; font-size:.78rem; letter-spacing:.04em; color:var(--tenue); }
+  .onb--acerca .onb-acciones{ margin-top:20px; }
   @media (max-width:620px){ .onb-modos{ grid-template-columns:1fr; } }
 
   /* ---- Conmutador de modo (Ordenado / Aleatorio) sobre las secciones ---- */
@@ -872,7 +883,7 @@
       <a href="#presente">{{ t.nav_present }}</a>
       <a href="#" id="nav-personalizar">{{ t.onb_edit }}</a>
       <a href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.nav_github }}</a>
-      <a href="#acerca">{{ t.nav_about }}</a>
+      <a href="#acerca" id="nav-acerca">{{ t.nav_about }}</a>
     </nav>
   </div>
 </header>
@@ -1045,6 +1056,34 @@
         <button type="button" id="onb-estandar" class="boton fantasma">{{ t.onb_standard }}</button>
       </div>
       <p class="onb-nota">{{ t.onb_note }}</p>
+    </div>
+  </div>
+</div>
+
+{# Modal "Acerca": explica Sibylla para visitantes y carga el grafo solo al abrir. #}
+<div id="acerca" class="onb onb--acerca" role="dialog" aria-modal="true" aria-labelledby="acerca-titulo" hidden>
+  <div class="onb-panel" id="acerca-panel" tabindex="-1">
+    <div class="meandro" aria-hidden="true"></div>
+    <div class="onb-cuerpo">
+      <button type="button" class="sec-btn" id="acerca-cerrar" aria-label="{{ t.about_close }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <h2 id="acerca-titulo" class="onb-titulo">{{ t.about_title }}</h2>
+      <p class="onb-body">{{ t.about_lead }}</p>
+      <ul class="acerca-lista">
+        <li>{{ t.about_li1 }}</li>
+        <li>{{ t.about_li2 }}</li>
+        <li>{{ t.about_li3 }}</li>
+        <li>{{ t.about_li4 }}</li>
+      </ul>
+      <div class="acerca-grafo">
+        <div class="acerca-grafo-marco">
+          <iframe data-src="acerca-grafo.html" title="{{ t.about_graph_note }}" loading="lazy"></iframe>
+        </div>
+        <p class="acerca-nota">{{ t.about_graph_note }}</p>
+      </div>
+      <div class="onb-acciones">
+        <a class="boton oro" href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.about_github }}</a>
+        <button type="button" class="boton fantasma" id="acerca-cerrar-accion">{{ t.about_close }}</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1345,6 +1384,7 @@
   function revealHashTarget(){
     var id=window.location.hash ? window.location.hash.slice(1) : '';
     if(!id) return;
+    if(id==='acerca'){ acercaOpen(); return; }
     var card=document.getElementById(id);
     if(!card || !card.classList.contains('carta')) return;
     if(FEED && !FEED.hidden){
@@ -1634,6 +1674,36 @@
     onbClose();
   }
 
+  /* ---------- modal Acerca ---------- */
+  var ACERCA=document.getElementById('acerca');
+  var acercaPanel=document.getElementById('acerca-panel');
+  var acercaPrevFocus=null;
+  function acercaLoadGraph(){
+    if(!ACERCA) return;
+    var iframe=ACERCA.querySelector('iframe[data-src]');
+    if(iframe && !iframe.getAttribute('src')) iframe.setAttribute('src', iframe.dataset.src);
+  }
+  function acercaOpen(){
+    if(!ACERCA) return;
+    acercaPrevFocus=document.activeElement;
+    acercaLoadGraph();
+    ACERCA.hidden=false;
+    document.body.classList.add('onb-abierto');
+    setTimeout(function(){ if(acercaPanel) acercaPanel.focus(); }, 0);
+  }
+  function acercaClose(){
+    if(!ACERCA) return;
+    document.body.classList.remove('onb-abierto');
+    function done(){
+      ACERCA.hidden=true;
+      ACERCA.classList.remove('is-closing');
+      if(acercaPrevFocus && acercaPrevFocus.focus) acercaPrevFocus.focus();
+    }
+    if(prefersReducedMotion()){ done(); return; }
+    ACERCA.classList.add('is-closing');
+    setTimeout(done, 360);
+  }
+
   /* ---------- init + binds ---------- */
   applyLayout();
   applyMode();      /* ordenado: aplica nº de tarjetas; aleatorio: arma el feed */
@@ -1683,6 +1753,28 @@
     var mt=document.getElementById('menu-toggle'); if(mt) mt.checked=false;
     onbOpen();
   });
+  var navAcerca=document.getElementById('nav-acerca');
+  if(navAcerca) navAcerca.addEventListener('click', function(e){
+    e.preventDefault();
+    var mt=document.getElementById('menu-toggle'); if(mt) mt.checked=false;
+    acercaOpen();
+  });
+  if(ACERCA){
+    ACERCA.addEventListener('click', function(e){ if(e.target===ACERCA) acercaClose(); });
+    ACERCA.addEventListener('keydown', function(e){
+      if(e.key==='Escape'){ acercaClose(); return; }
+      if(e.key!=='Tab') return;
+      var focos=ACERCA.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if(!focos.length) return;
+      var first=focos[0], last=focos[focos.length-1];
+      if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+      else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+    });
+    var acercaCerrar=document.getElementById('acerca-cerrar');
+    var acercaCerrarAccion=document.getElementById('acerca-cerrar-accion');
+    if(acercaCerrar) acercaCerrar.addEventListener('click', acercaClose);
+    if(acercaCerrarAccion) acercaCerrarAccion.addEventListener('click', acercaClose);
+  }
   if(ONB) ONB.addEventListener('keydown', function(e){
     /* Escape solo cierra si ya hay preferencias (cancelar edición); en la
        primera visita se exige una elección explícita (o "un poco de todo"). */

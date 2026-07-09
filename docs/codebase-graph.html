@@ -47,7 +47,7 @@
     background-size:380px 260px;
   }
 
-  .app{ height:100%; display:grid; grid-template-rows:44px minmax(0,1fr); }
+  .app{ position:fixed; inset:0; }
 
   .topbar{
     display:flex; align-items:center; justify-content:space-between; gap:18px;
@@ -110,7 +110,7 @@
   .tree-row .caret{ color:#60727c; font-size:10px; }
   .tree-row .count{ color:#4f606a; font-size:10px; }
 
-  main{ position:relative; min-width:0; overflow:hidden; }
+  main{ position:fixed; inset:0; overflow:hidden; }
   .stats{
     position:absolute; top:18px; left:18px; z-index:3; display:flex; align-items:center; gap:14px;
     color:#778893; font-family:"SFMono-Regular", Consolas, monospace; font-size:11px;
@@ -139,13 +139,6 @@
   .label.major text{ font-size:12px; font-weight:700; fill:#fff7d8; }
   .label .tag{ font-size:8px; fill:#7f8f96; text-transform:uppercase; letter-spacing:.11em; }
 
-  @media (max-width:900px){
-    .layout{ grid-template-columns:1fr; }
-    aside{ display:none; }
-    .query{ display:none; }
-    .signature{ bottom:18px; }
-  }
-
   @media (prefers-reduced-motion: reduce){
     *,*:before,*:after{ animation:none !important; transition:none !important; }
   }
@@ -154,51 +147,16 @@
 <body>
 <div class="grain" aria-hidden="true"></div>
 <div class="app">
-  <header class="topbar">
-    <div class="brand"><span class="dot"></span><strong>Codebase Memory</strong><nav class="tabs" aria-label="Vista"><span class="tab active">Graph</span><span class="tab">Projects</span><span class="tab">Control</span></nav></div>
-    <div class="query"><span>GRAPH</span><b>C-Users-jfuen-Desktop-Sibylla</b><span class="x">×</span></div>
-  </header>
-  <div class="layout">
-    <aside>
-      <div class="side-head"><div class="side-title">Filters</div><div class="side-toggle">All <span>|</span> None</div></div>
-      <section class="section">
-        <h2>Nodes</h2>
-        <div class="chips" id="nodeChips"></div>
-      </section>
-      <section class="section">
-        <h2>Edges</h2>
-        <div class="chips" id="edgeChips"></div>
-      </section>
-      <section class="section">
-        <h2>Vista</h2>
-        <div class="chip" style="--c:var(--cyan)"><i></i><b>Show labels</b></div>
-        <div class="search">Search...</div>
-        <div class="tree" id="tree"></div>
-      </section>
-    </aside>
-    <main>
-      <canvas id="graph" aria-label="Grafo visual del proyecto Sibylla"></canvas>
-      <svg class="labels" id="labels" aria-hidden="true"></svg>
-      <div class="stats"><span><b>1.896</b> nodes</span><span>/</span><span><b>5.149</b> edges</span><span>· curated view</span></div>
-      <div class="refresh">Refresh</div>
-      <div class="signature">
-        <div class="eyebrow">Sibylla · Architecture Map</div>
-        <h1>Un oráculo estático con ingesta viva.</h1>
-        <p>Vista curada desde <strong>codebase-memory-mcp</strong>: pipeline, fuentes, IA, web, administración y tests, reducidos a una constelación legible para README.</p>
-      </div>
-    </main>
-  </div>
+  <main>
+    <canvas id="graph" aria-label="Grafo visual del proyecto Sibylla"></canvas>
+    <svg class="labels" id="labels" aria-hidden="true"></svg>
+  </main>
 </div>
 
 <script>
 const palette = {
   core: '#f2dd93', ingest: '#5ee6e0', process: '#42d989', ai: '#b05cff', web: '#68a7ff',
   admin: '#ff9654', data: '#ff668f', test: '#92a0ad', config: '#d9b85f', source: '#7de6a9'
-};
-
-const meta = {
-  nodes: { Function:611, Variable:722, Section:173, Route:111, File:85, Module:84, Method:62, Class:22, Folder:13, Package:8 },
-  edges: { DEFINES:1674, CALLS:1161, USAGE:1024, TESTS:334, WRITES:258, IMPORTS:163, SEMANTICALLY_RELATED:175, FILE_CHANGES_WITH:118, HTTP_CALLS:6 }
 };
 
 const nodes = [
@@ -419,23 +377,7 @@ function renderLabels(){
   }).join('');
 }
 
-function initSidebar(){
-  const nodeChips = document.getElementById('nodeChips');
-  nodeChips.innerHTML = Object.entries(meta.nodes).map(([k,v]) => {
-    const color = k === 'Function' ? palette.ingest : k === 'Class' ? palette.ai : k === 'File' || k === 'Module' ? palette.web : k === 'Route' ? palette.gold : '#7f91a0';
-    return `<span class="chip" style="--c:${color}"><i></i><b>${k}</b><em>${v.toLocaleString('es-CL')}</em></span>`;
-  }).join('');
-  const edgeChips = document.getElementById('edgeChips');
-  edgeChips.innerHTML = Object.entries(meta.edges).map(([k,v]) => `<span class="chip" style="--c:#7f91a0">${k.toLowerCase().replaceAll('_',' ')} <em>${v.toLocaleString('es-CL')}</em></span>`).join('');
-  const tree = document.getElementById('tree');
-  const rows = [
-    ['sibylla', 24, true], ['config', 1, false], ['templates', 5, false], ['tests', 24, false], ['locales', 4, false], ['workflows', 4, false], ['publicaciones', 1, false]
-  ];
-  tree.innerHTML = rows.map(([name,count,active]) => `<div class="tree-row${active ? ' active' : ''}"><span class="caret">›</span><span>${name}</span><span class="count">${count}</span></div>`).join('');
-}
-
 window.addEventListener('resize', resize);
-initSidebar();
 resize();
 requestAnimationFrame(draw);
 </script>
