@@ -479,6 +479,21 @@
   .comentario-form textarea:focus, .nick-form input:focus{ outline:2px solid rgba(94,230,224,.45); outline-offset:2px; }
   .comentario-count{ justify-self:end; color:var(--tenue); font-size:.72rem; }
   @media (max-width:480px){ .comentario-rama{ padding-left:12px; } .comentario-respuesta{ margin-left:10px; } }
+  /* Realce breve para los comentarios/respuestas que llegan en vivo (Fase B). */
+  .comentario-nuevo{ animation:socialNuevo 1.8s ease-out 1; }
+  @keyframes socialNuevo{
+    0%{ box-shadow:0 0 0 2px rgba(94,230,224,.6); }
+    100%{ box-shadow:0 0 0 0 rgba(94,230,224,0); }
+  }
+  /* Toast global (fuera de un panel de comentarios): cooldown de votos, etc. */
+  .social-toast{ position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:60;
+    max-width:min(90vw, 420px); padding:10px 14px; border-radius:10px;
+    background:rgba(8,11,20,.92); border:1px solid rgba(94,230,224,.32);
+    color:var(--marfil); font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; text-align:center; box-shadow:0 6px 24px rgba(0,0,0,.45);
+    transition:opacity .3s ease, transform .3s ease; }
+  .social-toast[hidden]{ display:none; }
+  .social-toast.is-out{ opacity:0; transform:translateX(-50%) translateY(8px); }
   .social-velo{ position:absolute; inset:0; z-index:20; display:flex; align-items:center;
     justify-content:center; gap:12px; min-height:260px; border-radius:20px;
     color:var(--oro-claro); font-family:'Cormorant Garamond',serif; font-style:italic;

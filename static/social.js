@@ -12,6 +12,16 @@ const COMMENTS_PAGE = 20;
 // Ventana durante la cual una tarjeta conserva su conteo optimista tras un voto
 // o comentario propio, para no parpadear mientras la Cloud Function confirma.
 const CONTEOS_HOLD_MS = 5000;
+// Tope de texto por comentario (reglas firestore: texto.size() <= 240).
+const COMENTARIO_MAX = 240;
+// Tope diario de comentarios por cuenta (UTC). Coincide con limiteComentariosDia()
+// de firestore.rules. Cuando existan cuentas premium (custom claim 'premium') el
+// servidor sube el suyo; aquí queda el valor por defecto (no premium).
+const LIMITE_COMENTARIOS_DIA = 5;
+// Cooldown de votos (tarjetas y comentarios) — espeja duration.value(5,'s').
+const VOTO_COOLDOWN_MS = 5000;
+// Debounce del refresco de comentarios en vivo (Fase B) por tarjeta.
+const REFRESCO_DEBOUNCE_MS = 1000;
 
 function readJson(id) {
   const el = document.getElementById(id);
@@ -99,8 +109,25 @@ function mapearError(code, TXT) {
   const enVuelo = new Set();
   const enVueloComentario = new Set();
   const commentState = new Map();
+  const refrescoTimers = new Map();
   let yaReordenado = false;
   let registroReciente = false;
+
+  // Cache del contador diario de comentarios del usuario actual ({dia, hoy} o
+  // null). Se carga bajo demanda al abrir el primer formulario (1 lectura a
+  // users/{uid}) y se incrementa en cliente tras cada comentario exitoso. El
+  // servidor (firestore.rules) es fuente de verdad: ante cualquier discrepancia
+  // el permission-denied fuerza una relecura.
+  let misComentarios = null;
+  let misComentariosPromise = null;
+
+  // Índice de día UTC como entero YYYYMMDD. Coincide con diaUtc() de
+  // firestore.rules (request.time.year()*10000 + month()*100 + day(), en UTC):
+  // el contador diario se reinicia a la misma medianoche UTC en ambos lados.
+  function diaUtcLocal() {
+    const d = new Date();
+    return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+  }
 
   function cssId(id) { return (window.CSS && CSS.escape) ? CSS.escape(id) : id; }
   function cardIdDe(carta) { return carta && carta.id && carta.id.startsWith('n-') ? carta.id : null; }
@@ -159,9 +186,106 @@ function mapearError(code, TXT) {
       const hold = holdHasta.get(id);
       if (hold && hold > ahora) return;
       if (hold) holdHasta.delete(id);
-      conteos.set(id, norm(vals[id]));
+      const previo = conteos.get(id);
+      const nuevo = norm(vals[id]);
+      conteos.set(id, nuevo);
       pintarConteo(id);
+      // Fase B: si el conteo de comentarios subió y hay panel abierto, refrescar
+      // comentarios en vivo (debounce por tarjeta). En hold no se refresca para
+      // no competir con el conteo optimista del propio comentario.
+      if (previo && nuevo.c > previo.c) programarRefresco(id);
     });
+  }
+
+  // ----- Fase B: reactividad sin listeners nuevos -----
+  // El listener existente de agregados/conteos ya entrega en vivo el conteo c
+  // de cada tarjeta; un c que sube es la señal de "hay comentario/respuesta
+  // nueva" (las respuestas también mueven c). Si el panel de esa tarjeta está
+  // abierto, se hace UNA query pequeña (índice card+oculto+ts DESC) para traer
+  // lo nuevo. Cero listeners adicionales; solo con pestaña visible.
+  function actualizarMaxTs(st, ts) {
+    if (!ts) return;
+    if (!st.maxTs) { st.maxTs = ts; return; }
+    try {
+      const a = ts.toMillis ? ts.toMillis() : (ts instanceof Date ? ts.getTime() : null);
+      const b = st.maxTs.toMillis ? st.maxTs.toMillis() : (st.maxTs instanceof Date ? st.maxTs.getTime() : null);
+      if (a != null && b != null && a > b) st.maxTs = ts;
+    } catch (_e) { /* ts no comparable: ignorar */ }
+  }
+
+  function programarRefresco(cardId) {
+    if (refrescoTimers.has(cardId)) return;
+    refrescoTimers.set(cardId, setTimeout(() => {
+      refrescoTimers.delete(cardId);
+      const carta = document.getElementById(cardId);
+      if (!carta) return;
+      const panel = carta.querySelector('.comentarios-panel:not([hidden])');
+      if (panel) refrescarComentarios(panel, cardId);
+    }, REFRESCO_DEBOUNCE_MS));
+  }
+
+  // Una sola query por refresco: comments where card==cardId, oculto==false,
+  // orderBy ts desc, endBefore(maxTs) → docs con ts > cursor (los nuevos).
+  // Usa el índice existente card+oculto+ts DESC (sin índice nuevo).
+  async function refrescarComentarios(panel, cardId) {
+    const st = commentState.get(cardId);
+    if (!st || !st.loaded) return; // sin primera carga no hay nada que refrescar
+    // Cursor = mayor ts visto en el panel (raíces + respuestas). Si el panel no
+    // tiene docs todavía, arrancar con la hora local menos un margen (cubre el
+    // desfase de reloj y el dedup absorbe los solapes).
+    const cursor = st.maxTs || fsApi.Timestamp.fromMillis(Date.now() - 60000);
+    try {
+      const snap = await fsApi.getDocs(fsApi.query(
+        fsApi.collection(db, 'comments'),
+        fsApi.where('card', '==', cardId),
+        fsApi.where('oculto', '==', false),
+        fsApi.orderBy('ts', 'desc'),
+        fsApi.endBefore(cursor),
+      ));
+      if (snap.empty) return;
+      snap.forEach((d) => {
+        const data = d.data();
+        actualizarMaxTs(st, data.ts);
+        // Dedup: ignorar lo ya renderizado (cubre el render optimista propio y
+        // cualquier solape de cursor).
+        if (panel.querySelector(`.comentario[data-comment="${cssId(d.id)}"]`)) return;
+        despacharComentarioNuevo(panel, d.id, data);
+      });
+    } catch (e) {
+      console.warn('[sibylla/social] refresco en vivo:', (e && e.code) || e);
+    }
+  }
+
+  function despacharComentarioNuevo(panel, docId, data) {
+    const parent = typeof data.parent === 'string' ? data.parent : null;
+    if (!parent) {
+      // Nueva raíz: prepend con realce.
+      const item = renderComentario(panel, docId, data, true);
+      if (item) item.classList.add('comentario-nuevo');
+      return;
+    }
+    const root = panel.querySelector(`.comentario[data-comment="${cssId(parent)}"]`);
+    if (!root) return; // raíz no cargada en este panel: ignorar
+    const toggle = root.querySelector(':scope > .comentario-rama > .comentario-respuestas-toggle');
+    const hiloAbierto = toggle && toggle.getAttribute('aria-expanded') === 'true';
+    if (hiloAbierto) {
+      const respuestas = root.querySelector(':scope > .comentario-rama > .comentario-respuestas');
+      if (respuestas) {
+        respuestas.hidden = false;
+        const item = construirComentario(panel, docId, data);
+        item.classList.add('comentario-nuevo');
+        respuestas.appendChild(item);
+      }
+      // El contador del toggle también sube con el hilo abierto: si el usuario
+      // colapsa después, el «Ver respuestas (N)» ya queda al día.
+      root.dataset.respuestas = String((Number(root.dataset.respuestas || 0) || 0) + 1);
+      syncBotonRespuestas(root);
+    } else {
+      // Hilo colapsado: subir el contador del botón "Ver respuestas (N)" en
+      // vivo; al expandir, cargarRespuestas trae el contenido.
+      root.dataset.respuestas = String((Number(root.dataset.respuestas || 0) || 0) + 1);
+      syncBotonRespuestas(root);
+    }
   }
 
   function suscribirConteos() {
@@ -320,14 +444,23 @@ function mapearError(code, TXT) {
         await fsApi.deleteDoc(ref);
         miVoto.delete(cardId);
       } else {
-        await fsApi.setDoc(ref, { card: cardId, uid, value: nuevo, ts: fsApi.serverTimestamp() });
+        // Cooldown de 5 s (tarjetas y comentarios): el voto va en batch con
+        // users/{uid}.lastVoteAt, que las reglas usan como gate. Quitar el voto
+        // (delete, rama nuevo===0) NO lleva lastVoteAt: no crea contenido y el
+        // toggle-off/on rápido lo frena el gate del create.
+        const batch = fsApi.writeBatch(db);
+        batch.set(ref, { card: cardId, uid, value: nuevo, ts: fsApi.serverTimestamp() });
+        batch.set(fsApi.doc(db, 'users', uid), { lastVoteAt: fsApi.serverTimestamp() }, { merge: true });
+        await batch.commit();
         miVoto.set(cardId, nuevo);
       }
     } catch (e) {
       holdHasta.delete(cardId);
       pintarVotoPropio(grupo, previo);
       pintarConteo(cardId, base);
-      alert(TXT.social_vote_error);
+      toastGlobal(e && e.code === 'permission-denied'
+        ? (TXT.social_vote_rate || TXT.social_vote_error)
+        : TXT.social_vote_error);
       console.warn('[sibylla/social] voto:', (e && e.code) || e);
     } finally {
       enVuelo.delete(cardId);
@@ -357,6 +490,135 @@ function mapearError(code, TXT) {
     el.hidden = false;
     clearTimeout(el._timer);
     el._timer = setTimeout(() => { el.hidden = true; }, 3500);
+  }
+
+  // Toast global (a nivel de body) para mensajes fuera de un panel de
+  // comentarios — p. ej. el cooldown de votos en tarjetas, que no tiene panel.
+  function toastGlobal(msg) {
+    if (!msg) return;
+    let el = document.querySelector('body > .social-toast');
+    if (!el) {
+      el = document.createElement('p');
+      el.className = 'social-toast';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.remove('is-out');
+    el.removeAttribute('hidden');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => {
+      el.classList.add('is-out');
+      setTimeout(() => { el.setAttribute('hidden', ''); }, 300);
+    }, 3500);
+  }
+
+  // Lee users/{uid} y cachea el contador diario. forzar=true bypassa la caché
+  // (se usa tras un permission-denied para reflotar el estado real del servidor).
+  async function cargarMisComentarios(forzar) {
+    if (!uid) { misComentarios = null; return misComentarios; }
+    if (!forzar && misComentarios) return misComentarios;
+    if (!forzar && misComentariosPromise) return misComentariosPromise;
+    misComentariosPromise = (async () => {
+      try {
+        const snap = await fsApi.getDoc(fsApi.doc(db, 'users', uid));
+        const diaHoy = diaUtcLocal();
+        if (snap.exists()) {
+          const d = snap.data() || {};
+          const dia = d.comentariosDia, hoy = d.comentariosHoy;
+          // Solo cuenta si el día guardado es el de hoy; si no (día distinto o
+          // campos ausentes por ser usuario legacy), hoy arranca en 0: el
+          // siguiente comentario reinicia el contador en servidor.
+          misComentarios = (typeof dia === 'number' && typeof hoy === 'number' && dia === diaHoy)
+            ? { dia, hoy }
+            : { dia: diaHoy, hoy: 0 };
+        } else {
+          misComentarios = { dia: diaHoy, hoy: 0 };
+        }
+      } catch (e) {
+        console.warn('[sibylla/social] mis comentarios hoy:', (e && e.code) || e);
+        misComentarios = null; // reintentar en el próximo intento
+      } finally {
+        misComentariosPromise = null;
+      }
+      return misComentarios;
+    })();
+    return misComentariosPromise;
+  }
+
+  function mensajeErrorComentario(mc) {
+    const diaHoy = diaUtcLocal();
+    if (mc && mc.dia === diaHoy && mc.hoy >= LIMITE_COMENTARIOS_DIA) return TXT.social_comment_daily_limit;
+    // Cualquier otro permission-denied de comments se interpreta como el gate
+    // de 30 s (o un cruce de medianoche ya sin reproducir).
+    return TXT.social_comment_rate;
+  }
+
+  // Crea un comentario (raíz o respuesta) con el batch que mantiene el contador
+  // diario en users/{uid}. Devuelve {ok, id} o {ok:false, error}. El render
+  // optimista lo hace quien llama (conoce el panel/root). Ante un
+  // permission-denied se relea users/{uid} y, si fue un cruce de medianoche UTC,
+  // se reintenta una vez con el día recomputado.
+  async function enviarComentario({ cardId, texto, parent }) {
+    const ref = fsApi.doc(fsApi.collection(db, 'comments'));
+    const commit = (dia, hoy) => {
+      const b = fsApi.writeBatch(db);
+      b.set(ref, {
+        card: cardId, uid: currentUser.uid, autor: currentUser.displayName, texto,
+        ts: fsApi.serverTimestamp(), reportes: 0, oculto: false, parent: parent || null,
+      });
+      b.set(fsApi.doc(db, 'users', currentUser.uid), {
+        lastCommentAt: fsApi.serverTimestamp(),
+        comentariosDia: dia,
+        comentariosHoy: hoy,
+      }, { merge: true });
+      return b.commit();
+    };
+    const diaHoy = diaUtcLocal();
+    const prevHoy = (misComentarios && misComentarios.dia === diaHoy) ? misComentarios.hoy : 0;
+    try {
+      await commit(diaHoy, prevHoy + 1);
+      misComentarios = { dia: diaHoy, hoy: prevHoy + 1 };
+      return { ok: true, id: ref.id };
+    } catch (err) {
+      if (err && err.code === 'permission-denied') {
+        await cargarMisComentarios(true);
+        const mc = misComentarios;
+        const diaAhora = diaUtcLocal();
+        // Cruce de medianoche (raro): el día del cliente cambió entre el intento
+        // y ahora. Reintentar una vez con el día actual y el contador del server.
+        if (diaAhora !== diaHoy && mc && mc.dia === diaAhora) {
+          try {
+            await commit(mc.dia, mc.hoy + 1);
+            misComentarios = { dia: mc.dia, hoy: mc.hoy + 1 };
+            return { ok: true, id: ref.id };
+          } catch (_e2) {
+            return { ok: false, error: mensajeErrorComentario(misComentarios) };
+          }
+        }
+        return { ok: false, error: mensajeErrorComentario(mc) };
+      }
+      console.warn('[sibylla/social] comentario:', (err && err.code) || err);
+      return { ok: false, error: TXT.social_comment_error };
+    }
+  }
+
+  // Aplica la UX de tope diario a un formulario ya construido: si el usuario
+  // alcanzó el límite, deshabilita textarea+botón y muestra el aviso. Se llama
+  // tras pintar el form (la carga del contador es async y no bloquea el render).
+  async function aplicarLimiteComentarios(form, ta, btn) {
+    const mc = await cargarMisComentarios();
+    const diaHoy = diaUtcLocal();
+    if (!(mc && mc.dia === diaHoy && mc.hoy >= LIMITE_COMENTARIOS_DIA)) return;
+    ta.disabled = true;
+    btn.disabled = true;
+    let aviso = form.querySelector('.comentarios-aviso');
+    if (!aviso) {
+      aviso = document.createElement('p');
+      aviso.className = 'comentarios-aviso';
+      form.appendChild(aviso);
+    }
+    aviso.textContent = TXT.social_comment_daily_limit;
   }
 
   function pintarVotoComentario(item, v) {
@@ -559,7 +821,7 @@ function mapearError(code, TXT) {
     panel.appendChild(more);
     panel.appendChild(formWrap);
     carta.appendChild(panel);
-    commentState.set(cardId, { loaded: false, last: null, done: false, loading: false, replies: new Map() });
+    commentState.set(cardId, { loaded: false, last: null, done: false, loading: false, replies: new Map(), maxTs: null });
     more.addEventListener('click', () => cargarComentarios(panel, cardId, true));
     panel.addEventListener('click', (e) => {
       const btn = e.target.closest('button[data-action]');
@@ -602,7 +864,7 @@ function mapearError(code, TXT) {
         );
       }
       const snap = await fsApi.getDocs(q);
-      snap.forEach((d) => renderComentario(panel, d.id, d.data(), false));
+      snap.forEach((d) => { const data = d.data(); renderComentario(panel, d.id, data, false); actualizarMaxTs(st, data.ts); });
       st.last = snap.docs[snap.docs.length - 1] || st.last;
       st.done = snap.size < COMMENTS_PAGE;
       st.loaded = true;
@@ -650,7 +912,15 @@ function mapearError(code, TXT) {
         );
       }
       const snap = await fsApi.getDocs(q);
-      snap.forEach((d) => wrap.appendChild(construirComentario(panel, d.id, d.data())));
+      snap.forEach((d) => {
+        const data = d.data();
+        actualizarMaxTs(st, data.ts);
+        // Dedup: cada expansión del hilo reconsulta la primera página; sin esto
+        // se duplican las respuestas ya renderizadas (la optimista propia y las
+        // llegadas en vivo por el refresco de conteos).
+        if (wrap.querySelector(`.comentario[data-comment="${cssId(d.id)}"]`)) return;
+        wrap.appendChild(construirComentario(panel, d.id, data));
+      });
       rs.last = snap.docs[snap.docs.length - 1] || rs.last;
       rs.done = snap.size < COMMENTS_PAGE;
       rs.loaded = true;
@@ -745,46 +1015,42 @@ function mapearError(code, TXT) {
     const form = document.createElement('form');
     form.className = 'comentario-form';
     const ta = document.createElement('textarea');
-    ta.maxLength = 500;
+    ta.maxLength = COMENTARIO_MAX;
     ta.minLength = 2;
     ta.placeholder = TXT.social_comment_placeholder;
     const count = document.createElement('span');
     count.className = 'comentario-count';
-    count.textContent = '0/500';
-    ta.addEventListener('input', () => { count.textContent = `${ta.value.length}/500`; });
+    count.textContent = `0/${COMENTARIO_MAX}`;
+    ta.addEventListener('input', () => { count.textContent = `${ta.value.length}/${COMENTARIO_MAX}`; });
     const btn = document.createElement('button');
     btn.type = 'submit';
     btn.textContent = TXT.social_comment_send;
     form.appendChild(ta);
     form.appendChild(count);
     form.appendChild(btn);
+    // Tope diario: si el usuario ya llegó al límite, deshabilitar y avisar.
+    aplicarLimiteComentarios(form, ta, btn);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const texto = ta.value.trim();
       if (texto.length < 2) return;
+      if (ta.disabled) return; // doble check del tope diario
       btn.disabled = true;
-      try {
-        const ref = fsApi.doc(fsApi.collection(db, 'comments'));
-        const batch = fsApi.writeBatch(db);
-        batch.set(ref, {
-          card: cardId,
-          uid: currentUser.uid,
-          autor: currentUser.displayName,
-          texto,
-          ts: fsApi.serverTimestamp(),
-          reportes: 0,
-          oculto: false,
-          parent: null,
-        });
-        batch.set(fsApi.doc(db, 'users', currentUser.uid), { lastCommentAt: fsApi.serverTimestamp() }, { merge: true });
-        await batch.commit();
-        renderComentario(panel, ref.id, { uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date(), parent: null }, true);
+      const res = await enviarComentario({ cardId, texto, parent: null });
+      if (res.ok) {
+        renderComentario(panel, res.id, { uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date(), parent: null }, true);
         const cur = norm(conteos.get(cardId)); cur.c++;
         pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
-        ta.value = ''; count.textContent = '0/500';
-      } catch (err) {
-        toast(panel, err && err.code === 'permission-denied' ? TXT.social_comment_rate : TXT.social_comment_error);
-      } finally { btn.disabled = false; }
+        ta.value = ''; count.textContent = `0/${COMENTARIO_MAX}`;
+        // Si este comentario alcanzó el tope diario, re-renderizar para mostrar
+        // el aviso y dejar el formulario deshabilitado.
+        if (misComentarios && misComentarios.dia === diaUtcLocal() && misComentarios.hoy >= LIMITE_COMENTARIOS_DIA) {
+          renderForm(panel, cardId);
+        }
+      } else if (res.error) {
+        toast(panel, res.error);
+      }
+      btn.disabled = false;
     });
     wrap.appendChild(form);
   }
@@ -797,56 +1063,46 @@ function mapearError(code, TXT) {
     const form = document.createElement('form');
     form.className = 'comentario-form comentario-reply-form';
     const ta = document.createElement('textarea');
-    ta.maxLength = 500;
+    ta.maxLength = COMENTARIO_MAX;
     ta.minLength = 2;
     ta.placeholder = TXT.social_reply_placeholder;
     const count = document.createElement('span');
     count.className = 'comentario-count';
-    count.textContent = '0/500';
-    ta.addEventListener('input', () => { count.textContent = `${ta.value.length}/500`; });
+    count.textContent = `0/${COMENTARIO_MAX}`;
+    ta.addEventListener('input', () => { count.textContent = `${ta.value.length}/${COMENTARIO_MAX}`; });
     const btn = document.createElement('button');
     btn.type = 'submit';
     btn.textContent = TXT.social_reply_send;
     form.appendChild(ta);
     form.appendChild(count);
     form.appendChild(btn);
+    aplicarLimiteComentarios(form, ta, btn);
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const texto = ta.value.trim();
       if (texto.length < 2) return;
+      if (ta.disabled) return; // doble check del tope diario
       btn.disabled = true;
-      try {
-        const ref = fsApi.doc(fsApi.collection(db, 'comments'));
-        const batch = fsApi.writeBatch(db);
-        batch.set(ref, {
-          card: cardId,
-          uid: currentUser.uid,
-          autor: currentUser.displayName,
-          texto,
-          ts: fsApi.serverTimestamp(),
-          reportes: 0,
-          oculto: false,
-          parent: rootId,
-        });
-        batch.set(fsApi.doc(db, 'users', currentUser.uid), { lastCommentAt: fsApi.serverTimestamp() }, { merge: true });
-        await batch.commit();
+      const res = await enviarComentario({ cardId, texto, parent: rootId });
+      if (res.ok) {
         const root = panel.querySelector(`.comentario[data-comment="${cssId(rootId)}"]`);
         const respuestas = root && root.querySelector(':scope > .comentario-rama > .comentario-respuestas');
         if (respuestas) {
           respuestas.hidden = false;
-          respuestas.appendChild(construirComentario(panel, ref.id, {
+          respuestas.appendChild(construirComentario(panel, res.id, {
             uid: currentUser.uid, autor: currentUser.displayName, texto, ts: new Date(), parent: rootId,
           }));
         }
         setRootReplyCount(panel, rootId, 1);
         const cur = norm(conteos.get(cardId)); cur.c++;
         pintarConteo(cardId, cur); holdHasta.set(cardId, Date.now() + CONTEOS_HOLD_MS);
-        ta.value = ''; count.textContent = '0/500';
+        ta.value = ''; count.textContent = `0/${COMENTARIO_MAX}`;
         wrap.replaceChildren();
         if (opener) opener.setAttribute('aria-expanded', 'false');
-      } catch (err) {
-        toast(panel, err && err.code === 'permission-denied' ? TXT.social_comment_rate : TXT.social_comment_error);
-      } finally { btn.disabled = false; }
+      } else if (res.error) {
+        toast(panel, res.error);
+      }
+      btn.disabled = false;
     });
     wrap.appendChild(form);
     if (opener) opener.setAttribute('aria-expanded', 'true');
@@ -873,13 +1129,20 @@ function mapearError(code, TXT) {
         await fsApi.deleteDoc(ref);
         miVotoComentario.delete(commentId);
       } else {
-        await fsApi.setDoc(ref, { comment: commentId, card: cardId, uid, value: nuevo, ts: fsApi.serverTimestamp() });
+        // Mismo cooldown de 5 s que los votos de tarjeta (users.lastVoteAt
+        // compartido). El delete del toggle-off queda sin gate.
+        const batch = fsApi.writeBatch(db);
+        batch.set(ref, { comment: commentId, card: cardId, uid, value: nuevo, ts: fsApi.serverTimestamp() });
+        batch.set(fsApi.doc(db, 'users', uid), { lastVoteAt: fsApi.serverTimestamp() }, { merge: true });
+        await batch.commit();
         miVotoComentario.set(commentId, nuevo);
       }
     } catch (e) {
       actualizarConteosComentario(item, base);
       pintarVotoComentario(item, previo);
-      toast(panel, TXT.social_comment_vote_error);
+      toast(panel, e && e.code === 'permission-denied'
+        ? (TXT.social_vote_rate || TXT.social_comment_vote_error)
+        : TXT.social_comment_vote_error);
       console.warn('[sibylla/social] voto comentario:', (e && e.code) || e);
     } finally {
       enVueloComentario.delete(commentId);
@@ -1101,6 +1364,10 @@ function mapearError(code, TXT) {
   function pintarSesion(user) {
     currentUser = user || null;
     uid = user ? user.uid : null;
+    // El contador diario es por usuario: resetear la caché en cada cambio de
+    // sesión para que se relea users/{uid} del nuevo usuario.
+    misComentarios = null;
+    misComentariosPromise = null;
     if (user) {
       miVotoComentario.clear();
       comentariosVotosCargados.clear();
