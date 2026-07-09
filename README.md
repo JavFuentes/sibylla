@@ -4,11 +4,11 @@
 
 # Sibylla
 
-**Investigadora periódica de noticias.** Lee fuentes confiables, las filtra y rankea por confiabilidad, y produce un **resumen con enlaces a la fuente original** para profundizar.
+**Lectora periódica de noticias.** Selecciona con reglas públicas, resume en español y enlaza siempre a la fuente original.
 
-[![Estado](https://img.shields.io/badge/estado-prototipo%20funcional-2ea44f)](#estado)
-[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#instalación)
-[![Web](https://img.shields.io/badge/web-español%20(monolingüe)-7d5fff)](#uso)
+[![Estado](https://img.shields.io/badge/estado-en%20producci%C3%B3n-2ea44f)](https://sibylla.cl)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#instalación-y-uso)
+[![Tests](https://img.shields.io/badge/tests-533%20%E2%9C%93-2ea44f)](TEST.md)
 [![Licencia](https://img.shields.io/badge/licencia-MIT-blue)](LICENSE)
 [![Sitio](https://img.shields.io/badge/en%20vivo-sibylla.cl-d4a017)](https://sibylla.cl)
 
@@ -16,68 +16,53 @@
 
 ---
 
-Sibylla revisa cada cierto tiempo los temas que te interesan (**ciencia y tecnología**, más una **sección Nacional de Chile**) y te entrega un resumen ordenado. No republica el contenido: **detecta la noticia y enlaza a una fuente fiable**. El diseño es agnóstico de tema (se escala por configuración) y agnóstico de proveedor de IA (conectas la API que quieras, o ninguna).
+Elegir qué leer se volvió un trabajo: portadas ordenadas por el clic, la misma historia repetida diez veces y criterios de selección que ningún lector puede inspeccionar. Sibylla toma el camino contrario: es un agregador donde **todas las reglas de selección son públicas**. Qué fuentes usa y por qué, cómo las rankea, cuándo interviene una IA y con qué límites — está escrito en este repositorio, para que cualquiera pueda auditarlo, discutirlo o proponer cambios.
 
-<a name="estado"></a>
-> **Estado:** prototipo funcional. La ingesta, el filtrado/ranking y el resumen (con o sin IA) funcionan. La **web estática monolingüe (español)** está operativa y desplegada en **[sibylla.cl](https://sibylla.cl)**, con el título y el snippet de cada tarjeta traducidos por IA al español. La **sección Nacional (Chile)** usa un juez LLM con corroboración cruzada y cuota regional. El despliegue y la automatización periódica están documentados ([DEPLOY.md](DEPLOY.md)); la entrega por email sigue en el roadmap.
+Cada mañana, Sibylla lee un centenar de fuentes — papers, agencias espaciales, prensa de ciencia y tecnología, medios chilenos — descarta lo irrelevante y lo duplicado, y publica en **[sibylla.cl](https://sibylla.cl)** un tablero de tarjetas por tema: cada una con su sello de confiabilidad, un resumen en español y el enlace al original. **No republica contenido:** detecta la noticia y te lleva a quien la publicó.
 
-## Tabla de contenidos
-
-- [Características](#características)
-- [Vista de la web](#vista-de-la-web)
-- [Arquitectura](#arquitectura)
-- [Instalación](#instalación)
-- [Uso](#uso)
-- [Configuración](#configuración)
-- [Roadmap](#roadmap)
-- [Notas](#notas)
-
-## Características
-
-- **Fuentes por confiabilidad (tiers), no por idioma.** Ingesta multilingüe; el resumen se entrega en tu idioma.
-- **24 fuentes por defecto** (de **50** en el registro curado): APIs científicas (arXiv, PubMed), agregadores (Google News, Hacker News), 11 medios de ciencia/tecnología por RSS directo (Nature, BBC, MIT Tech Review, Phys.org, ScienceDaily, The Conversation, TechCrunch, Scientific American, Quanta, IEEE Spectrum, Agencia SINC) y la sección Nacional de Chile.
-- **Sección Nacional (Chile).** 8 medios chilenos por RSS nativo (elegidos por **modelo de financiación**, no por línea editorial) más un agregador para los que no tienen feed. La selección es un **embudo de dos etapas**: pre-filtro heurístico (frescura + corroboración cruzada entre medios) → **juez LLM** que ordena por valor noticioso sin castigar la investigación exclusiva, con **cuota por medio y mínimo de tarjetas regionales**. Degrada con elegancia al top heurístico si no hay LLM.
-- **Filtro de relevancia bilingüe** (ES/EN, sin tildes) y **deduplicación** por URL canónica / título.
-- **Agrupación de misma historia entre medios** (near-dedup conservador por similitud de título): una noticia cubierta por varios medios se muestra una vez, con "También en: …" enlazando a los demás. Señal débil a propósito; prefiere no fusionar a fusionar de más.
-- **Ranking** por `tier × frescura` y **diversidad** (una sola fuente no tapa al resto).
-- **Resumen con IA opcional y multi-proveedor:** Anthropic (Claude), OpenAI, OpenRouter, cualquier endpoint compatible o **Ollama** (local). Sin LLM, genera una lista determinista.
-- **Web estática monolingüe (español) con contenido localizado:** una sola página `index.html` enfocada en Chile. Los títulos y snippets de las tarjetas en otros idiomas se traducen al español con IA; cada tarjeta trae además un **botón "Resumen"** con un resumen en español generado por IA (abstract de papers, cuerpo de prensa extraído con trafilatura). Sin LLM, las tarjetas quedan en el idioma original de la fuente y sin botón de resumen.
-- **X / Twitter opcional** con **tope de presupuesto mensual duro** (es de pago por uso), aislado en su propia sección de redes sociales.
-- **Herramienta admin local (`--dashboard`):** servidor en `http://127.0.0.1:8765` con `/metricas` (historial de ejecuciones y costo de tokens, descargado del host) y `/divulgacion` (ver, añadir y quitar canales de YouTube por `@handle`/URL/`UC…`). Solo edita archivos; el banner avisa de cambios pendientes de commit.
-- **SEO listo para producción:** favicons (con fondo transparente), `manifest`, `og:image`, `robots.txt` y `sitemap.xml`.
-
-## Vista de la web
+> **Estado:** en producción y en desarrollo activo. El sitio se regenera solo, una vez al día, con GitHub Actions ([regenerate.yml](.github/workflows/regenerate.yml)).
 
 <div align="center">
-<img src="images/screenshot-web.png" alt="Captura de la web de Sibylla" width="720" />
+<img src="images/screenshot-web.png" alt="Captura de la web de Sibylla" width="760" />
 </div>
 
-> Estética grecorromana + sci-fi sobre el concepto "Lo que está sucediendo": una tarjeta por noticia, con sello de tier, enlace a la fuente y selector de cuántas tarjetas mostrar por tema.
+## Cómo decide qué mostrar
 
-## Arquitectura
+Las decisiones editoriales de Sibylla no son un algoritmo opaco: son reglas versionadas que se pueden leer.
 
-```
- FUENTES                INGESTA               PROCESO                 SALIDA
-┌──────────────┐   ┌────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│ APIs (arXiv, │   │ fetchers.py    │   │ pipeline.py      │   │ digest.py /      │
-│ PubMed)      │   │ normaliza a    │   │ dedupe + cluster │   │ summarize.py     │
-│ Google News  │──▶│ NewsItem;      │──▶│ + rank +         │──▶│ -> Markdown      │
-│ Hacker News  │   │ relevancia     │   │ diversify        │   │ (output/)        │
-│ Medios RSS   │   │ por tema       │   │                  │   ├──────────────────┤
-│ Nacional CL  │   └────────────────┘   ├──────────────────┤   │ web.py           │
-│ X (opcional) │        │               │ nacional.py      │   │ -> HTML estático │
-└──────────────┘   i18n.py +            │ (juez LLM +      │   │ (web/*.html)     │
-                    locales/{es,...}    │  cuota regional) │   │ (solo español)   │
-                    (traducciones)      └──────────────────┘   ├──────────────────┤
-                   (traducciones)                              │ dashboard.py +   │
-                                            IA opcional         │ metrics.py       │
-                                            (llm.py)            │ -> métricas      │
-                                                                └──────────────────┘
-```
+- **Confiabilidad antes que popularidad.** Cada fuente tiene un tier (1 = primaria / peer-review, 2 = periodismo, 3 = agregadores y discusión) y el ranking pondera `tier × frescura`, con un límite de diversidad para que ningún medio tape al resto. El registro curado — 100 fuentes, 80 activas por defecto — vive en [`config/sources.yaml`](config/sources.yaml).
+- **Medios chilenos elegidos por modelo de financiación, no por línea editorial.** La sección de actualidad nacional exige además corroboración cruzada entre medios; un juez LLM ordena por valor noticioso sin castigar la investigación exclusiva, con cuota por medio y espacio garantizado para prensa regional.
+- **Reglas por sección, escritas.** Qué fuentes alimentan cada sección, cómo se eligen sus tarjetas y en qué orden: documentado regla por regla en [SECCIONES.md](SECCIONES.md).
+- **Una historia, una tarjeta.** Deduplicación por URL canónica y agrupación de la misma noticia cubierta por medios distintos ("También en: …"), conservando como representante a la fuente más confiable.
+- **La IA tiene un rol acotado.** Traduce, resume y ordena la sección nacional; nunca genera noticias y toda tarjeta enlaza al original. Es multi-proveedor (Anthropic, OpenAI, OpenRouter, cualquier endpoint compatible u Ollama local) y **opcional**: sin LLM, el pipeline degrada a listas deterministas y tarjetas en su idioma original.
+- **Sin publicidad ni tracking.** La web es HTML estático. La personalización (intereses, orden de secciones, modo feed) vive en el navegador del visitante (`localStorage`), sin cuentas de por medio. Los votos y comentarios son opcionales y con límites anti-abuso; sus reglas de Firestore también están versionadas aquí ([firestore.rules](firestore.rules)).
+- **Presupuestos duros para lo que cuesta dinero.** X/Twitter es de pago por uso: tope mensual de lecturas y caché diaria. Traducciones y resúmenes por IA se cachean para no gastar tokens dos veces.
 
-Cada ítem conserva su **URL de origen** y su **tier de confianza**. Ver [`config/README.md`](config/README.md) para el registro de fuentes y los tiers, y [AGENTS.md](AGENTS.md) para la estructura de módulos.
+## Secciones
 
-## Instalación
+| Sección | Qué muestra |
+|---|---|
+| **Actualidad en Chile** | Prensa nacional: 8 medios por RSS nativo más un agregador, con juez LLM y corroboración cruzada. |
+| **Frontera Digital** | Inteligencia artificial, computación y ciberseguridad. |
+| **Medicina** | Papers (PubMed, arXiv) y prensa de salud y biomedicina. |
+| **Astronomía** | Instituciones chilenas (ALMA, CATA, SOCHIAS) y agencias espaciales (NASA, ESA, JAXA…), más la foto astronómica del día. |
+| **Divulgación** | El video más reciente de canales de divulgación científica en español (YouTube). |
+| **SIBYLLA** | Publicaciones propias del sitio (Markdown en [`publicaciones/`](publicaciones/)). |
+| **Voces de la red** | Mastodon, Bluesky y X: lo que se comenta, con lentes temáticas rotativas. |
+
+## Cómo funciona
+
+<div align="center">
+<img src="images/codebase-graph.png" alt="Grafo de módulos de Sibylla" width="760" />
+</div>
+
+> Grafo real de módulos del proyecto: `fetchers.py` normaliza cada fuente a un modelo común (`NewsItem`), `pipeline.py` orquesta (dedupe → cluster → rank → diversify) y `web.py` renderiza el sitio estático. Versión interactiva en [`docs/codebase-graph.html`](docs/codebase-graph.html).
+
+Es Python sin frameworks: ~7.000 líneas en 24 módulos. Cada fuente tiene su fetcher y **falla de forma aislada** (una API caída jamás rompe la corrida). La capa LLM usa `requests` puro, sin SDKs de proveedor. Los 533 tests cubren la lógica de dominio pura y corren en ~1 segundo, sin red.
+
+La estructura de módulos, las convenciones y las guías para extender (temas, fuentes, secciones, proveedores LLM) están en [AGENTS.md](AGENTS.md).
+
+## Instalación y uso
 
 Requiere **Python 3.10+** (probado en 3.12).
 
@@ -85,73 +70,48 @@ Requiere **Python 3.10+** (probado en 3.12).
 python -m venv .venv
 # Windows:  .venv\Scripts\activate     |  Linux/Mac:  source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # opcional: rellena claves (IA, X, etc.)
+cp .env.example .env        # opcional: claves de IA, X, etc.
 ```
 
-## Uso
-
 ```bash
-# Por defecto: Nacional (Chile) + IA + medicina (lista determinista si no hay LLM)
+# Resumen Markdown en output/ (con IA si hay clave; lista determinista si no)
 python -m sibylla.cli
 
 # Temas a la carta
 python -m sibylla.cli --topics ai,medicine --max-per-source 8
-python -m sibylla.cli --topics space --sources google_news_rss,arxiv_api
 
-# Forzar solo lista (sin IA), o incluir X (DE PAGO, con tope de presupuesto)
-python -m sibylla.cli --topics ai --summarize off
-python -m sibylla.cli --topics ai --with-x
-
-# Generar también la web estática (español; tarjetas traducidas por IA si hay LLM)
+# Generar la web estática (web/index.html, en español)
 python -m sibylla.cli --topics nacional,ai,medicine --html
 
-# Dejar las tarjetas en el idioma original de la fuente (sin traducir contenido)
-python -m sibylla.cli --topics ai,medicine --html --translate off
+# Incluir X (DE PAGO, respeta el tope mensual)
+python -m sibylla.cli --topics ai --with-x
 
-# El resumen Markdown sí admite otros idiomas (la web siempre se genera en español)
-python -m sibylla.cli --topics space --lang en
-
-# Herramienta admin local: /metricas (historial + costo) y /divulgacion (gestión
-# de canales de YouTube). Cierra con Ctrl+C.
+# Herramienta admin local: /metricas (historial + costo de tokens) y
+# /divulgacion (gestión de canales de YouTube)
 python -m sibylla.cli --dashboard
 ```
 
-El resumen se escribe en `output/digest-AAAAMMDD-HHMM.md`. La web se genera en `web/index.html` (página única en español).
-
-Temas disponibles: `nacional, ai, computing, space, physics, biotech, medicine, neuroscience, climate, energy, general_science, general_tech`.
+Temas disponibles: `nacional, ai, computing, space, physics, biotech, medicine, neuroscience, climate, energy, general_science, general_tech` (más las secciones curadas `astronomia` y `divulgacion`).
 
 ## Configuración
 
-Toda la configuración sensible vive en `.env` (que **no** se sube al repo). Copia `.env.example` y rellena lo que necesites:
+Todo lo sensible vive en `.env` (ignorado por git; plantilla en `.env.example`):
 
 - **IA (opcional):** `LLM_PROVIDER` (`anthropic` / `openai` / `openrouter` / `openai_compatible` / `ollama`), `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`.
-- **X / Twitter (opcional, de pago):** `X_BEARER_TOKEN` (+ claves). El tope mensual de lecturas vive en `config/sources.yaml` (`x_twitter.monthly_read_budget`) y el uso se cuenta en `data/x_usage.json`.
-- **Idioma de salida:** `SIBYLLA_LANG` (`es`, `en`, `it`, `pt`). Si no se define, se usa `default_user_language` de `config/sources.yaml`. Fallback: `es`.
-- **Sitio público:** `SIBYLLA_SITE_URL` (base para `og:image`, `sitemap.xml`, etc.). Fallback: `https://sibylla.cl`.
-- **Otras (opcionales):** `NCBI_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`, `GUARDIAN_API_KEY`, `BLUESKY_*`.
+- **X / Twitter (opcional, de pago):** `X_BEARER_TOKEN`; el tope mensual vive en `config/sources.yaml` (`x_twitter.monthly_read_budget`).
+- **Otras (opcionales):** `NCBI_API_KEY`, `GUARDIAN_API_KEY`, `BLUESKY_*`, `YOUTUBE_API_KEY`.
 
-Las fuentes se definen en [`config/sources.yaml`](config/sources.yaml) (registro curado por tiers).
+Las fuentes y sus tiers se definen en [`config/sources.yaml`](config/sources.yaml); el registro está documentado en [`config/README.md`](config/README.md).
 
 ## Roadmap
 
-- [x] Ingestor (fetchers + normalización + dedupe + ranking)
-- [x] Resumen con IA multi-proveedor (con fallback determinista)
-- [x] Calidad: relevancia bilingüe, diversidad, URLs limpias de medios
-- [x] Agrupación de misma historia entre medios (near-dedup por título; "También en")
-- [x] Más fuentes (medios RSS + español + X con presupuesto)
-- [x] Sección Nacional (Chile): juez LLM + corroboración cruzada + cuota regional
-- [x] Web estática monolingüe (español) generada desde el pipeline
-- [x] Despliegue en [sibylla.cl](https://sibylla.cl) + SEO (favicons, manifest, og:image, sitemap)
-- [x] Dashboard local de métricas (ejecuciones + costo de tokens)
-- [ ] Mejorar el near-dedup con una señal más fuerte (entidades / embeddings / LLM)
-- [ ] Automatización periódica + entrega por email
-- [ ] Resolver URLs de Google News (formato opaco actual) — mitigado con medios directos
+- [ ] Señal más fuerte para agrupar la misma historia entre medios (entidades / embeddings / LLM)
+- [ ] Entrega del resumen por email
+- [ ] Resolver URLs opacas de Google News — mitigado con medios por RSS directo
 
 ## Notas
 
-- **Seguridad:** nunca subas `.env` (tiene claves reales). Ver [AGENTS.md](AGENTS.md).
-- **Tests:** lógica de dominio pura (URLs, relevancia bilingüe). Ver [TEST.md](TEST.md).
+- **Seguridad:** nunca subas `.env` (claves reales). Ver [AGENTS.md](AGENTS.md).
+- **Tests:** `python -m pytest tests/ -v` — lógica de dominio pura, sin red. Ver [TEST.md](TEST.md).
+- **Despliegue:** guía genérica en [DEPLOY.md](DEPLOY.md).
 - **Licencia:** [MIT](LICENSE).
-- Para contribuir o trabajar con agentes de IA, lee [AGENTS.md](AGENTS.md).
-</content>
-</invoke>
