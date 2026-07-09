@@ -5,8 +5,16 @@
 // at-least-once; recalcular evita deriva por incrementos duplicados.
 
 const { onDocumentWritten } = require('firebase-functions/v2/firestore');
+const { setGlobalOptions } = require('firebase-functions/v2/options');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, AggregateField } = require('firebase-admin/firestore');
+
+// Cinturones anti-runaway de facturación: región fija (Chile) y tope de
+// instancias concurrentes. Las alertas de presupuesto ($1/$5) ya existen; esto
+// acota el pico de una tormenta de escrituras sobre votos/comentarios.
+// OJO: cambiar `region` reubica las funciones en el siguiente deploy ( Firestore
+// entrega el evento a cualquier región; funcionalmente sigue igual).
+setGlobalOptions({ region: 'southamerica-west1', maxInstances: 5 });
 
 initializeApp();
 const db = getFirestore();

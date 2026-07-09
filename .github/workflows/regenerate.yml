@@ -238,6 +238,11 @@ jobs:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           BLUESKY_IDENTIFIER: ${{ secrets.BLUESKY_IDENTIFIER }}
           BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+          # Service account de Firebase (proyecto sibylla-a81d2, rol
+          # datastore.viewer) para leer agregados/conteos por REST con token
+          # OAuth. Sobrevive al Enforce de App Check; si no está definida, el
+          # build cae al REST anónimo (tras Enforce, sitio sin números).
+          SIBYLLA_FIREBASE_SA_JSON: ${{ secrets.SIBYLLA_FIREBASE_SA_JSON }}
         run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --translate auto
 
       # Aviso NO bloqueante: si YouTube throttlea todos los feeds en un build de

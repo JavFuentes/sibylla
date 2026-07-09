@@ -220,7 +220,7 @@ Si tienes una máquina encendida (o un VPS), programa el build + subida con `cro
 
 ---
 
-## 6. App Check (fase social) — activo en Supervisión; enforcement PENDIENTE
+## 6. App Check (fase social) — Supervisión; Enforce listo tras configurar la SA
 
 La web inicializa **App Check** con reCAPTCHA v3. La *Site key* pública viaja en
 el bloque `social-i18n` del template (`appCheckSiteKey`, activada 2026-07-05); el
@@ -228,15 +228,37 @@ init está cableado en `static/social.js` (degrada en silencio si falla). Firest
 está en modo **Supervisión** (mide peticiones verificadas vs no verificadas, **no
 bloquea**).
 
-> **PENDIENTE antes de pasar Firestore a "Aplicar" (Enforce):** el build lee
-> `agregados/conteos` de forma **anónima** por REST con la API key pública
-> (`sibylla/social_sync.py`) para hornear los conteos en el HTML. Con enforcement
-> activo esa lectura anónima se **bloquea** y el sitio se regenera sin números.
-> Para poder aplicar Enforce hay que **migrar esa lectura del build a una cuenta
-> de servicio** (Admin SDK o token de App Check de servidor). Hasta entonces,
-> dejar Firestore en **Supervisión**.
+El build lee `agregados/conteos` por REST para hornear los conteos en el HTML.
+**Sin Enforce** basta la API key pública (anónimo). **Con Enforce** esa lectura
+anónima se bloquea, así que el build usa una **cuenta de servicio**:
+
+- `sibylla/social_sync.py` detecta credenciales en `SIBYLLA_FIREBASE_SA_JSON`
+  (JSON inline) o `GOOGLE_APPLICATION_CREDENTIALS` (ruta) y, si las hay, llama al
+  mismo REST con `Authorization: Bearer <token OAuth>` (scope `datastore`) en vez
+  de `?key=`. Sin credenciales o si falla, cae al camino anónimo (que tras Enforce
+  devuelve `{}` → sitio sin números, sin romper el build).
+- `google-auth` es la dependencia nueva; el resto del build sigue siendo
+  `requests` puro.
+
+### Pasos para activar Enforce (operador, manual)
+
+1. **Crear la service account** en el proyecto Firebase `sibylla-a81d2` (¡no
+   confundir con `sibylla-501104`, el de la key de YouTube!) con rol mínimo
+   `roles/datastore.viewer`. Generar una **key JSON** (consola GCP → IAM →
+   Service accounts; `gcloud` no está en la máquina del autor, usar la web).
+2. **Cargar el secret** `SIBYLLA_FIREBASE_SA_JSON` en GitHub (contenido del JSON)
+   y, si se prueba local, pegarlo en `.env` o apuntar `GOOGLE_APPLICATION_CREDENTIALS`.
+3. **Verificar un build** con la SA: regenerar y comprobar que los conteos se
+   hornean en el HTML (`#social-conteos`). En Supervisión, una lectura REST
+   anónima con la API key pública debe seguir funcionando (todavía no bloquea).
+4. **Activar Enforce** (consola Firebase → App Check → Firestore → "Aplicar")
+   solo tras confirmar en Supervisión que ~100 % de las peticiones llegan
+   verificadas **y** un build de producción con la SA hornea los conteos. Tras
+   activarlo, votar/comentar/leer siguen funcionando y una lectura REST anónima
+   con la API key pública **falla** (esperado). Rollback: volver a Supervisión
+   (un clic).
 
 - La CSP de `static/.htaccess` ya permite reCAPTCHA (`www.google.com`,
   `www.gstatic.com` en `script-src`/`connect-src`/`frame-src`): no requiere cambios.
 - La *Secret key* de reCAPTCHA vive **solo** en la consola de App Check, nunca en
-  el repo.
+  el repo. La key JSON de la SA va **solo** como secret de CI o en `.env` local.
