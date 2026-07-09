@@ -606,7 +606,10 @@ function mapearError(code, TXT) {
       st.last = snap.docs[snap.docs.length - 1] || st.last;
       st.done = snap.size < COMMENTS_PAGE;
       st.loaded = true;
-      panel.querySelector('.comentarios-more').hidden = st.done;
+      // :scope > : el toggle «Ver respuestas» de los hilos también lleva la
+      // clase comentarios-more; sin acotar al hijo directo se ocultaba ese
+      // botón en lugar del paginador del panel.
+      panel.querySelector(':scope > .comentarios-more').hidden = st.done;
       panel.querySelector('.comentarios-empty').hidden = !!panel.querySelector('.comentario');
     } catch (e) {
       toast(panel, TXT.social_comment_error);
