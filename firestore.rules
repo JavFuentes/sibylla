@@ -1,9 +1,37 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Índice de día UTC como entero YYYYMMDD (p. ej. 20260709). Se codifica con
+    // los campos calendario de request.time (todos en UTC, que es como el
+    // Timestamp absoluto expone sus partes). Coincide con
+    // getUTCFullYear()*10000 + (getUTCMonth()+1)*100 + getUTCDate() en el
+    // cliente, así el contador diario se reinicia a la misma medianoche UTC en
+    // ambos lados. Solo se usa para igualdad/desigualdad (no aritmética de diff,
+    // que rompería en límites de mes).
+    function diaUtc() {
+      return request.time.year() * 10000 + request.time.month() * 100 + request.time.day();
+    }
+
+    // Tope diario de comentarios por cuenta. Gancho premium: cuando existan
+    // cuentas premium se les pondrá el custom claim 'premium' vía Admin SDK;
+    // subir el límite es cambiar este retorno, no rediseñar las reglas.
+    // (Valor premium provisional; lo decide el autor cuando exista.)
+    function limiteComentariosDia() {
+      return (request.auth != null && 'premium' in request.auth.token
+              && request.auth.token.premium == true) ? 25 : 5;
+    }
+
+    // ¿El write cambia alguna de estas claves respecto al estado anterior?
+    function cambio(claves) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(claves);
+    }
+
     // Votos: doc id = <cardId>_<uid>. Un voto por usuario y tarjeta por
     // construcción del id. Se conserva la decisión de Fase 1: votar no exige
-    // correo verificado.
+    // correo verificado. Cooldown de 5 s entre votos (tarjetas y comentarios)
+    // vía users/{uid}.lastVoteAt; quitar un voto (delete) no crea contenido y
+    // queda libre — el gate del create frena el bucle toggle-off/on rápido.
     match /votes/{voteId} {
       allow read: if true;
       allow create: if request.auth != null
@@ -14,14 +42,24 @@ service cloud.firestore {
         && request.resource.data.card.size() >= 3
         && request.resource.data.card.size() <= 64
         && request.resource.data.value in [1, -1]
-        && request.resource.data.ts == request.time;
+        && request.resource.data.ts == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt == request.time
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('lastVoteAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt
+               < request.time - duration.value(5, 's'));
       allow update: if request.auth != null
         && resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['card', 'uid', 'value', 'ts'])
         && request.resource.data.card == resource.data.card
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.value in [1, -1]
-        && request.resource.data.ts == request.time;
+        && request.resource.data.ts == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt == request.time
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('lastVoteAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt
+               < request.time - duration.value(5, 's'));
       allow delete: if request.auth != null
         && resource.data.uid == request.auth.uid;
     }
@@ -40,7 +78,7 @@ service cloud.firestore {
         && request.resource.data.card.size() <= 64
         && request.resource.data.texto is string
         && request.resource.data.texto.size() >= 2
-        && request.resource.data.texto.size() <= 500
+        && request.resource.data.texto.size() <= 240
         && request.resource.data.autor is string
         && request.resource.data.autor == request.auth.token.name
         && request.resource.data.autor.size() >= 2
@@ -63,7 +101,13 @@ service cloud.firestore {
         && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
             || !('lastCommentAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
             || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastCommentAt
-               < request.time - duration.value(30, 's'));
+               < request.time - duration.value(30, 's'))
+        // Tope diario UTC: el batch del comentario mantiene el contador en
+        // users/{uid}; aquí se valida la foto POST-write (getAfter). Una
+        // respuesta cuenta como comentario (mueve comentariosHoy).
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.comentariosDia == diaUtc()
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.comentariosHoy
+           <= limiteComentariosDia();
 
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid
         && (!('respuestas' in resource.data) || resource.data.respuestas == 0);
@@ -88,7 +132,8 @@ service cloud.firestore {
     }
 
     // Votos en comentarios: un voto por usuario por comentario. No exige correo
-    // verificado, igual que los votos de tarjeta.
+    // verificado, igual que los votos de tarjeta. Cooldown de 5 s compartido
+    // con los votos de tarjeta vía users/{uid}.lastVoteAt.
     match /commentVotes/{voteId} {
       allow read: if true;
       allow create: if request.auth != null
@@ -99,7 +144,12 @@ service cloud.firestore {
         && request.resource.data.ts == request.time
         && exists(/databases/$(database)/documents/comments/$(request.resource.data.comment))
         && get(/databases/$(database)/documents/comments/$(request.resource.data.comment)).data.card
-           == request.resource.data.card;
+           == request.resource.data.card
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt == request.time
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('lastVoteAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt
+               < request.time - duration.value(5, 's'));
       allow update: if request.auth != null
         && resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(['comment', 'card', 'uid', 'value', 'ts'])
@@ -107,7 +157,12 @@ service cloud.firestore {
         && request.resource.data.card == resource.data.card
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.value in [1, -1]
-        && request.resource.data.ts == request.time;
+        && request.resource.data.ts == request.time
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt == request.time
+        && (!exists(/databases/$(database)/documents/users/$(request.auth.uid))
+            || !('lastVoteAt' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data)
+            || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.lastVoteAt
+               < request.time - duration.value(5, 's'));
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
 
@@ -133,26 +188,48 @@ service cloud.firestore {
                < request.time - duration.value(10, 's'));
     }
 
-    // Marcas de tiempo para rate-limit. Solo el dueño escribe, y cada campo que
-    // cambie debe valer request.time.
+    // Marcas de tiempo para rate-limit y el contador diario de comentarios.
+    // Solo el dueño escribe. Cada timestamp que cambie debe valer request.time.
+    // El contador diario (comentariosDia/comentariosHoy) solo puede moverse
+    // dentro del batch de un comentario (lastCommentAt == request.time) y con el
+    // patrón incremento/reinicio: dentro de un mismo día UTC el contador SOLO
+    // crece; un write suelto malicioso nunca lo resetea (solo quema la cuota
+    // propia del atacante).
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt', 'lastNickChangeAt'])
+        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt', 'lastNickChangeAt', 'comentariosDia', 'comentariosHoy', 'lastVoteAt'])
         && (!('lastCommentAt' in request.resource.data) || request.resource.data.lastCommentAt == request.time)
         && (!('lastReportAt' in request.resource.data) || request.resource.data.lastReportAt == request.time)
-        && (!('lastNickChangeAt' in request.resource.data) || request.resource.data.lastNickChangeAt == request.time);
+        && (!('lastVoteAt' in request.resource.data) || request.resource.data.lastVoteAt == request.time)
+        && (!('lastNickChangeAt' in request.resource.data) || request.resource.data.lastNickChangeAt == request.time)
+        && (!(('comentariosDia' in request.resource.data) || ('comentariosHoy' in request.resource.data))
+            || (request.resource.data.comentariosDia == diaUtc()
+                && request.resource.data.comentariosHoy == 1
+                && 'lastCommentAt' in request.resource.data
+                && request.resource.data.lastCommentAt == request.time));
       allow update: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt', 'lastNickChangeAt'])
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastCommentAt'])
-            || request.resource.data.lastCommentAt == request.time)
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastReportAt'])
-            || request.resource.data.lastReportAt == request.time)
+        && request.resource.data.keys().hasOnly(['lastCommentAt', 'lastReportAt', 'lastNickChangeAt', 'comentariosDia', 'comentariosHoy', 'lastVoteAt'])
+        && (!cambio(['lastCommentAt']) || request.resource.data.lastCommentAt == request.time)
+        && (!cambio(['lastReportAt']) || request.resource.data.lastReportAt == request.time)
+        && (!cambio(['lastVoteAt']) || request.resource.data.lastVoteAt == request.time)
         // Apodo: solo se puede (re)escribir si pasaron 30 días desde el último cambio.
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastNickChangeAt'])
+        && (!cambio(['lastNickChangeAt'])
             || (request.resource.data.lastNickChangeAt == request.time
                 && (!('lastNickChangeAt' in resource.data)
-                    || resource.data.lastNickChangeAt < request.time - duration.value(30, 'd'))));
+                    || resource.data.lastNickChangeAt < request.time - duration.value(30, 'd'))))
+        // Coherencia del contador diario de comentarios.
+        && (!cambio(['comentariosDia', 'comentariosHoy'])
+            || ('lastCommentAt' in request.resource.data
+                && request.resource.data.lastCommentAt == request.time
+                && request.resource.data.comentariosDia == diaUtc()
+                // mismo día previo: incremento en 1
+                && (('comentariosDia' in resource.data && 'comentariosHoy' in resource.data
+                     && resource.data.comentariosDia == diaUtc()
+                     && request.resource.data.comentariosHoy == resource.data.comentariosHoy + 1)
+                    // día distinto o contador ausente (legacy): reinicio a 1
+                    || ((!('comentariosDia' in resource.data) || resource.data.comentariosDia != diaUtc())
+                        && request.resource.data.comentariosHoy == 1))));
     }
 
     // Conteos pre-agregados: los mantiene la Cloud Function con Admin SDK.
