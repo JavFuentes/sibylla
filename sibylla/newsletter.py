@@ -430,10 +430,22 @@ def enviar_boletin_cli() -> int:
             prueba = Suscriptor("prueba", test_to, TEMAS_VALIDOS)
             estado_prueba = _estado_nuevo(hoy, 1)
             # Estado temporal en memoria: el modo prueba nunca toca el estado diario.
-            enviar(edicion, [prueba], estado=estado_prueba, cfg=cfg,
-                   site_url=edicion.get("site_url") or get_site_url(), tope=1,
-                   estado_path=ROOT / "data" / "newsletter_test_state.json",
-                   dry_run=dry_run, asunto_prueba=True)
+            resultado_prueba = enviar(
+                edicion, [prueba], estado=estado_prueba, cfg=cfg,
+                site_url=edicion.get("site_url") or get_site_url(), tope=1,
+                estado_path=ROOT / "data" / "newsletter_test_state.json",
+                dry_run=dry_run, asunto_prueba=True,
+            )
+            if dry_run:
+                log.warning("boletín prueba: dry-run completado; no se envió correo")
+            elif resultado_prueba.get("enviados"):
+                log.warning("boletín prueba: mensaje aceptado por el servidor SMTP")
+            elif resultado_prueba.get("omitidos"):
+                log.warning("boletín prueba: omitido porque la edición no tiene tarjetas")
+            else:
+                errores = resultado_prueba.get("fallidos") or []
+                causa = errores[0].get("error", "desconocida") if errores else "desconocida"
+                log.warning("boletín prueba: no enviado (%s)", causa)
             try:
                 (ROOT / "data" / "newsletter_test_state.json").unlink()
             except OSError:

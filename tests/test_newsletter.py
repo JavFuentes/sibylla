@@ -157,6 +157,22 @@ def test_dry_run_no_avanza_estado(tmp_path):
     assert estado == original and not (tmp_path / "state.json").exists()
 
 
+def test_envio_devuelve_el_resultado_actualizado(monkeypatch, tmp_path):
+    class SMTP:
+        def send_message(self, _msg): pass
+        def quit(self): pass
+    monkeypatch.setattr(nl, "_abrir_smtp", lambda _cfg: SMTP())
+    estado = nl._estado_nuevo("2026-07-25", 1)
+    cfg = nl.SmtpConfig("smtp", 465, "u", "p", "noticias@sibylla.cl", throttle_s=0)
+    resultado = nl.enviar(
+        _edicion(), [Suscriptor("u1", "a@example.com", ("ai",))],
+        estado=estado, cfg=cfg, site_url="https://sibylla.cl", tope=1,
+        estado_path=tmp_path / "state.json",
+    )
+    assert resultado is estado
+    assert resultado["enviados"] == ["u1"]
+
+
 def test_tope_deja_estado_reanudable(monkeypatch, tmp_path):
     class SMTP:
         def send_message(self, _msg): pass
