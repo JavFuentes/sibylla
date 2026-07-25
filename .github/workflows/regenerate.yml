@@ -426,7 +426,7 @@ jobs:
           SIBYLLA_SITE_URL: ${{ vars.SIBYLLA_SITE_URL || 'https://sibylla.cl' }}
           SIBYLLA_NEWSLETTER_MAX: ${{ vars.SIBYLLA_NEWSLETTER_MAX || '80' }}
           SIBYLLA_NEWSLETTER_DRYRUN: ${{ vars.SIBYLLA_NEWSLETTER_DRYRUN || '0' }}
-          SIBYLLA_NEWSLETTER_TEST_TO: ${{ vars.SIBYLLA_NEWSLETTER_TEST_TO }}
+          SIBYLLA_NEWSLETTER_TEST_TO: ${{ secrets.SIBYLLA_NEWSLETTER_TEST_TO }}
           SIBYLLA_FIREBASE_SA_JSON: ${{ secrets.SIBYLLA_FIREBASE_SA_JSON }}
         run: python -m sibylla.cli --newsletter-send
 

@@ -12,7 +12,8 @@ DMARC inicialmente con `p=none`, y probar el destino de
 `SIBYLLA_NEWSLETTER_TEST_TO` en mail-tester (objetivo 9/10). En GitHub guardar
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` como secrets;
 `SMTP_MODE`, `SMTP_THROTTLE_S`, `SIBYLLA_NEWSLETTER_MAX`,
-`SIBYLLA_NEWSLETTER_DRYRUN` y el destino de prueba como variables.
+`SIBYLLA_NEWSLETTER_DRYRUN` como variables, y `SIBYLLA_NEWSLETTER_TEST_TO`
+como secret para que la dirección de prueba quede enmascarada en los logs.
 Crear además el alias `baja@sibylla.cl` apuntando a `noticias@sibylla.cl` y un
 filtro de webmail que mueva ese destinatario a la carpeta `Bajas`. El plan no
 acepta direcciones del tipo `noticias+baja@...`.
