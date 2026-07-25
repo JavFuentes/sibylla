@@ -1094,22 +1094,6 @@ sources:
     cost: free
     status: verified_2026-07-01
 
-  - id: yt_jesusgmaestro
-    name: "Jesús G. Maestro"
-    publisher: "YouTube"
-    tier: 3
-    type: rss
-    category: youtube
-    handle: "@JesúsGMaestro"
-    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCfWWjBMY6zpvvU6wAe5j_Eg"
-    topics: [divulgacion]
-    lang: es
-    license: "solo miniatura + título + enlace al video"
-    access: open
-    cost: free
-    status: verified_2026-07-01
-    notes: "Feed Atom flaky (404/500 intermitente por rate-limit de YouTube, sobre todo desde CI); fetch_youtube reintenta y cachea."
-
   - id: yt_quantumfracture
     name: "QuantumFracture"
     publisher: "YouTube"
@@ -1209,21 +1193,6 @@ sources:
     category: youtube
     handle: "@FaztTech"
     url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCX9NJ471o7Wie1DQe94RVIg"
-    topics: [divulgacion]
-    lang: es
-    license: "solo miniatura + título + enlace al video"
-    access: open
-    cost: free
-    status: verified_2026-07-01
-
-  - id: yt_psicovlog
-    name: "Psico Vlog"
-    publisher: "YouTube"
-    tier: 3
-    type: rss
-    category: youtube
-    handle: "@psicovlog"
-    url: "https://www.youtube.com/feeds/videos.xml?channel_id=UCKK25Prf-UD9Qak0W1d02KQ"
     topics: [divulgacion]
     lang: es
     license: "solo miniatura + título + enlace al video"

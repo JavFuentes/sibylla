@@ -31,10 +31,10 @@ DEFAULT_FREE_SOURCES = [
     # Divulgación: los 38 canales de YouTube (1 tarjeta por canal). El feed es
     # flaky; fetch_youtube reintenta y cachea, así que TODOS entran por defecto.
     "yt_jodisea", "yt_radientnews", "yt_jefillysh", "yt_elrobotdeplaton",
-    "yt_jesusgmaestro", "yt_quantumfracture", "yt_veritasiumes",
+    "yt_quantumfracture", "yt_veritasiumes",
     "yt_pildorasinformaticas",
     "yt_exoplanetas", "yt_robotitus", "yt_ecosdeunmundoestrellado", "yt_fazttech",
-    "yt_psicovlog", "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente",
+    "yt_lagatadeschrodinger", "yt_sizematters", "yt_curiosamente",
     "yt_iftmadrid", "yt_novagea", "yt_astrumespanol", "yt_raqueldelamorenaoficial",
     "yt_ter", "yt_darinmex", "yt_candeliousfang", "yt_jefidos",
     "yt_matesmike", "yt_pontebata", "yt_cienciadesofa", "yt_bitboss",
