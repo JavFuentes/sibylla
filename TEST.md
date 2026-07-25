@@ -17,6 +17,7 @@ python -m pytest tests/ -v
 # solo un módulo
 python -m pytest tests/test_models.py -v
 python -m pytest tests/test_relevance.py -v
+python -m pytest tests/test_newsletter.py tests/test_suscriptores.py tests/test_locales.py tests/test_web.py -q
 
 # con cobertura (opcional, instalar pytest-cov)
 python -m pytest tests/ -v --cov=sibylla --cov-report=term-missing
@@ -71,6 +72,15 @@ tests/
 | `cli.py` (main) | Orquestación. Test de integración/e2e. |
 
 ## Convenciones
+
+### Boletín y reglas de Firestore
+
+Los tests del boletín usan SMTP, LLM y REST falsos: no abren red. Además de
+pytest, validar `firestore.rules` con `firebase deploy --only firestore:rules
+--dry-run` y en el Playground de reglas estos casos: correo distinto del token;
+email sin verificar; uid ajeno; tema fuera de lista; lista vacía o de 9 temas
+(todos denegados); delete del dueño (permitido). Los tests del emulador requieren
+Java, pero su ausencia no bloquea estas dos validaciones.
 
 - **Idioma:** docstrings y descripciones en español, coherente con el resto del repo.
 - **Sin mocks ni fixtures:** todos los casos son datos inline (funciones puras).

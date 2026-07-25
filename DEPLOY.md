@@ -4,6 +4,30 @@ Guía **genérica** (independiente del proveedor) para subir el sitio a un hosti
 estático y mantenerlo al día. Para arquitectura y convenciones, ver
 [AGENTS.md](AGENTS.md); para uso del CLI, [README.md](README.md).
 
+## Boletín diario: preparación operativa
+
+Antes de habilitarlo: crear `noticias@sibylla.cl`, confirmar el límite móvil de
+24 horas del buzón, configurar SPF (`include:_spf.mail.hostinger.com`), DKIM y
+DMARC inicialmente con `p=none`, y probar el destino de
+`SIBYLLA_NEWSLETTER_TEST_TO` en mail-tester (objetivo 9/10). En GitHub guardar
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` como secrets;
+`SMTP_MODE`, `SMTP_THROTTLE_S`, `SIBYLLA_NEWSLETTER_MAX`,
+`SIBYLLA_NEWSLETTER_DRYRUN` y el destino de prueba como variables.
+Crear además el alias `baja@sibylla.cl` apuntando a `noticias@sibylla.cl` y un
+filtro de webmail que mueva ese destinatario a la carpeta `Bajas`. El plan no
+acepta direcciones del tipo `noticias+baja@...`.
+
+Desplegar `firestore.rules` antes de abrir el opt-in. El workflow construye
+`data/newsletter_edicion.json`, publica el sitio y solo entonces envía. Descarga
+y vuelve a subir `data/newsletter_state.json` desde `DEPLOY_DATA_PATH`; contiene
+uids, nunca correos. El step SMTP es no bloqueante, por lo que un fallo no pone
+el deploy en rojo y un `workflow_dispatch` reanuda solo los pendientes.
+
+La service account (`SIBYLLA_FIREBASE_SA_JSON`, rol mínimo datastore viewer)
+puede listar ahora correos. No imprimir el secreto ni direcciones en logs. Ante
+cualquier sospecha, revocar la key en Google Cloud, crear otra, sustituir el
+secret de GitHub y revisar los logs de acceso antes de reactivar el envío.
+
 ---
 
 ## 1. Qué se publica

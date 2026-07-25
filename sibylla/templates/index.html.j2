@@ -555,10 +555,11 @@
   #sesion-menu .sesion-sep{ height:1px; margin:13px 0 11px;
     background:linear-gradient(90deg, transparent, rgba(217,184,95,.32), transparent); }
   /* ---- Cambiar apodo (una vez al mes) ---- */
-  #sesion-apodo{ margin-top:0; padding:0; text-align:left; cursor:pointer; background:none;
+  #sesion-apodo, #sesion-boletin{ margin-top:0; padding:0; text-align:left; cursor:pointer; background:none;
     border:none; font-family:inherit; font-size:.76rem; letter-spacing:.04em; color:var(--cian);
     transition:color .2s; }
-  #sesion-apodo:hover{ color:var(--cian-claro); }
+  #sesion-apodo:hover, #sesion-boletin:hover{ color:var(--cian-claro); }
+  #sesion-boletin{ margin-top:10px; }
   #sesion-apodo-form{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
   #sesion-apodo-form[hidden]{ display:none; }
   #sesion-apodo-input{ padding:7px 9px; border-radius:8px; font-family:inherit; font-size:.78rem;
@@ -615,6 +616,18 @@
     text-underline-offset:3px; text-decoration-color:rgba(217,184,95,.4); }
   .auth-links button:hover{ color:var(--oro-claro); }
   #auth-cerrar{ position:absolute; top:14px; right:16px; }
+  .onb--correo .onb-panel{ max-width:560px; position:relative; }
+  .onb--correo .onb-cuerpo{ padding:8px 30px 28px; }
+  #correo-cerrar{ position:absolute; top:14px; right:16px; }
+  .correo-estado[hidden]{ display:none; }
+  .correo-cuenta{ color:var(--cian-claro); font-size:.85rem; text-align:center; word-break:break-all; }
+  .correo-msg{ min-height:1em; color:#E7A38F; text-align:center; font-size:.8rem; }
+  .correo-msg[data-ok]{ color:var(--cian-claro); }
+  #correo-chips{ margin:14px 0; }
+  #correo-chips .chip-tema{ cursor:pointer; }
+  .correo-borrar{ display:block; margin:12px auto 0; border:0; background:none; color:var(--tenue);
+    text-decoration:underline; cursor:pointer; font-family:inherit; }
+  #pie-boletin{ color:var(--oro-claro); text-underline-offset:3px; }
 
   .sello{ width:30px; height:30px; flex:none; border-radius:50%; display:grid; place-items:center;
     font-family:'Cinzel',serif; font-size:.72rem; }
@@ -872,6 +885,7 @@
           <span class="sesion-apodo-msg" id="sesion-apodo-msg" hidden></span>
           <button type="submit">{{ t.social_nick_save }}</button>
         </form>
+        <button type="button" id="sesion-boletin">{{ t.news_menu }}</button>
         <button type="button" id="sesion-salir">{{ t.auth_logout }}</button>
       </div>
     </span>
@@ -1026,6 +1040,7 @@
       <span><span class="punto t3"></span> III · {{ t.tier3_label }}</span>
     </div>
     <p class="lema">{{ t.footer_motto }}</p>
+    <p class="lema"><a href="?boletin=temas" id="pie-boletin">{{ t.news_footer_link }}</a></p>
   </div>
 </footer>
 
@@ -1056,6 +1071,39 @@
         <button type="button" id="onb-estandar" class="boton fantasma">{{ t.onb_standard }}</button>
       </div>
       <p class="onb-nota">{{ t.onb_note }}</p>
+    </div>
+  </div>
+</div>
+
+{# Gestión del boletín: opt-in explícito para cuentas con correo verificado. #}
+<div id="correo" class="onb onb--correo" role="dialog" aria-modal="true" aria-labelledby="correo-titulo" hidden>
+  <div class="onb-panel">
+    <div class="meandro" aria-hidden="true"></div>
+    <div class="onb-cuerpo">
+      <button type="button" class="sec-btn" id="correo-cerrar" aria-label="{{ t.auth_close }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <h2 id="correo-titulo" class="onb-titulo">{{ t.news_title }}</h2>
+      <p class="onb-body">{{ t.news_lead }}</p>
+      <p id="correo-msg" class="correo-msg" role="status" hidden></p>
+      <section id="correo-sin-sesion" class="correo-estado" hidden>
+        <p class="onb-body">{{ t.news_need_account }}</p>
+        <div class="onb-acciones"><button type="button" id="correo-entrar" class="boton oro">{{ t.auth_enter }}</button></div>
+      </section>
+      <section id="correo-sin-verificar" class="correo-estado" hidden>
+        <p class="onb-body">{{ t.news_verify_needed }}</p>
+        <div class="onb-acciones"><button type="button" id="correo-verificar" class="boton oro">{{ t.social_verify_resend }}</button></div>
+      </section>
+      <section id="correo-config" class="correo-estado" hidden>
+        <p id="correo-cuenta" class="correo-cuenta"></p>
+        <h3 class="onb-subtitulo">{{ t.news_topics_label }}</h3>
+        <p class="onb-nota">{{ t.news_topics_hint }}</p>
+        <div id="correo-chips" class="chips-temas"></div>
+        <p class="onb-nota">{{ t.news_privacy }}</p>
+        <div class="onb-acciones">
+          <button type="button" id="correo-guardar" class="boton oro">{{ t.news_subscribe }}</button>
+          <button type="button" id="correo-baja" class="boton fantasma" hidden>{{ t.news_unsubscribe }}</button>
+        </div>
+        <button type="button" id="correo-borrar" class="correo-borrar" hidden>{{ t.news_delete }}</button>
+      </section>
     </div>
   </div>
 </div>
@@ -1097,7 +1145,7 @@
     <div class="onb-cuerpo">
       <button type="button" class="sec-btn" id="auth-cerrar" aria-label="{{ t.auth_close }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       <h2 id="auth-titulo" class="onb-titulo">{{ t.auth_title }}</h2>
-      <p id="auth-sub" class="auth-sub" data-vote="{{ t.auth_sub_vote }}" data-comment="{{ t.auth_sub_comment }}">{{ t.auth_sub_vote }}</p>
+      <p id="auth-sub" class="auth-sub" data-vote="{{ t.auth_sub_vote }}" data-comment="{{ t.auth_sub_comment }}" data-newsletter="{{ t.auth_sub_newsletter }}">{{ t.auth_sub_vote }}</p>
       <button type="button" id="auth-google"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg> {{ t.auth_google }}</button>
       <div class="auth-sep">{{ t.auth_or }}</div>
       <form id="auth-form" novalidate>
@@ -1786,7 +1834,16 @@
     if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
     else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
   });
-  if(!loadPrefs()) onbOpen();
+  /* Lectura para social.js (boletín): orden visible efectivo. No escribe. */
+  window.SibyllaPrefs={ temasVisibles:function(){
+    var prefs=loadPrefs(), lay=loadLayout();
+    var orden=(lay.order && lay.order.length ? lay.order : derivedOrder(prefs)).slice();
+    ORIGINAL.forEach(function(tp){ if(orden.indexOf(tp)<0) orden.push(tp); });
+    var ocultos=(lay.hidden && lay.hidden.length ? lay.hidden : derivedHidden(prefs));
+    return orden.filter(function(tp){ return PINNED.indexOf(tp)<0 && ocultos.indexOf(tp)<0; });
+  }};
+  var boletinQuery=new URLSearchParams(location.search).get('boletin');
+  if(!loadPrefs() && !boletinQuery) onbOpen();
 })();
 /* Miniaturas de Divulgación: al pulsar, sustituyen su contenido por el
    reproductor embebido (youtube-nocookie) en vez de navegar a YouTube. El
@@ -1881,6 +1938,7 @@
   "social_nick_error": t.social_nick_error, "auth_change_nick": t.auth_change_nick,
   "auth_nick_edit_hint": t.auth_nick_edit_hint, "auth_nick_locked": t.auth_nick_locked,
   "auth_title": t.auth_title, "auth_sub_vote": t.auth_sub_vote, "auth_sub_comment": t.auth_sub_comment,
+  "auth_sub_newsletter": t.auth_sub_newsletter,
   "auth_google": t.auth_google, "auth_or": t.auth_or, "auth_email": t.auth_email,
   "auth_password": t.auth_password, "auth_signin": t.auth_signin, "auth_signup": t.auth_signup,
   "auth_to_signup": t.auth_to_signup, "auth_to_signin": t.auth_to_signin, "auth_forgot": t.auth_forgot,
@@ -1889,7 +1947,15 @@
   "auth_err_wrong": t.auth_err_wrong, "auth_err_email_in_use": t.auth_err_email_in_use,
   "auth_err_weak_password": t.auth_err_weak_password, "auth_err_popup": t.auth_err_popup,
   "auth_err_network": t.auth_err_network, "auth_err_too_many": t.auth_err_too_many,
-  "auth_err_generic": t.auth_err_generic
+  "auth_err_generic": t.auth_err_generic,
+  "news_menu": t.news_menu, "news_need_account": t.news_need_account,
+  "news_verify_needed": t.news_verify_needed, "news_topics_label": t.news_topics_label,
+  "news_subscribe": t.news_subscribe, "news_save": t.news_save,
+  "news_unsubscribe": t.news_unsubscribe, "news_delete": t.news_delete,
+  "news_delete_confirm": t.news_delete_confirm, "news_active": t.news_active,
+  "news_inactive": t.news_inactive, "news_saved": t.news_saved, "news_off": t.news_off,
+  "news_err_denied": t.news_err_denied, "news_err_generic": t.news_err_generic,
+  "news_min_one": t.news_min_one
 } -%}
 <script type="application/json" id="social-conteos">{{ social_conteos | tojson }}</script>
 <script type="application/json" id="social-i18n">{{ {"texts": social_texts, "config": {"apiKey": "AIzaSyCVa11offl3SebRwlK5ZP7viP9vHPiMp0U", "authDomain": "sibylla-a81d2.firebaseapp.com", "projectId": "sibylla-a81d2", "storageBucket": "sibylla-a81d2.firebasestorage.app", "messagingSenderId": "490666060572", "appId": "1:490666060572:web:aee8d022b4de2781ee68d9", "appCheckSiteKey": "6LevtUUtAAAAAO-gKJ_Q3D2We6fFlb9i8XB2sdro"}} | tojson }}</script>

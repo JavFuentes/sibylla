@@ -160,6 +160,7 @@ jobs:
           descargar_xrecent() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_recent.json" data/x_recent.json; }
           descargar_xhouse()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/x_house.json" data/x_house.json; }
           descargar_stellarh() { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/stellar_history.json" data/stellar_history.json; }
+          descargar_nlstate()  { scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/newsletter_state.json" data/newsletter_state.json; }
 
           # Si el host es inalcanzable ABORTAMOS: generar con historial vacío y
           # luego subirlo machacaría el runs.json bueno que vive en el servidor.
@@ -225,6 +226,14 @@ jobs:
             echo "ⓘ Sin stellar_history.json en el host (o inalcanzable); arranca vacío."
           fi
 
+          # Guardia reanudable del boletín: best-effort. Conservarla entre
+          # runners evita duplicados y permite completar un envío parcial.
+          if descargar_nlstate 2>/dev/null; then
+            echo "✓ newsletter_state.json descargado ($(wc -c < data/newsletter_state.json) bytes)."
+          else
+            echo "ⓘ Sin newsletter_state.json en el host; el estado diario arranca vacío."
+          fi
+
       - name: Generar sitio (con traducción de tarjetas)
         env:
           LLM_PROVIDER: ${{ vars.LLM_PROVIDER }}
@@ -243,7 +252,7 @@ jobs:
           # OAuth. Sobrevive al Enforce de App Check; si no está definida, el
           # build cae al REST anónimo (tras Enforce, sitio sin números).
           SIBYLLA_FIREBASE_SA_JSON: ${{ secrets.SIBYLLA_FIREBASE_SA_JSON }}
-        run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --translate auto
+        run: python -m sibylla.cli --topics nacional,ai,medicine,astronomia,divulgacion --with-x --html --newsletter --translate auto
 
       # Aviso NO bloqueante: si YouTube throttlea todos los feeds en un build de
       # caché fría, la sección puede quedar vacía. NO debe abortar el deploy (el
@@ -382,3 +391,57 @@ jobs:
           fi
 
           echo "✅ Deploy completado a $DEPLOY_PATH"
+
+      - name: Preflight SMTP (aviso)
+        continue-on-error: true
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+        run: |
+          python - <<'PY'
+          import os, socket
+          host = os.getenv("SMTP_HOST", "")
+          port = int(os.getenv("SMTP_PORT", "465") or 465)
+          if not host:
+              print("::warning::SMTP_HOST no está configurado; el boletín no se enviará.")
+          else:
+              try:
+                  with socket.create_connection((host, port), 10):
+                      print(f"✓ SMTP accesible en {host}:{port}")
+              except OSError as ex:
+                  print(f"::warning::No se pudo conectar a SMTP {host}:{port}: {type(ex).__name__}")
+          PY
+
+      - name: Enviar boletín diario
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_MODE: ${{ vars.SMTP_MODE || 'ssl' }}
+          SMTP_THROTTLE_S: ${{ vars.SMTP_THROTTLE_S || '1.5' }}
+          SIBYLLA_SITE_URL: ${{ vars.SIBYLLA_SITE_URL || 'https://sibylla.cl' }}
+          SIBYLLA_NEWSLETTER_MAX: ${{ vars.SIBYLLA_NEWSLETTER_MAX || '80' }}
+          SIBYLLA_NEWSLETTER_DRYRUN: ${{ vars.SIBYLLA_NEWSLETTER_DRYRUN || '0' }}
+          SIBYLLA_NEWSLETTER_TEST_TO: ${{ vars.SIBYLLA_NEWSLETTER_TEST_TO }}
+          SIBYLLA_FIREBASE_SA_JSON: ${{ secrets.SIBYLLA_FIREBASE_SA_JSON }}
+        run: python -m sibylla.cli --newsletter-send
+
+      - name: Persistir estado del boletín
+        if: always()
+        continue-on-error: true
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          set -uo pipefail
+          [ -f data/newsletter_state.json ] || { echo "ⓘ No hay estado diario que persistir."; exit 0; }
+          source .github/scripts/ssh_retry.sh
+          PORT="${DEPLOY_PORT:-22}"
+          ssh $SSH_OPTS -p "$PORT" -i ~/.ssh/id_deploy "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$REMOTE_DATA'"
+          scp $SSH_OPTS -P "$PORT" -i ~/.ssh/id_deploy data/newsletter_state.json "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_DATA/newsletter_state.json" \
+            || echo "::warning::No se pudo persistir newsletter_state.json; una corrida del mismo día podría duplicar envíos."

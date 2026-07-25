@@ -1167,17 +1167,22 @@ def render_html(items: list[NewsItem], topics: list[str], meta: dict,
                 build_v: int | None = None,
                 social_conteos: dict[str, dict] | None = None) -> str:
     """Renderiza la portada a una cadena HTML."""
+    return render_from_context(build_context(
+        items, topics, meta, lang, max_por_tema, is_landing, translations,
+        social_items, astro_items, divulgacion_items, sibylla_items, resumenes,
+        build_v, social_conteos,
+    ))
+
+
+def render_from_context(ctx: dict) -> str:
+    """Renderiza un contexto ya calculado sin repetir la selección de tarjetas."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATES_DIR)),
         autoescape=select_autoescape(["html", "j2"]),
         trim_blocks=True, lstrip_blocks=True,
     )
     tmpl = env.get_template("index.html.j2")
-    return tmpl.render(**build_context(items, topics, meta, lang, max_por_tema,
-                                        is_landing, translations, social_items,
-                                        astro_items, divulgacion_items,
-                                        sibylla_items, resumenes, build_v,
-                                        social_conteos))
+    return tmpl.render(**ctx)
 
 
 def _render_pub_page(it: NewsItem, site_url: str, build_v: int) -> str:
@@ -1328,7 +1333,8 @@ def _write_build_meta(build_v: int) -> Path:
 def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
                      max_por_tema: int = 6, translate: bool = True,
                      translate_tracker: list[dict] | None = None,
-                     include_x: bool = False) -> list[Path]:
+                     include_x: bool = False,
+                     newsletter: dict | None = None) -> list[Path]:
     """Genera un HTML por idioma + index.html de aterrizaje con auto-detección.
 
     Estructura generada (sitio monolingüe, español):
@@ -1465,16 +1471,28 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
             pub_locs.append(f"{site_url}/pub/{slug}.html")
 
     # Única página del sitio (español).
-    html = render_html(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
+    ctx = build_context(normal_items, topics, meta, lang="es", max_por_tema=max_por_tema,
                         is_landing=False, translations=translations,
                         social_items=social_top, astro_items=astro_top,
                         divulgacion_items=divulgacion_top,
                         sibylla_items=sibylla_items,
                         resumenes=resumenes, build_v=build_v,
                         social_conteos=social_conteos)
+    html = render_from_context(ctx)
     out = SITE_DIR / "index.html"
     out.write_text(html, encoding="utf-8")
     paths.append(out)
+
+    # La edición usa literalmente las tarjetas del contexto publicado. Es un
+    # sidecar en data/: no forma parte del conjunto web que se sube por glob.
+    if newsletter is not None:
+        try:
+            from .newsletter import construir_sintesis, edicion_desde_contexto, escribir_edicion
+            sintesis = construir_sintesis(ctx, tracker=translate_tracker)
+            newsletter.update(edicion_desde_contexto(ctx, sintesis=sintesis))
+            escribir_edicion(newsletter)
+        except Exception as ex:  # noqa: BLE001 - fallo aislado del build
+            log.warning("boletín: no se pudo construir la edición (%s)", ex)
 
     # build.json: marca viva que consulta el cliente (se cache-bustea por URL).
     paths.append(_write_build_meta(build_v))

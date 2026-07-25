@@ -42,6 +42,16 @@
     "user_prompt": "Elige los {n} titulares más relevantes para Chile hoy y devuélvelos como un array JSON de id (números enteros), ordenado de más a menos relevante.\n\nÍtems disponibles (JSON):\n{items_json}"
   },
 
+  "newsletter": {
+    "system_prompt": "Write one short daily newsletter opening in Spanish.",
+    "user_prompt": "Headlines:\n{items_json}",
+    "sintesis_fallback": "Sibylla reviewed {count} signals from {sources} sources today.",
+    "subject": "Sibylla · {day} {month}", "subject_test": "[TEST] {subject}",
+    "saludo": "Sibylla observes", "ver_en_sitio": "View on site", "comentar": "Comment",
+    "footer_baja": "Unsubscribe", "footer_gestion": "Change my topics",
+    "footer_por_que": "You receive this because you enabled it in Sibylla.", "baja_mailto_asunto": "unsubscribe"
+  },
+
   "web": {
     "page_title": "Sibylla — What is happening. What will happen.",
     "meta_description": "Sibylla gathers the most reliable science and technology sources, separates signal from noise, and shows you what is happening today in AI, medicine, space, physics, and more. Always linking to the original source.",

@@ -69,7 +69,7 @@ def _conteos_url(project_id: str) -> str:
             f"{project_id}/databases/(default)/documents/agregados/conteos")
 
 
-def _load_sa_credentials():
+def load_sa_credentials():
     """Devuelve credenciales de service account si hay, o ``None`` (anónimo)."""
     inline = os.getenv("SIBYLLA_FIREBASE_SA_JSON")
     path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
@@ -133,7 +133,7 @@ def fetch_conteos(api_key: str = FIREBASE_API_KEY,
     Check); si no, o si la lectura autenticada falla, cae al REST anónimo. Todo
     fallo se registra como warning y devuelve ``{}``.
     """
-    creds = _load_sa_credentials()
+    creds = load_sa_credentials()
     if creds is not None:
         try:
             return _fetch_conteos_authed(creds, project_id)

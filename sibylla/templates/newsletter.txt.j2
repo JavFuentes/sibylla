@@ -1,0 +1,18 @@
+SIBYLLA
+{{ edicion.generado }}
+
+{{ t.saludo }}
+{{ edicion.sintesis | wrap72 }}
+
+{% for seccion in secciones %}{{ seccion.label | upper }}
+{% for card in seccion.cards %}{{ card.title | wrap72 }}
+{{ card.source_name }} · {{ card.date }} · T{{ card.seal_roman }}
+{% set extracto = card.snippet or card.resumen or '' %}{% if extracto %}{{ (extracto[:260] ~ ('…' if extracto|length > 260 else '')) | wrap72 }}
+{% endif %}{{ card.url }}
+{{ t.comentar }}: {{ site_url }}/#{{ card.id }}
+
+{% endfor %}{% endfor %}{{ footer_motto }}
+
+{{ t.footer_baja }}: {{ baja_url }}
+{{ t.footer_gestion }}: {{ site_url }}/?boletin=temas
+{{ baja_mailto }}

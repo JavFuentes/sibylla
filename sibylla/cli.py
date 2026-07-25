@@ -73,6 +73,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="genera y escribe SOLO web/apod-i18n.json (sin correr el pipeline de noticias); "
                              "para un cron temprano que corra apenas NASA publique el APOD del día, "
                              "antes del build completo de las 11 (ver sibylla/apod.py)")
+    parser.add_argument("--newsletter", action="store_true",
+                        help="construye data/newsletter_edicion.json junto con la web")
+    parser.add_argument("--newsletter-send", action="store_true",
+                        help="envía la edición ya construida; no corre el pipeline")
     parser.add_argument("-q", "--quiet", action="store_true", help="menos logs")
     args = parser.parse_args(argv)
 
@@ -83,6 +87,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.dashboard:
         from .admin import serve
         return serve(args.port)
+
+    if args.newsletter_send:
+        from .newsletter import enviar_boletin_cli
+        return enviar_boletin_cli()
 
     # Sidecar del APOD solo: no corre el pipeline de noticias (ver DEPLOY.md §4
     # y .github/workflows/regenerate-apod.yml).
@@ -175,8 +183,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.html:
         from .web import build_all_sites
+        newsletter = {} if args.newsletter else None
         paths = build_all_sites(items, topics, meta, translate=do_translate,
-                                translate_tracker=llm_calls, include_x=args.with_x)
+                                translate_tracker=llm_calls, include_x=args.with_x,
+                                newsletter=newsletter)
         print(f"\n🌐 Web estática generada:")
         for p in paths:
             print(f"  {p}")

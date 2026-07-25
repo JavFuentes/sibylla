@@ -120,6 +120,24 @@ web/             # sitio estático generado — ignorado por git
 
 `run_pipeline(topics, sources, limit)` → por cada fuente `fetch_source` → `dedupe` (URL canónica / título) → `cluster_stories` (agrupa la misma historia entre medios distintos) → `rank` (`tier × frescura` + bonus HN) → `diversify` (máx. 3 por fuente y tema). El CLer decide si resumir con IA (`summarize_digest`, si hay LLM) o con el render determinista (`render_digest`).
 
+## Boletín diario por correo
+
+El build con `--newsletter` reutiliza el contexto exacto de la portada y escribe
+`data/newsletter_edicion.json`; tras publicar `web/`, `--newsletter-send` lee
+`suscripciones/{uid}`, personaliza hasta 12 tarjetas por round-robin y envía una
+dirección por mensaje mediante SMTP. `data/newsletter_state.json` guarda solo
+uids y se flushea tras cada destinatario para reanudar sin duplicar.
+
+`SIBYLLA_FIREBASE_SA_JSON` permite ahora listar correos de suscriptores: nunca
+imprimir direcciones completas ni guardarlas en estado/artefactos; los logs usan
+uid truncado y correo enmascarado. Rotar inmediatamente la key ante sospecha de
+filtración. El correo es opt-in para cuentas con email verificado; la UI escribe
+solo `v, uid, email, activa, temas, creada, actualizada`.
+
+La baja sin sesión usa el alias real `baja@sibylla.cl`, que Hostinger entrega
+al buzón `noticias@sibylla.cl`; no usar subdireccionamiento con `+`, porque el
+servidor de este plan lo rechaza.
+
 ### Agrupación de misma historia (`cluster.py`)
 
 Tras el `dedupe` exacto (misma URL), `cluster_stories` detecta la **misma noticia cubierta por

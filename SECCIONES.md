@@ -38,6 +38,16 @@ de RRSS).
 
 ### Todas muestran 6 tarjetas
 
+### Boletín diario
+
+El correo incluye `nacional`, `ai`, `medicine`, `astronomia` y `divulgacion`
+según el orden elegido por cada suscriptor. Toma hasta 3 tarjetas por tema y 12
+en total mediante rondas, por lo que ningún tema elegido queda relegado por un
+truncado secuencial. Las publicaciones propias `sibylla` entran siempre (máximo
+2 y cuentan contra el tope). `social` se excluye: es señal débil sin confirmar.
+Las tarjetas son los mismos diccionarios renderizados en portada, incluidos sus
+anchors estables `n-<hash>`.
+
 Las seis secciones se hornean con **6 tarjetas** (`max_por_tema = 6`, valor por
 defecto en `build_all_sites` / `build_context` de `sibylla/web.py`).
 

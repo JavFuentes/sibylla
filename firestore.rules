@@ -238,6 +238,50 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Temas suscribibles al boletín. Debe coincidir con web.topics de
+    // locales/es.json, TEMAS_VALIDOS de sibylla/newsletter.py y
+    // TEMAS_BOLETIN de static/social.js.
+    function temasBoletin() {
+      return ['nacional', 'ai', 'medicine', 'astronomia', 'divulgacion'];
+    }
+
+    // Clava el correo al del token verificado: un doc nunca puede llevar el
+    // correo de un tercero.
+    function suscripcionValida() {
+      return request.resource.data.keys().hasOnly(['v','uid','email','activa','temas','creada','actualizada'])
+        && request.resource.data.keys().hasAll(['v','uid','email','activa','temas','creada','actualizada'])
+        && request.resource.data.v == 1
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.email.size() <= 254
+        && request.resource.data.activa is bool
+        && request.resource.data.temas is list
+        && request.resource.data.temas.size() >= 1
+        && request.resource.data.temas.size() <= 8
+        && request.resource.data.temas.toSet().size() == request.resource.data.temas.size()
+        && temasBoletin().toSet().hasAll(request.resource.data.temas)
+        && request.resource.data.actualizada == request.time;
+    }
+
+    // Boletín diario. Un doc por cuenta; solo el dueño lo ve, escribe y
+    // borra. El build lo lista con service account, que bypassa estas reglas.
+    match /suscripciones/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && suscripcionValida()
+        && request.resource.data.creada == request.time;
+
+      // `creada` inmutable + cooldown por doc contra bucles del cliente.
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.email_verified == true
+        && suscripcionValida()
+        && request.resource.data.creada == resource.data.creada
+        && request.time > resource.data.actualizada + duration.value(3, 's');
+    }
+
     match /{document=**} { allow read, write: if false; }
   }
 }

@@ -42,8 +42,8 @@ test.beforeEach(async () => {
   await env.clearFirestore();
 });
 
-function authed(uid, verified = true, name = 'Alicia') {
-  return env.authenticatedContext(uid, { email_verified: verified, name }).firestore();
+function authed(uid, verified = true, name = 'Alicia', email = `${uid}@example.com`) {
+  return env.authenticatedContext(uid, { email_verified: verified, name, email }).firestore();
 }
 
 // Índice de día UTC como entero YYYYMMDD. espeja diaUtc() de las reglas
@@ -398,4 +398,56 @@ test('voto de tarjeta a <5 s falla y a >5 s pasa; delete sin gate pasa', async (
   await assertSucceeds(createCardVote(db, { uid: 'alice' }));
   // Borrar el voto no tiene gate.
   await assertSucceeds(deleteDoc(doc(db, 'votes', 'n-card_alice')));
+});
+
+// ---------------------------------------------------------------------------
+// Suscripciones al boletín diario
+// ---------------------------------------------------------------------------
+
+function suscripcion(uid = 'alice', email = 'alice@example.com', temas = ['ai']) {
+  return {
+    v: 1, uid, email, activa: true, temas,
+    creada: serverTimestamp(), actualizada: serverTimestamp(),
+  };
+}
+
+test('suscripción con correo distinto del token falla', async () => {
+  const db = authed('alice', true, 'Alicia', 'alice@example.com');
+  await assertFails(setDoc(doc(db, 'suscripciones', 'alice'),
+    suscripcion('alice', 'tercero@example.com')));
+});
+
+test('suscripción sin email verificado falla', async () => {
+  const db = authed('alice', false, 'Alicia', 'alice@example.com');
+  await assertFails(setDoc(doc(db, 'suscripciones', 'alice'), suscripcion()));
+});
+
+test('suscripción en el uid de otra cuenta falla', async () => {
+  const db = authed('alice', true, 'Alicia', 'alice@example.com');
+  await assertFails(setDoc(doc(db, 'suscripciones', 'bob'), suscripcion('bob')));
+});
+
+test('suscripción con tema fuera de la lista falla', async () => {
+  const db = authed('alice', true, 'Alicia', 'alice@example.com');
+  await assertFails(setDoc(doc(db, 'suscripciones', 'alice'),
+    suscripcion('alice', 'alice@example.com', ['ai', 'clima_inventado'])));
+});
+
+test('suscripción con lista vacía o nueve temas falla', async () => {
+  const db = authed('alice', true, 'Alicia', 'alice@example.com');
+  await assertFails(setDoc(doc(db, 'suscripciones', 'alice'),
+    suscripcion('alice', 'alice@example.com', [])));
+  await assertFails(setDoc(doc(db, 'suscripciones', 'alice'),
+    suscripcion('alice', 'alice@example.com', Array(9).fill('ai'))));
+});
+
+test('dueño puede borrar sus datos del boletín', async () => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'suscripciones', 'alice'), {
+      v: 1, uid: 'alice', email: 'alice@example.com', activa: true, temas: ['ai'],
+      creada: new Date(), actualizada: new Date(),
+    });
+  });
+  const db = authed('alice', true, 'Alicia', 'alice@example.com');
+  await assertSucceeds(deleteDoc(doc(db, 'suscripciones', 'alice')));
 });

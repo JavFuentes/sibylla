@@ -1250,6 +1250,7 @@ function mapearError(code, TXT) {
   const authEmail = document.getElementById('auth-email');
   const authPass = document.getElementById('auth-pass');
   let modoRegistro = false;
+  let intencionBoletin = false;
 
   function setModo(registro) {
     modoRegistro = registro;
@@ -1265,7 +1266,10 @@ function mapearError(code, TXT) {
   }
   function abrirAuth(motivo) {
     if (!AUTH) return;
-    authSub.textContent = motivo === 'comment' ? authSub.getAttribute('data-comment') : authSub.getAttribute('data-vote');
+    authSub.textContent = motivo === 'comment' ? authSub.getAttribute('data-comment')
+      : motivo === 'newsletter' ? authSub.getAttribute('data-newsletter')
+      : authSub.getAttribute('data-vote');
+    intencionBoletin = motivo === 'newsletter';
     mostrarMsgAuth('');
     AUTH.hidden = false;
     document.body.classList.add('auth-abierto');
@@ -1380,6 +1384,13 @@ function mapearError(code, TXT) {
       cargarMisVotos(user);
       if (AUTH && !AUTH.hidden && !registroReciente) cerrarAuth();
       registroReciente = false;
+      if (intencionBoletin) {
+        intencionBoletin = false;
+        cerrarAuth();
+        abrirBoletin();
+      } else if (CORREO && !CORREO.hidden) {
+        pintarBoletin();
+      }
       document.querySelectorAll('.comentarios-panel:not([hidden])').forEach((panel) => {
         const carta = panel.closest('.carta');
         if (carta) {
@@ -1396,6 +1407,7 @@ function mapearError(code, TXT) {
       comentariosVotosCargados.clear();
       document.querySelectorAll('.soc-grupo').forEach((g) => pintarVotoPropio(g, undefined));
       document.querySelectorAll('.comentarios-panel').forEach((panel) => pintarTodosVotosComentarios(panel));
+      if (CORREO && !CORREO.hidden) pintarBoletin();
     }
   }
   function cerrarSesionMenu() {
@@ -1485,5 +1497,198 @@ function mapearError(code, TXT) {
           : TXT.social_nick_error);
       } finally { if (btnApodo) btnApodo.disabled = false; }
     });
+  }
+
+  // ---- Boletín diario (suscripciones/{uid}) ----
+  // Debe coincidir con temasBoletin() de firestore.rules y TEMAS_VALIDOS de
+  // sibylla/newsletter.py y sibylla/suscriptores.py.
+  const TEMAS_BOLETIN = ['nacional', 'ai', 'medicine', 'astronomia', 'divulgacion'];
+  const CORREO = document.getElementById('correo');
+  const correoSinSesion = document.getElementById('correo-sin-sesion');
+  const correoSinVerificar = document.getElementById('correo-sin-verificar');
+  const correoConfig = document.getElementById('correo-config');
+  const correoChips = document.getElementById('correo-chips');
+  const correoCuenta = document.getElementById('correo-cuenta');
+  const correoMsg = document.getElementById('correo-msg');
+  const correoGuardar = document.getElementById('correo-guardar');
+  const correoBaja = document.getElementById('correo-baja');
+  const correoBorrar = document.getElementById('correo-borrar');
+  const sesionBoletin = document.getElementById('sesion-boletin');
+  const pieBoletin = document.getElementById('pie-boletin');
+  let suscripcionActual = null;
+  let temasSeleccionados = [];
+
+  function mostrarCorreoEstado(el) {
+    [correoSinSesion, correoSinVerificar, correoConfig].forEach((x) => {
+      if (x) x.hidden = x !== el;
+    });
+  }
+  function msgCorreo(texto, ok) {
+    if (!correoMsg) return;
+    correoMsg.textContent = texto || '';
+    correoMsg.hidden = !texto;
+    if (ok) correoMsg.setAttribute('data-ok', ''); else correoMsg.removeAttribute('data-ok');
+  }
+  function temasIniciales() {
+    let visibles = [];
+    try {
+      visibles = window.SibyllaPrefs && window.SibyllaPrefs.temasVisibles
+        ? window.SibyllaPrefs.temasVisibles() : [];
+    } catch (e) { visibles = []; }
+    visibles = visibles.filter((x, i) => TEMAS_BOLETIN.includes(x) && visibles.indexOf(x) === i);
+    return visibles.length ? visibles : TEMAS_BOLETIN.slice();
+  }
+  function pintarChipsBoletin() {
+    if (!correoChips) return;
+    correoChips.innerHTML = '';
+    TEMAS_BOLETIN.forEach((tema) => {
+      const bloque = document.querySelector('.bloque[data-topic="' + tema + '"]');
+      const h = bloque && bloque.querySelector('.tema h3');
+      const btn = document.createElement('button');
+      const pos = temasSeleccionados.indexOf(tema);
+      btn.type = 'button';
+      btn.className = 'chip-tema';
+      btn.dataset.topic = tema;
+      btn.setAttribute('aria-pressed', pos >= 0 ? 'true' : 'false');
+      const sello = document.createElement('span');
+      sello.className = 'chip-sello';
+      sello.setAttribute('aria-hidden', 'true');
+      sello.textContent = pos >= 0 ? ['I','II','III','IV','V'][pos] : '';
+      const nombre = document.createElement('span');
+      nombre.textContent = h ? h.textContent : tema;
+      btn.append(sello, nombre);
+      correoChips.appendChild(btn);
+    });
+  }
+  async function leerSuscripcion() {
+    if (!currentUser) return null;
+    const snap = await fsApi.getDoc(fsApi.doc(db, 'suscripciones', currentUser.uid));
+    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+  }
+  async function pintarBoletin() {
+    msgCorreo('');
+    if (!currentUser) {
+      suscripcionActual = null;
+      mostrarCorreoEstado(correoSinSesion);
+      return;
+    }
+    if (!currentUser.emailVerified) {
+      suscripcionActual = null;
+      mostrarCorreoEstado(correoSinVerificar);
+      return;
+    }
+    mostrarCorreoEstado(correoConfig);
+    if (correoCuenta) correoCuenta.textContent = currentUser.email || '';
+    try {
+      suscripcionActual = await leerSuscripcion();
+      if (suscripcionActual && suscripcionActual.email !== currentUser.email) {
+        // Mantiene el correo clavado al token tras un cambio en Firebase Auth.
+        // El doc completo conserva `creada`; la regla rechaza cualquier campo
+        // extra y aplica el cooldown del servidor.
+        try {
+          await fsApi.setDoc(fsApi.doc(db, 'suscripciones', currentUser.uid), {
+            v: 1, uid: currentUser.uid, email: currentUser.email,
+            activa: !!suscripcionActual.activa,
+            temas: (suscripcionActual.temas || []).filter((x) => TEMAS_BOLETIN.includes(x)),
+            creada: suscripcionActual.creada, actualizada: fsApi.serverTimestamp(),
+          });
+          suscripcionActual = await leerSuscripcion();
+        } catch (e) {
+          console.warn('[sibylla/social] sincronizar correo del boletín:', (e && e.code) || e);
+        }
+      }
+      temasSeleccionados = suscripcionActual && Array.isArray(suscripcionActual.temas)
+        ? suscripcionActual.temas.filter((x) => TEMAS_BOLETIN.includes(x))
+        : temasIniciales();
+      if (!temasSeleccionados.length) temasSeleccionados = temasIniciales();
+      pintarChipsBoletin();
+      const activa = !!(suscripcionActual && suscripcionActual.activa);
+      correoGuardar.textContent = suscripcionActual ? TXT.news_save : TXT.news_subscribe;
+      correoBaja.hidden = !activa;
+      correoBorrar.hidden = !suscripcionActual;
+      if (suscripcionActual) msgCorreo(activa ? TXT.news_active : TXT.news_inactive, true);
+    } catch (e) {
+      console.warn('[sibylla/social] leer boletín:', (e && e.code) || e);
+      msgCorreo(TXT.news_err_generic);
+    }
+  }
+  function abrirBoletin() {
+    if (!CORREO) return;
+    cerrarSesionMenu();
+    CORREO.hidden = false;
+    document.body.classList.add('auth-abierto');
+    pintarBoletin();
+    setTimeout(() => document.getElementById('correo-cerrar').focus(), 0);
+  }
+  function cerrarBoletin() {
+    if (!CORREO) return;
+    CORREO.hidden = true;
+    document.body.classList.remove('auth-abierto');
+  }
+  async function guardarSuscripcion(activa) {
+    if (!currentUser || !currentUser.emailVerified) return;
+    if (!temasSeleccionados.length) { msgCorreo(TXT.news_min_one); return; }
+    correoGuardar.disabled = true;
+    try {
+      const ref = fsApi.doc(db, 'suscripciones', currentUser.uid);
+      const creada = suscripcionActual && suscripcionActual.creada
+        ? suscripcionActual.creada : fsApi.serverTimestamp();
+      await fsApi.setDoc(ref, {
+        v: 1, uid: currentUser.uid, email: currentUser.email,
+        activa: !!activa, temas: temasSeleccionados.slice(),
+        creada, actualizada: fsApi.serverTimestamp(),
+      });
+      suscripcionActual = await leerSuscripcion();
+      correoGuardar.textContent = TXT.news_save;
+      correoBaja.hidden = !activa;
+      correoBorrar.hidden = false;
+      msgCorreo(activa ? TXT.news_saved : TXT.news_off, true);
+    } catch (e) {
+      console.warn('[sibylla/social] guardar boletín:', (e && e.code) || e);
+      msgCorreo(e && e.code === 'permission-denied' ? TXT.news_err_denied : TXT.news_err_generic);
+    } finally { correoGuardar.disabled = false; }
+  }
+  if (correoChips) correoChips.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip-tema');
+    if (!btn) return;
+    const tema = btn.dataset.topic;
+    const pos = temasSeleccionados.indexOf(tema);
+    if (pos >= 0) temasSeleccionados.splice(pos, 1); else temasSeleccionados.push(tema);
+    pintarChipsBoletin();
+  });
+  if (correoGuardar) correoGuardar.addEventListener('click', () => guardarSuscripcion(true));
+  if (correoBaja) correoBaja.addEventListener('click', () => guardarSuscripcion(false));
+  if (correoBorrar) correoBorrar.addEventListener('click', async () => {
+    if (!currentUser || !confirm(TXT.news_delete_confirm)) return;
+    try {
+      await fsApi.deleteDoc(fsApi.doc(db, 'suscripciones', currentUser.uid));
+      suscripcionActual = null;
+      temasSeleccionados = temasIniciales();
+      pintarChipsBoletin();
+      correoGuardar.textContent = TXT.news_subscribe;
+      correoBaja.hidden = true; correoBorrar.hidden = true;
+      msgCorreo(TXT.news_off, true);
+    } catch (e) { msgCorreo(TXT.news_err_generic); }
+  });
+  const correoEntrar = document.getElementById('correo-entrar');
+  if (correoEntrar) correoEntrar.addEventListener('click', () => { cerrarBoletin(); abrirAuth('newsletter'); });
+  const correoVerificar = document.getElementById('correo-verificar');
+  if (correoVerificar) correoVerificar.addEventListener('click', async () => {
+    if (!currentUser) return;
+    try { await authApi.sendEmailVerification(currentUser); msgCorreo(TXT.social_verify_sent, true); }
+    catch (e) { msgCorreo(TXT.news_err_generic); }
+  });
+  if (CORREO) {
+    document.getElementById('correo-cerrar').addEventListener('click', cerrarBoletin);
+    CORREO.addEventListener('click', (e) => { if (e.target === CORREO) cerrarBoletin(); });
+    CORREO.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarBoletin(); });
+  }
+  if (sesionBoletin) sesionBoletin.addEventListener('click', abrirBoletin);
+  if (pieBoletin) pieBoletin.addEventListener('click', (e) => { e.preventDefault(); abrirBoletin(); });
+
+  const boletinParam = new URLSearchParams(location.search).get('boletin');
+  if (boletinParam) {
+    history.replaceState(null, '', location.pathname + location.hash);
+    abrirBoletin();
   }
 })();

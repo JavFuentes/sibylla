@@ -100,13 +100,17 @@ Todo lo sensible vive en `.env` (ignorado por git; plantilla en `.env.example`):
 - **IA (opcional):** `LLM_PROVIDER` (`anthropic` / `openai` / `openrouter` / `openai_compatible` / `ollama`), `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`.
 - **X / Twitter (opcional, de pago):** `X_BEARER_TOKEN`; el tope mensual vive en `config/sources.yaml` (`x_twitter.monthly_read_budget`).
 - **Otras (opcionales):** `NCBI_API_KEY`, `GUARDIAN_API_KEY`, `BLUESKY_*`, `YOUTUBE_API_KEY`.
+- **Boletín diario:** `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`,
+  `SMTP_FROM`; límite y modo seguro en `SIBYLLA_NEWSLETTER_MAX` y
+  `SIBYLLA_NEWSLETTER_DRYRUN`. La lista se lee de Firestore con
+  `SIBYLLA_FIREBASE_SA_JSON`.
 
 Las fuentes y sus tiers se definen en [`config/sources.yaml`](config/sources.yaml); el registro está documentado en [`config/README.md`](config/README.md).
 
 ## Roadmap
 
 - [ ] Señal más fuerte para agrupar la misma historia entre medios (entidades / embeddings / LLM)
-- [ ] Entrega del resumen por email
+- [x] Entrega del resumen por email (opt-in con cuenta verificada, personalizado por temas)
 - [ ] Resolver URLs opacas de Google News — mitigado con medios por RSS directo
 
 ## Notas
