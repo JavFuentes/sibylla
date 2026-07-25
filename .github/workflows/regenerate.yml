@@ -92,7 +92,7 @@ jobs:
       REMOTE_DATA: ${{ vars.DEPLOY_DATA_PATH || '.sibylla' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
