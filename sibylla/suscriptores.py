@@ -28,6 +28,16 @@ class Suscriptor:
     temas: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class LecturaSuscriptores:
+    """Resultado inequívoco de la lectura REST de Firestore."""
+
+    ok: bool
+    suscriptores: tuple[Suscriptor, ...] = ()
+    examinados: int = 0
+    error: str | None = None
+
+
 def _valor(raw: Any) -> Any:
     """Convierte el formato tipado de la API REST de Firestore."""
     if not isinstance(raw, dict):
@@ -68,17 +78,17 @@ def _parse_doc(doc: dict[str, Any]) -> Suscriptor | None:
 
 
 def fetch_suscriptores(project_id: str = FIREBASE_PROJECT_ID, *,
-                       page_size: int = 300, max_docs: int = 5000) -> list[Suscriptor]:
+                       page_size: int = 300, max_docs: int = 5000) -> LecturaSuscriptores:
     """Lista ``suscripciones`` paginando con ``pageToken``.
 
-    Sin service account, o ante cualquier error de autenticación, red o
-    formato, devuelve ``[]``. Nunca intenta una lectura anónima.
+    Distingue una colección correctamente leída y vacía de un fallo de
+    autenticación, red o formato. Nunca intenta una lectura anónima.
     """
     try:
         creds = load_sa_credentials()
         if creds is None:
             log.warning("boletín: no hay credenciales de service account; no se leen suscriptores")
-            return []
+            return LecturaSuscriptores(ok=False, error="credenciales_ausentes")
         from google.auth.transport import requests as grequests
         creds.refresh(grequests.Request())
         url = ("https://firestore.googleapis.com/v1/projects/"
@@ -109,7 +119,9 @@ def fetch_suscriptores(project_id: str = FIREBASE_PROJECT_ID, *,
             token = payload.get("nextPageToken")
             if not token:
                 break
-        return out
+        return LecturaSuscriptores(
+            ok=True, suscriptores=tuple(out), examinados=scanned,
+        )
     except Exception as ex:  # noqa: BLE001 - fallo aislado del envío
         log.warning("boletín: no se pudieron leer suscriptores (%s)", ex)
-        return []
+        return LecturaSuscriptores(ok=False, error=type(ex).__name__)

@@ -126,7 +126,12 @@ El build con `--newsletter` reutiliza el contexto exacto de la portada y escribe
 `data/newsletter_edicion.json`; tras publicar `web/`, `--newsletter-send` lee
 `suscripciones/{uid}`, personaliza hasta 12 tarjetas por round-robin y envía una
 dirección por mensaje mediante SMTP. `data/newsletter_state.json` guarda solo
-uids y se flushea tras cada destinatario para reanudar sin duplicar.
+uids y se flushea tras cada destinatario para reanudar sin duplicar. Cada
+corrida relee Firestore: la idempotencia depende de `enviados`, no del flag
+informativo `terminado`, por lo que un alta posterior el mismo día sigue siendo
+elegible. Un fallo REST es distinto de una colección vacía y no avanza estado.
+Los logs registran conteos agregados y el acuse DATA/queue-id, nunca la respuesta
+SMTP completa ni direcciones legibles.
 
 `SIBYLLA_FIREBASE_SA_JSON` permite ahora listar correos de suscriptores: nunca
 imprimir direcciones completas ni guardarlas en estado/artefactos; los logs usan

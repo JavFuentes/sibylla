@@ -82,6 +82,13 @@ email sin verificar; uid ajeno; tema fuera de lista; lista vacía o de 9 temas
 (todos denegados); delete del dueño (permitido). Los tests del emulador requieren
 Java, pero su ausencia no bloquea estas dos validaciones.
 
+La regresión obligatoria del estado es: primera corrida con cero suscriptores,
+alta posterior y segunda corrida el mismo día. La segunda debe releer Firestore
+y enviar al uid nuevo aunque el estado anterior diga `terminado: true`. Un fallo
+REST debe ser distinto de una colección vacía y no puede modificar el estado.
+Los mocks SMTP validan la captura segura del código DATA/queue-id, pero no
+sustituyen una prueba de entrega real con Hostinger.
+
 - **Idioma:** docstrings y descripciones en español, coherente con el resto del repo.
 - **Sin mocks ni fixtures:** todos los casos son datos inline (funciones puras).
 - **Parametrize:** se usa `@pytest.mark.parametrize` para agrupar casos similares con un 3er campo `_desc` (solo documentación, no se aserta).

@@ -15,6 +15,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import smtplib
 import ssl
 import textwrap
@@ -254,10 +255,11 @@ def construir_mensaje(destino: str, asunto: str, html: str, texto: str, *,
     msg["Date"] = formatdate(localtime=False)
     dominio = parseaddr(remitente)[1].partition("@")[2] or "sibylla.cl"
     msg["Message-ID"] = make_msgid(domain=dominio)
-    msg["List-Id"] = "Boletín de Sibylla <boletin.sibylla.cl>"
+    # RFC 2919: el identificador y su etiqueta se mantienen en ASCII para que
+    # la librería no convierta List-Id en un encoded-word ambiguo.
+    msg["List-Id"] = "Sibylla <boletin.sibylla.cl>"
     msg["List-Unsubscribe"] = f"<{baja_url}>, <{baja_mailto}>"
     msg["Precedence"] = "bulk"
-    msg["Auto-Submitted"] = "auto-generated"
     msg["X-Auto-Response-Suppress"] = "OOF, AutoReply"
     msg.set_content(texto)
     msg.add_alternative(html, subtype="html")
@@ -282,14 +284,10 @@ def guardar_estado(estado: dict, path: Path | str = ESTADO_PATH) -> Path:
     return out
 
 
-def debe_enviar(estado: dict, hoy: str | date) -> bool:
-    hoy_s = hoy.isoformat() if isinstance(hoy, date) else hoy
-    return estado.get("date") != hoy_s or not estado.get("terminado", False)
-
-
 def pendientes(suscriptores: Iterable[Suscriptor], estado: dict) -> list[Suscriptor]:
-    resueltos = set(estado.get("enviados") or []) | set(estado.get("omitidos") or [])
-    return [s for s in suscriptores if s.uid not in resueltos]
+    """Devuelve quienes todavía no recibieron la edición del estado."""
+    enviados = set(estado.get("enviados") or [])
+    return [s for s in suscriptores if s.uid not in enviados]
 
 
 def _enmascarar(email: str) -> str:
@@ -309,15 +307,65 @@ def _estado_nuevo(hoy: str, total: int) -> dict:
     }
 
 
+class _CapturaRespuestaData:
+    """Conserva la respuesta a DATA sin habilitar el debug inseguro de smtplib."""
+
+    respuesta_data: tuple[int, str] | None = None
+
+    def data(self, msg):  # noqa: ANN001 - firma heredada de smtplib
+        codigo, respuesta = super().data(msg)
+        if isinstance(respuesta, bytes):
+            texto = respuesta.decode("utf-8", errors="replace")
+        else:
+            texto = str(respuesta)
+        self.respuesta_data = (codigo, texto)
+        return codigo, respuesta
+
+
+class _SMTPConAcuse(_CapturaRespuestaData, smtplib.SMTP):
+    pass
+
+
+class _SMTPSSLConAcuse(_CapturaRespuestaData, smtplib.SMTP_SSL):
+    pass
+
+
+_QUEUE_ID_RE = re.compile(
+    r"\b(?:queued\s+as|queue(?:\s+id)?|id)\b\s*[:=]?\s*<?([A-Za-z0-9][A-Za-z0-9._-]{2,79})",
+    re.IGNORECASE,
+)
+
+
+def _acuse_data(conn) -> tuple[int | None, str | None]:
+    """Extrae solo código y queue-id; nunca vuelca la respuesta SMTP completa."""
+    respuesta = getattr(conn, "respuesta_data", None)
+    if not respuesta:
+        return None, None
+    codigo, texto = respuesta
+    match = _QUEUE_ID_RE.search(texto)
+    return codigo, match.group(1) if match else None
+
+
+def _log_aceptacion(conn, uid: str) -> None:
+    codigo, queue_id = _acuse_data(conn)
+    if codigo is None:
+        log.warning("boletín: aceptado uid=%s; acuse DATA no disponible", uid[:6])
+        return
+    log.warning(
+        "boletín: aceptado uid=%s smtp=%s cola=%s",
+        uid[:6], codigo, queue_id or "no-informada",
+    )
+
+
 def _abrir_smtp(cfg: SmtpConfig):
     if cfg.modo == "starttls":
-        conn = smtplib.SMTP(cfg.host, cfg.port, timeout=30)
+        conn = _SMTPConAcuse(cfg.host, cfg.port, timeout=30)
         conn.ehlo()
         conn.starttls(context=ssl.create_default_context())
         conn.ehlo()
     else:
-        conn = smtplib.SMTP_SSL(cfg.host, cfg.port, timeout=30,
-                                context=ssl.create_default_context())
+        conn = _SMTPSSLConAcuse(cfg.host, cfg.port, timeout=30,
+                               context=ssl.create_default_context())
     conn.login(cfg.user, cfg.password)
     return conn
 
@@ -336,6 +384,8 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
     if asunto_prueba:
         asunto = t(tr, "newsletter.subject_test", subject=asunto)
     todos = list(suscriptores)
+    for clave in ("enviados", "fallidos", "omitidos"):
+        estado.setdefault(clave, [])
     truncado = len(todos) > max(0, tope)
     lista = todos[:max(0, tope)]
     if truncado:
@@ -366,12 +416,14 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
                     continue
                 assert conn is not None
                 conn.send_message(msg)
+                _log_aceptacion(conn, suscriptor.uid)
             except smtplib.SMTPServerDisconnected:
                 if reconexiones >= 2:
                     raise
                 reconexiones += 1
                 conn = _abrir_smtp(cfg)
                 conn.send_message(msg)
+                _log_aceptacion(conn, suscriptor.uid)
             except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused,
                     smtplib.SMTPDataError, UnicodeError, ValueError, OSError) as ex:
                 estado["fallidos"].append({"uid": suscriptor.uid,
@@ -395,7 +447,7 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
                 pass
     if dry_run:
         return estado
-    estado["terminado"] = not fatal and not truncado
+    estado["terminado"] = not fatal and not truncado and not pendientes(todos, estado)
     estado["fin"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     guardar_estado(estado, estado_path)
     return estado
@@ -452,17 +504,41 @@ def enviar_boletin_cli() -> int:
                 pass
             return 0
         estado = cargar_estado()
-        if not debe_enviar(estado, hoy):
-            log.info("boletín: la edición de hoy ya terminó")
-            return 0
         from .suscriptores import fetch_suscriptores
-        suscriptores = fetch_suscriptores()
+        lectura = fetch_suscriptores()
+        if not lectura.ok:
+            log.warning(
+                "boletín: lectura de Firestore fallida (%s); estado sin cambios",
+                lectura.error or "desconocida",
+            )
+            return 0
+        suscriptores = list(lectura.suscriptores)
         if estado.get("date") != hoy:
             estado = _estado_nuevo(hoy, len(suscriptores))
+        else:
+            estado["total"] = len(suscriptores)
         lista = pendientes(suscriptores, estado)
-        enviar(edicion, lista, estado=estado, cfg=cfg,
-               site_url=edicion.get("site_url") or get_site_url(), tope=tope,
-               dry_run=dry_run)
+        enviados_antes = len(estado.get("enviados") or [])
+        omitidos_antes = len(estado.get("omitidos") or [])
+        fallidos_antes = len(estado.get("fallidos") or [])
+        log.warning(
+            "boletín: Firestore ok examinados=%s válidos=%s pendientes=%s enviados_previos=%s",
+            lectura.examinados, len(suscriptores), len(lista), enviados_antes,
+        )
+        resultado = enviar(
+            edicion, lista, estado=estado, cfg=cfg,
+            site_url=edicion.get("site_url") or get_site_url(), tope=tope,
+            dry_run=dry_run,
+        )
+        log.warning(
+            "boletín: resumen aceptados=%s omitidos=%s fallidos=%s pendientes=%s "
+            "terminado=%s dry_run=%s",
+            len(resultado.get("enviados") or []) - enviados_antes,
+            len(resultado.get("omitidos") or []) - omitidos_antes,
+            len(resultado.get("fallidos") or []) - fallidos_antes,
+            len(pendientes(suscriptores, resultado)),
+            bool(resultado.get("terminado")), dry_run,
+        )
     except Exception as ex:  # noqa: BLE001 - contrato: nunca rompe CI
         log.warning("boletín: fallo aislado en el comando de envío (%s)", ex)
     return 0

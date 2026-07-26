@@ -32,9 +32,16 @@ def test_fetch_pagina_y_descarta_invalidos(monkeypatch):
     monkeypatch.setitem(sys.modules, "google.auth.transport", types.ModuleType("google.auth.transport"))
     monkeypatch.setitem(sys.modules, "google.auth.transport.requests", transport)
     got = su.fetch_suscriptores()
-    assert [(s.uid, s.temas) for s in got] == [("u1", ("ai",)), ("u3", ("medicine",))]
+    assert got.ok is True
+    assert got.examinados == 3
+    assert [(s.uid, s.temas) for s in got.suscriptores] == [
+        ("u1", ("ai",)), ("u3", ("medicine",)),
+    ]
 
 
-def test_fetch_fallo_devuelve_vacio(monkeypatch):
+def test_fetch_fallo_no_se_confunde_con_coleccion_vacia(monkeypatch):
     monkeypatch.setattr(su, "load_sa_credentials", lambda: None)
-    assert su.fetch_suscriptores() == []
+    got = su.fetch_suscriptores()
+    assert got.ok is False
+    assert got.suscriptores == ()
+    assert got.error == "credenciales_ausentes"

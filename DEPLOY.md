@@ -21,8 +21,16 @@ acepta direcciones del tipo `noticias+baja@...`.
 Desplegar `firestore.rules` antes de abrir el opt-in. El workflow construye
 `data/newsletter_edicion.json`, publica el sitio y solo entonces envía. Descarga
 y vuelve a subir `data/newsletter_state.json` desde `DEPLOY_DATA_PATH`; contiene
-uids, nunca correos. El step SMTP es no bloqueante, por lo que un fallo no pone
-el deploy en rojo y un `workflow_dispatch` reanuda solo los pendientes.
+uids, nunca correos. Cada corrida vuelve a leer Firestore y calcula pendientes
+por uid realmente enviado: un `terminado: true` anterior es informativo y no
+oculta altas posteriores del mismo día. Un fallo de lectura deja el estado sin
+cambios. El step SMTP es no bloqueante, por lo que un fallo no pone el deploy en
+rojo; hay que revisar el resumen del paso y sus acuses `smtp=250 cola=...`.
+
+El preflight solo acredita conectividad TCP. Antes de habilitar producción es
+obligatorio confirmar una entrega real en al menos dos proveedores receptores y
+conservar el id de cola que Hostinger devuelve tras `DATA`. El código no activa
+`set_debuglevel`, porque esa traza puede exponer AUTH en el log público.
 
 La service account (`SIBYLLA_FIREBASE_SA_JSON`, rol mínimo datastore viewer)
 puede listar ahora correos. No imprimir el secreto ni direcciones en logs. Ante

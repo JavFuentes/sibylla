@@ -35,15 +35,6 @@ def test_repartir_no_deja_tema_en_cero_y_respeta_tope():
     assert sum(len(s["cards"]) for s in got) == 12
 
 
-@pytest.mark.parametrize("estado,hoy,esperado", [
-    ({}, "2026-07-25", True),
-    ({"date": "2026-07-25", "terminado": True}, "2026-07-25", False),
-    ({"date": "2026-07-25", "terminado": False}, "2026-07-25", True),
-])
-def test_debe_enviar(estado, hoy, esperado):
-    assert nl.debe_enviar(estado, hoy) is esperado
-
-
 def test_pendientes_excluye_enviados():
     subs = [Suscriptor("u1", "a@example.com", ("ai",)), Suscriptor("u2", "b@example.com", ("ai",))]
     assert [s.uid for s in nl.pendientes(subs, {"enviados": ["u1"]})] == ["u2"]
@@ -68,6 +59,11 @@ def test_mensaje_tiene_un_to_y_sin_one_click():
     )
     assert msg.get_all("To") == ["a@example.com"]
     assert msg["List-Unsubscribe-Post"] is None
+    assert msg["List-Id"] == "Sibylla <boletin.sibylla.cl>"
+    assert msg["Auto-Submitted"] is None
+    assert b"=?utf-8?" not in next(
+        line for line in msg.as_bytes().splitlines() if line.startswith(b"List-Id:")
+    ).lower()
     assert msg.is_multipart()
 
 
@@ -87,6 +83,19 @@ def test_edicion_excluye_social_y_poda_campos():
 def test_enmascarar_no_deja_correo_legible():
     masked = nl._enmascarar("persona@gmail.com")
     assert "persona" not in masked and "gmail" not in masked and "@" in masked
+
+
+def test_acuse_data_extrae_queue_id_sin_respuesta_completa():
+    class BaseSMTP:
+        def data(self, _msg):
+            return 250, b"2.0.0 Ok: queued as HSTG-123_abc"
+
+    class SMTP(nl._CapturaRespuestaData, BaseSMTP):
+        pass
+
+    smtp = SMTP()
+    assert smtp.data(b"mensaje") == (250, b"2.0.0 Ok: queued as HSTG-123_abc")
+    assert nl._acuse_data(smtp) == (250, "HSTG-123_abc")
 
 
 def test_whitelist_python_es_una_sola_lista_logica():
@@ -184,3 +193,65 @@ def test_tope_deja_estado_reanudable(monkeypatch, tmp_path):
     nl.enviar(_edicion(), subs, estado=estado, cfg=cfg, site_url="https://sibylla.cl",
               tope=1, estado_path=tmp_path / "state.json")
     assert estado["terminado"] is False and estado["enviados"] == ["u1"]
+
+
+def test_cero_suscriptores_alta_posterior_mismo_dia_se_envia(monkeypatch):
+    """Regresión del lanzamiento: `terminado` no impide releer Firestore."""
+    estado = nl._estado_nuevo("2026-07-25", 0)
+    estado["terminado"] = True
+    nuevo = Suscriptor("u-nuevo", "nuevo@example.com", ("ai",))
+    lectura = su.LecturaSuscriptores(ok=True, suscriptores=(nuevo,), examinados=1)
+    capturados = []
+
+    monkeypatch.setattr(nl, "load_env", lambda: None)
+    monkeypatch.setattr(nl, "cargar_edicion", _edicion)
+    monkeypatch.setattr(nl, "_hoy", lambda: "2026-07-25")
+    monkeypatch.setattr(nl, "cargar_estado", lambda: estado)
+    monkeypatch.setattr(su, "fetch_suscriptores", lambda: lectura)
+    monkeypatch.setattr(
+        nl, "smtp_config_desde_entorno",
+        lambda: nl.SmtpConfig("smtp", 465, "u", "p", "noticias@sibylla.cl"),
+    )
+    monkeypatch.delenv("SIBYLLA_NEWSLETTER_TEST_TO", raising=False)
+    monkeypatch.setenv("SIBYLLA_NEWSLETTER_DRYRUN", "0")
+
+    def fake_enviar(_edicion_arg, lista, *, estado, **_kwargs):
+        capturados.extend(lista)
+        estado["enviados"].extend(s.uid for s in lista)
+        estado["terminado"] = True
+        return estado
+
+    monkeypatch.setattr(nl, "enviar", fake_enviar)
+    assert nl.enviar_boletin_cli() == 0
+    assert [s.uid for s in capturados] == ["u-nuevo"]
+
+
+def test_fallo_firestore_no_intenta_enviar_ni_modifica_estado(monkeypatch):
+    estado = nl._estado_nuevo("2026-07-25", 2)
+    original = {**estado, "enviados": list(estado["enviados"])}
+    monkeypatch.setattr(nl, "load_env", lambda: None)
+    monkeypatch.setattr(nl, "cargar_edicion", _edicion)
+    monkeypatch.setattr(nl, "_hoy", lambda: "2026-07-25")
+    monkeypatch.setattr(nl, "cargar_estado", lambda: estado)
+    monkeypatch.setattr(
+        su, "fetch_suscriptores",
+        lambda: su.LecturaSuscriptores(ok=False, error="Timeout"),
+    )
+    monkeypatch.setattr(
+        nl, "smtp_config_desde_entorno",
+        lambda: nl.SmtpConfig("smtp", 465, "u", "p", "noticias@sibylla.cl"),
+    )
+    monkeypatch.setattr(nl, "enviar", lambda *_a, **_k: pytest.fail("no debe enviar"))
+    monkeypatch.delenv("SIBYLLA_NEWSLETTER_TEST_TO", raising=False)
+    monkeypatch.setenv("SIBYLLA_NEWSLETTER_DRYRUN", "0")
+    assert nl.enviar_boletin_cli() == 0
+    assert estado == original
+
+
+def test_fecha_editorial_usa_la_misma_fuente_en_build_y_envio(monkeypatch):
+    monkeypatch.setattr(nl, "_hoy", lambda: "2026-07-25")
+    ctx = {
+        "grupos": [], "astro_cards": [], "divulgacion_cards": [],
+        "sibylla_cards": [], "t": {},
+    }
+    assert nl.edicion_desde_contexto(ctx, sintesis="S")["fecha"] == nl._hoy()

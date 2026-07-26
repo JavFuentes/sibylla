@@ -110,7 +110,7 @@ Las fuentes y sus tiers se definen en [`config/sources.yaml`](config/sources.yam
 ## Roadmap
 
 - [ ] Señal más fuerte para agrupar la misma historia entre medios (entidades / embeddings / LLM)
-- [x] Entrega del resumen por email (opt-in con cuenta verificada, personalizado por temas)
+- [ ] Entrega del resumen por email (implementada; pendiente validar entrega real extremo a extremo)
 - [ ] Resolver URLs opacas de Google News — mitigado con medios por RSS directo
 
 ## Notas
