@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-30T11:15:17.986Z",
+  "title": "Design System: Sibylla",
+  "extensions": {
+    "colorMeta": {
+      "obsidian-night": {
+        "role": "neutral",
+        "displayName": "Obsidiana nocturna",
+        "canonical": "#080B14",
+        "tonalRamp": ["oklch(15% 0.025 265)", "oklch(25% 0.025 265)", "oklch(35% 0.024 265)", "oklch(47% 0.022 265)", "oklch(59% 0.020 265)", "oklch(71% 0.017 265)", "oklch(83% 0.012 265)", "oklch(95% 0.006 265)"]
+      },
+      "deep-night": {
+        "role": "neutral",
+        "displayName": "Noche profunda",
+        "canonical": "#0D1322",
+        "tonalRamp": ["oklch(15% 0.030 265)", "oklch(25% 0.030 265)", "oklch(35% 0.028 265)", "oklch(47% 0.026 265)", "oklch(59% 0.022 265)", "oklch(71% 0.018 265)", "oklch(83% 0.012 265)", "oklch(95% 0.006 265)"]
+      },
+      "oracle-panel": {
+        "role": "neutral",
+        "displayName": "Panel oracular",
+        "canonical": "rgba(20,27,46,.55)",
+        "tonalRamp": ["oklch(15% 0.035 265)", "oklch(25% 0.035 265)", "oklch(35% 0.032 265)", "oklch(47% 0.028 265)", "oklch(59% 0.024 265)", "oklch(71% 0.019 265)", "oklch(83% 0.013 265)", "oklch(95% 0.006 265)"]
+      },
+      "oracle-border": {
+        "role": "neutral",
+        "displayName": "Borde oracular",
+        "canonical": "rgba(217,184,95,.22)",
+        "tonalRamp": ["oklch(15% 0.045 90)", "oklch(25% 0.060 90)", "oklch(35% 0.075 90)", "oklch(47% 0.090 90)", "oklch(59% 0.100 90)", "oklch(71% 0.090 90)", "oklch(83% 0.060 90)", "oklch(95% 0.025 90)"]
+      },
+      "marble-ivory": {
+        "role": "neutral",
+        "displayName": "Mármol marfil",
+        "canonical": "#ECE4D2",
+        "tonalRamp": ["oklch(15% 0.018 85)", "oklch(25% 0.022 85)", "oklch(35% 0.026 85)", "oklch(47% 0.030 85)", "oklch(59% 0.032 85)", "oklch(71% 0.030 85)", "oklch(83% 0.024 85)", "oklch(95% 0.012 85)"]
+      },
+      "marble-muted": {
+        "role": "neutral",
+        "displayName": "Mármol velado",
+        "canonical": "#C3BCA9",
+        "tonalRamp": ["oklch(15% 0.015 85)", "oklch(25% 0.020 85)", "oklch(35% 0.024 85)", "oklch(47% 0.027 85)", "oklch(59% 0.028 85)", "oklch(71% 0.026 85)", "oklch(83% 0.020 85)", "oklch(95% 0.010 85)"]
+      },
+      "muted-stone": {
+        "role": "neutral",
+        "displayName": "Piedra tenue",
+        "canonical": "#8E8979",
+        "tonalRamp": ["oklch(15% 0.012 85)", "oklch(25% 0.016 85)", "oklch(35% 0.020 85)", "oklch(47% 0.022 85)", "oklch(59% 0.022 85)", "oklch(71% 0.020 85)", "oklch(83% 0.015 85)", "oklch(95% 0.008 85)"]
+      },
+      "laurel-gold": {
+        "role": "primary",
+        "displayName": "Oro laurel",
+        "canonical": "#D9B85F",
+        "tonalRamp": ["oklch(15% 0.055 90)", "oklch(25% 0.075 90)", "oklch(35% 0.095 90)", "oklch(47% 0.115 90)", "oklch(59% 0.125 90)", "oklch(71% 0.115 90)", "oklch(83% 0.080 90)", "oklch(95% 0.030 90)"]
+      },
+      "laurel-light": {
+        "role": "primary",
+        "displayName": "Oro laurel claro",
+        "canonical": "#F2DD93",
+        "tonalRamp": ["oklch(15% 0.050 90)", "oklch(25% 0.070 90)", "oklch(35% 0.090 90)", "oklch(47% 0.105 90)", "oklch(59% 0.110 90)", "oklch(71% 0.100 90)", "oklch(83% 0.070 90)", "oklch(95% 0.025 90)"]
+      },
+      "bronze": {
+        "role": "neutral",
+        "displayName": "Bronce antiguo",
+        "canonical": "#9C7B3E",
+        "tonalRamp": ["oklch(15% 0.045 80)", "oklch(25% 0.060 80)", "oklch(35% 0.075 80)", "oklch(47% 0.085 80)", "oklch(59% 0.080 80)", "oklch(71% 0.065 80)", "oklch(83% 0.045 80)", "oklch(95% 0.018 80)"]
+      },
+      "oracle-cyan": {
+        "role": "secondary",
+        "displayName": "Cian oráculo",
+        "canonical": "#5EE6E0",
+        "tonalRamp": ["oklch(15% 0.055 190)", "oklch(25% 0.075 190)", "oklch(35% 0.095 190)", "oklch(47% 0.115 190)", "oklch(59% 0.125 190)", "oklch(71% 0.115 190)", "oklch(83% 0.080 190)", "oklch(95% 0.030 190)"]
+      },
+      "oracle-cyan-light": {
+        "role": "secondary",
+        "displayName": "Cian oráculo claro",
+        "canonical": "#A8F2EE",
+        "tonalRamp": ["oklch(15% 0.045 190)", "oklch(25% 0.065 190)", "oklch(35% 0.082 190)", "oklch(47% 0.095 190)", "oklch(59% 0.100 190)", "oklch(71% 0.090 190)", "oklch(83% 0.060 190)", "oklch(95% 0.022 190)"]
+      },
+      "tier-silver": {
+        "role": "tertiary",
+        "displayName": "Plata de fuente",
+        "canonical": "#C7CEDB",
+        "tonalRamp": ["oklch(15% 0.012 255)", "oklch(25% 0.018 255)", "oklch(35% 0.024 255)", "oklch(47% 0.030 255)", "oklch(59% 0.032 255)", "oklch(71% 0.028 255)", "oklch(83% 0.020 255)", "oklch(95% 0.008 255)"]
+      },
+      "tier-sage": {
+        "role": "tertiary",
+        "displayName": "Salvia de discusión",
+        "canonical": "#86B5A6",
+        "tonalRamp": ["oklch(15% 0.025 165)", "oklch(25% 0.040 165)", "oklch(35% 0.055 165)", "oklch(47% 0.065 165)", "oklch(59% 0.065 165)", "oklch(71% 0.055 165)", "oklch(83% 0.038 165)", "oklch(95% 0.014 165)"]
+      },
+      "ink-on-gold": {
+        "role": "neutral",
+        "displayName": "Tinta sobre oro",
+        "canonical": "#1A1305",
+        "tonalRamp": ["oklch(15% 0.025 80)", "oklch(25% 0.030 80)", "oklch(35% 0.032 80)", "oklch(47% 0.030 80)", "oklch(59% 0.025 80)", "oklch(71% 0.020 80)", "oklch(83% 0.014 80)", "oklch(95% 0.006 80)"]
+      }
+    },
+    "typographyMeta": {
+      "display": {"displayName": "Inscripción oracular", "purpose": "Declaraciones principales y horizonte de la portada."},
+      "headline": {"displayName": "Umbral de sección", "purpose": "Nombres de sección y divisiones estructurales."},
+      "title": {"displayName": "Voz editorial", "purpose": "Titulares y contenido narrativo."},
+      "body": {"displayName": "Lectura operativa", "purpose": "Resúmenes, metadatos extendidos y formularios."},
+      "label": {"displayName": "Marca instrumental", "purpose": "Navegación, acciones compactas y taxonomías."}
+    },
+    "shadows": [
+      {"name": "halo-editorial", "value": "0 0 30px -8px rgba(217,184,95,.6)", "purpose": "Acciones primarias y autoridad editorial."},
+      {"name": "tarjeta-editorial", "value": "0 22px 50px -26px rgba(217,184,95,.45), inset 0 0 30px rgba(217,184,95,.05)", "purpose": "Hover contenido en tarjetas editoriales."},
+      {"name": "tarjeta-oracular", "value": "0 22px 50px -26px rgba(94,230,224,.5), inset 0 0 30px rgba(94,230,224,.05)", "purpose": "Hover de contenido futuro o tecnológico."},
+      {"name": "modal-profundo", "value": "0 40px 90px -30px rgba(0,0,0,.85), 0 0 70px -24px rgba(217,184,95,.35)", "purpose": "Separación excepcional de diálogos sobre la portada."}
+    ],
+    "motion": [
+      {"name": "state-standard", "value": "200ms ease", "purpose": "Cambios de color, borde y foco en controles."},
+      {"name": "surface-response", "value": "250ms ease", "purpose": "Elevación breve de botones y tarjetas."},
+      {"name": "image-reveal", "value": "400ms ease", "purpose": "Escala contenida de imágenes durante hover."},
+      {"name": "oracle-orbit", "value": "18s linear infinite", "purpose": "Rotación ambiental del portal; se desactiva con prefers-reduced-motion."}
+    ],
+    "breakpoints": [
+      {"name": "tablet", "value": "860px"},
+      {"name": "compact", "value": "620px"},
+      {"name": "phone", "value": "480px"}
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción editorial principal con autoridad contenida.",
+      "html": "<button class=\"ds-btn-primary\">VER LO QUE SUCEDE</button>",
+      "css": ".ds-btn-primary{min-height:44px;padding:14px 26px;border:1px solid #F2DD93;border-radius:8px;background:linear-gradient(180deg,#F2DD93,#D9B85F);color:#1A1305;font:500 .82rem Cinzel,serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;box-shadow:0 0 30px -8px rgba(217,184,95,.6);transition:box-shadow .25s,transform .25s}.ds-btn-primary:hover{box-shadow:0 0 36px -4px rgba(217,184,95,.85);transform:translateY(-1px)}.ds-btn-primary:focus-visible{outline:2px solid rgba(94,230,224,.6);outline-offset:3px}.ds-btn-primary:active{transform:none}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acción secundaria que conserva el campo nocturno.",
+      "html": "<button class=\"ds-btn-ghost\">ORIGINAL</button>",
+      "css": ".ds-btn-ghost{min-height:44px;padding:14px 26px;border:1px solid rgba(217,184,95,.45);border-radius:8px;background:transparent;color:#ECE4D2;font:500 .82rem Cinzel,serif;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;transition:color .2s,border-color .2s}.ds-btn-ghost:hover{border-color:#F2DD93;color:#F2DD93}.ds-btn-ghost:focus-visible{outline:2px solid rgba(94,230,224,.6);outline-offset:3px}"
+    },
+    {
+      "name": "News Card",
+      "kind": "card",
+      "refersTo": "card-news",
+      "description": "Ventana de observación para fuente, titular, contexto y acciones.",
+      "html": "<article class=\"ds-news-card\"><div class=\"ds-news-image\"></div><h3>La señal que transforma el horizonte</h3><p class=\"ds-news-meta\"><span class=\"ds-news-seal\">I</span> FUENTE · 30 JUL 2026</p><p>Contexto breve, legible y siempre subordinado a la fuente original.</p></article>",
+      "css": ".ds-news-card{position:relative;overflow:hidden;padding:22px 24px 20px;border:1px solid rgba(217,184,95,.22);border-radius:14px;background:rgba(20,27,46,.55);color:#ECE4D2;font:400 .92rem/1.6 Inter,system-ui,sans-serif;transition:border-color .25s,transform .25s,box-shadow .25s}.ds-news-card:before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:linear-gradient(180deg,#D9B85F,transparent)}.ds-news-card:hover{transform:translateY(-3px);border-color:rgba(242,221,147,.5);box-shadow:0 22px 50px -26px rgba(217,184,95,.45),inset 0 0 30px rgba(217,184,95,.05)}.ds-news-image{height:120px;margin:-22px -24px 14px;background:radial-gradient(120% 100% at 80% 0,#5EE6E0 0,transparent 55%),#0D1322}.ds-news-card h3{margin:0 0 12px;font:600 1.25rem/1.28 'Cormorant Garamond',serif}.ds-news-card p{margin:0;color:#C3BCA9}.ds-news-meta{display:flex;align-items:center;gap:10px;margin-bottom:12px!important;color:#8E8979!important;font-size:.76rem;letter-spacing:.04em}.ds-news-seal{display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:radial-gradient(circle at 40% 35%,#F2DD93,#C99B43);color:#3A2C08;font:500 .72rem Cinzel,serif}"
+    },
+    {
+      "name": "Topic Chip",
+      "kind": "chip",
+      "refersTo": "topic-chip",
+      "description": "Selector de interés con estado visible y tactilidad sobria.",
+      "html": "<button class=\"ds-topic-chip\" aria-pressed=\"true\"><span>I</span> ASTRONOMÍA</button>",
+      "css": ".ds-topic-chip{display:flex;min-height:56px;align-items:center;gap:12px;padding:12px 16px;border:1px solid rgba(242,221,147,.7);border-radius:12px;background:rgba(217,184,95,.10);color:#F2DD93;font:500 .8rem Cinzel,serif;letter-spacing:.13em;text-transform:uppercase;cursor:pointer;transition:color .2s,border-color .2s,background .2s}.ds-topic-chip span{display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:#D9B85F;color:#3A2C08}.ds-topic-chip:hover{background:rgba(217,184,95,.14)}.ds-topic-chip:focus-visible{outline:2px solid rgba(94,230,224,.6);outline-offset:2px}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo nocturno de alta legibilidad con foco editorial.",
+      "html": "<label class=\"ds-field\">CORREO<input type=\"email\" placeholder=\"tu@correo.cl\"></label>",
+      "css": ".ds-field{display:grid;gap:5px;color:#C3BCA9;font:500 .72rem Inter,system-ui,sans-serif;letter-spacing:.08em}.ds-field input{padding:10px 12px;border:1px solid rgba(217,184,95,.28);border-radius:8px;background:rgba(217,184,95,.05);color:#ECE4D2;font:400 .92rem Inter,system-ui,sans-serif;transition:border-color .2s,box-shadow .2s}.ds-field input:focus{outline:none;border-color:#F2DD93;box-shadow:0 0 0 3px rgba(242,221,147,.15)}.ds-field input:disabled{opacity:.38}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "description": "Orientación compacta que permanece subordinada a la marca.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\">LO QUE SUCEDE</a><a href=\"#\">PERSONALIZAR</a><a href=\"#\">ACERCA</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:28px;padding:16px 0;background:#080B14}.ds-nav a{color:#C3BCA9;text-decoration:none;font:400 .8rem Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:color .2s}.ds-nav a:hover{color:#F2DD93}.ds-nav a:focus-visible{outline:2px solid rgba(94,230,224,.6);outline-offset:4px}"
+    },
+    {
+      "name": "Source Pill",
+      "kind": "custom",
+      "description": "Taxonomía futura o de red expresada como señal pequeña.",
+      "html": "<span class=\"ds-source-pill\">OBSERVATORIO</span>",
+      "css": ".ds-source-pill{display:inline-flex;align-items:center;padding:3px 10px;border:1px solid rgba(94,230,224,.45);border-radius:999px;background:rgba(94,230,224,.08);color:#A8F2EE;font:500 .62rem Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}.ds-source-pill:focus-visible{outline:2px solid rgba(242,221,147,.6);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "La Pitonisa Cibernética",
+    "overview": "Sibylla se presenta como una inteligencia oracular que observa el presente para ayudar a vislumbrar el horizonte. La interfaz combina la gravedad de un archivo clásico con señales tecnológicas precisas: la claridad visionaria domina, mientras lo ceremonial enmarca la lectura sin volverla críptica.\n\nEl sistema debe separar la señal del ruido también en su forma. La densidad es editorial, no frenética; la jerarquía guía hacia hechos, fuentes y contexto sin competir por atención. La noche, el mármol, el oro y el cian construyen un observatorio sobrio donde cada destello tiene una función.\n\nLa anti-referencia es cualquier experiencia que ciegue en lugar de abrir los ojos: portales noticiosos genéricos, dashboards SaaS intercambiables, estética de casino, neón excesivo, gamificación o acumulación de estímulos sin jerarquía.",
+    "keyCharacteristics": [
+      "Oscuridad profunda como campo de observación, no como espectáculo.",
+      "Oro para autoridad editorial y cian para señales del horizonte.",
+      "Tipografía clásica para la voz y sans serif para la evidencia operativa.",
+      "Capas translúcidas, bordes finos y resplandores ambientales contenidos.",
+      "Controles instrumentales que nunca compiten con las noticias."
+    ],
+    "rules": [
+      {"name": "La regla de las dos luces", "body": "El oro comunica autoridad editorial; el cian revela futuro, foco o información. No intercambiar sus papeles ni hacerlos competir en la misma jerarquía.", "section": "colors"},
+      {"name": "La regla de la señal escasa", "body": "Los acentos luminosos deben ser raros y funcionales; una pantalla saturada de oro o cian deja de separar señal de ruido.", "section": "colors"},
+      {"name": "La regla de las tres voces", "body": "Cinzel orienta, Cormorant narra e Inter informa; no añadir una cuarta familia ni usar una voz fuera de su función.", "section": "typography"},
+      {"name": "La regla de la inscripción breve", "body": "Las mayúsculas espaciadas pertenecen a etiquetas cortas; nunca a párrafos ni titulares largos.", "section": "typography"},
+      {"name": "La regla del horizonte despejado", "body": "Cada sección debe revelar con claridad título, línea guía y contenido; los controles permanecen agrupados y subordinados al encabezado.", "section": "layout"},
+      {"name": "La regla de profundidad ambiental", "body": "Ninguna superficie se eleva con una sombra genérica; toda profundidad debe explicar capa, foco o estado.", "section": "elevation"}
+    ],
+    "dos": [
+      "Do preservar la jerarquía señal → fuente → contexto → acción en cada tarjeta.",
+      "Do usar oro para autoridad editorial y cian para futuro, foco o información.",
+      "Do mantener fondos oscuros, capas translúcidas y bordes finos como sistema principal de profundidad.",
+      "Do respetar prefers-reduced-motion y mantener objetivos táctiles de al menos 44px para acciones principales.",
+      "Do tratar fotografías, sellos de fuente y metadatos como evidencia, no como decoración."
+    ],
+    "donts": [
+      "Don't introducir estética de casino, gamificación, neón excesivo o animaciones que compitan con la lectura.",
+      "Don't convertir la interfaz en un portal noticioso genérico o un dashboard SaaS intercambiable.",
+      "Don't llenar una superficie con oro y cian simultáneamente; la rareza de la señal es parte del sistema.",
+      "Don't añadir tipografías, radios o sombras ajenos a las escalas documentadas sin una decisión explícita de rediseño.",
+      "Don't editar web/*.html como fuente visual; los cambios durables pertenecen a las plantillas de sibylla/templates/."
+    ]
+  }
+}
