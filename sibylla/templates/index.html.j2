@@ -50,11 +50,11 @@
 {% macro tarjeta(c, also_in='') -%}
 <article id="{{ c.id }}" class="carta" style="--sello:{{ c.seal_color }};">
   {% if c.image %}<a class="carta-img"{% if c.url %} href="{{ c.url }}"{% endif %} aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}><img src="{{ c.image }}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('ph');this.remove();">{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% else %}<a class="carta-img ph"{% if c.url %} href="{{ c.url }}"{% endif %} aria-label="{{ c.title|e }}"{% if c.is_video and c.video_id %} data-video-id="{{ c.video_id }}"{% endif %}>{% if c.is_video %}<span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>{% endif %}</a>{% endif %}
-  <h4>
+  <h3>
     {% if c.network %}<span class="pill">{{ t['net_' + c.network] if not c.is_house else t.social_house_badge }}</span>{% endif %}
     <a{% if c.url %} href="{{ c.url }}"{% endif %}>{{ c.title }}</a>
-  </h4>
-  <div class="fuente">{% if c.is_video %}<span class="sello sello-video" title="{{ t.video_label }}">▶</span>{% else %}<span class="sello {{ c.seal_class }}">{{ c.seal_roman }}</span>{% endif %} {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
+  </h3>
+  <div class="fuente">{% if c.is_video %}<span class="sello sello-video" title="{{ t.video_label }}">▶</span>{% else %}{% set tier_label = t.tier1_label if c.seal_roman == 'I' else (t.tier2_label if c.seal_roman == 'II' else t.tier3_label) %}<span class="sello {{ c.seal_class }}" aria-hidden="true">{{ c.seal_roman }}</span><span class="tier-text">{{ c.seal_roman }} · {{ tier_label }}</span>{% endif %} {{ c.source_name }} <span class="sep">·</span> {{ c.date }}</div>
   {% if c.snippet %}<p class="resumen">{{ c.snippet }}</p>{% endif %}
   {% if c.related %}<p class="tambien">{{ also_in }}: {% for r in c.related %}<a href="{{ r.url }}">{{ r.source_name }}</a>{% if not loop.last %} <span class="sep">·</span> {% endif %}{% endfor %}{% if c.related_extra %} <span class="sep">·</span> +{{ c.related_extra }}{% endif %}</p>{% endif %}
   <div class="carta-acciones">
@@ -138,6 +138,13 @@
     margin:0; font-family:'Inter',system-ui,sans-serif; color:var(--marfil);
     background:var(--obsidiana); -webkit-font-smoothing:antialiased; line-height:1.6;
   }
+  .sr-only{ position:absolute!important; width:1px!important; height:1px!important; padding:0!important;
+    margin:-1px!important; overflow:hidden!important; clip:rect(0,0,0,0)!important;
+    white-space:nowrap!important; border:0!important; }
+  .skip-link{ position:fixed; top:10px; left:10px; z-index:100; padding:10px 14px; border-radius:8px;
+    color:#1a1305; background:var(--oro-claro); font-weight:600; text-decoration:none;
+    transform:translateY(-150%); transition:transform .18s ease-out; }
+  .skip-link:focus{ transform:none; outline:2px solid var(--cian); outline-offset:2px; }
 
   .cielo{ position:fixed; inset:0; z-index:-1;
     background:
@@ -178,13 +185,14 @@
     text-transform:uppercase; transition:color .2s; }
   nav.menu a:hover{ color:var(--oro-claro); }
   /* ---- Hamburguesa (móvil) ---- */
-  .menu-toggle{ display:none; }
-  .menu-icon{ display:none; flex-direction:column; justify-content:center; align-items:center; gap:5px; width:44px; height:44px; cursor:pointer; border-radius:8px; transition:.2s; }
+  .menu-icon{ display:none; flex-direction:column; justify-content:center; align-items:center; gap:5px; width:44px; height:44px; padding:0; cursor:pointer; border-radius:8px; transition:.2s;
+    color:inherit; background:transparent; border:1px solid transparent; }
   .menu-icon:hover{ background:rgba(217,184,95,.08); }
+  .menu-icon:focus-visible{ outline:2px solid var(--cian); outline-offset:2px; }
   .menu-icon span{ display:block; width:22px; height:2px; background:var(--marfil-2); border-radius:2px; transition:.3s; }
-  .menu-toggle:checked ~ .menu-icon span:nth-child(1){ transform:translateY(7px) rotate(45deg); }
-  .menu-toggle:checked ~ .menu-icon span:nth-child(2){ opacity:0; }
-  .menu-toggle:checked ~ .menu-icon span:nth-child(3){ transform:translateY(-7px) rotate(-45deg); }
+  .menu-icon[aria-expanded="true"] span:nth-child(1){ transform:translateY(7px) rotate(45deg); }
+  .menu-icon[aria-expanded="true"] span:nth-child(2){ opacity:0; }
+  .menu-icon[aria-expanded="true"] span:nth-child(3){ transform:translateY(-7px) rotate(-45deg); }
 
   /* ================= Hero ================= */
   .hero{ display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:54px; align-items:center;
@@ -209,10 +217,14 @@
   .boton.fantasma{ color:var(--marfil); border:1px solid rgba(217,184,95,.45); }
   .boton.fantasma:hover{ border-color:var(--oro-claro); color:var(--oro-claro); }
   .marca-tiempo{ margin-top:26px; font-size:.8rem; letter-spacing:.06em; color:var(--tenue);
-    display:flex; align-items:center; gap:10px; }
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .stale-label{ display:none; font-size:.72rem; font-weight:600;
+    letter-spacing:.08em; text-transform:uppercase; color:var(--oro-claro); }
+  .marca-tiempo.is-stale .stale-label{ display:inline; }
+  .marca-tiempo.is-stale .pulso{ background:var(--oro); animation:none; box-shadow:0 0 0 3px rgba(217,184,95,.14); }
   /* Selector de tarjetas: mismos círculos oro que los controles de sección. */
   .card-ctrl{ display:inline-flex; align-items:center; gap:6px; flex:none; }
-  .card-ctrl-btn{ width:28px; height:28px; flex:none; display:grid; place-items:center; padding:0;
+  .card-ctrl-btn{ width:40px; height:40px; flex:none; display:grid; place-items:center; padding:0;
     border-radius:50%; cursor:pointer; color:var(--marfil-2);
     font-family:'Inter',sans-serif; font-size:1.05rem; font-weight:300; line-height:1;
     background:rgba(217,184,95,.045); border:1px solid rgba(217,184,95,.24);
@@ -231,12 +243,13 @@
   #secciones.is-reordering .sec-btn,
   #secciones.is-reordering .card-ctrl-btn{ pointer-events:none; }
   .bloque.is-moving{ z-index:2; position:relative; }
-  .bloque.is-moving .tema h3{ color:var(--oro-claro); }
+  .bloque.is-moving .tema h2{ color:var(--oro-claro); }
   .bloque-especial{ margin-top:30px; }
   .tema-ctrls{ display:inline-flex; align-items:center; flex:none; }
-  .sec-ctrl{ display:inline-flex; align-items:center; gap:6px; flex:none;
+  .sec-ctrl{ display:none; align-items:center; gap:6px; flex:none;
     margin-left:10px; padding-left:12px; border-left:1px solid rgba(217,184,95,.18); }
-  .sec-btn{ width:28px; height:28px; flex:none; display:grid; place-items:center; padding:0;
+  body.portada-editando .sec-ctrl{ display:inline-flex; }
+  .sec-btn{ width:40px; height:40px; flex:none; display:grid; place-items:center; padding:0;
     border-radius:50%; cursor:pointer; color:var(--marfil-2);
     background:rgba(217,184,95,.045); border:1px solid rgba(217,184,95,.24);
     transition:color .2s, border-color .2s, background .2s, transform .2s, box-shadow .2s; }
@@ -254,7 +267,7 @@
   /* ---- Botón flotante: restaurar las secciones a su estado original ---- */
   .restaurar{ position:fixed; right:24px; bottom:24px; z-index:30;
     display:inline-flex; align-items:center; gap:9px; padding:11px 18px;
-    font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.16em; text-transform:uppercase;
+    font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
     color:var(--oro-claro); cursor:pointer; border-radius:999px;
     background:rgba(13,19,34,.82); border:1px solid rgba(217,184,95,.4);
     backdrop-filter:blur(10px);
@@ -271,7 +284,7 @@
     .restaurar{ transition:opacity .2s; transform:none; }
     .restaurar.is-on{ transform:none; }
     .sec-btn{ transition:color .2s, border-color .2s, background .2s; }
-    .bloque.is-moving .tema h3{ color:var(--marfil); }
+    .bloque.is-moving .tema h2{ color:var(--marfil); }
   }
   /* ---- Botón flotante: actualizar la página tras un redeploy ----
      Aparece solo si el build vivo (web/build.json) es más nuevo que el build
@@ -279,7 +292,7 @@
      apilado sobre .restaurar. La lógica de detección va en el <script> del pie. */
   .actualizar{ position:fixed; right:24px; bottom:72px; z-index:30;
     display:inline-flex; align-items:center; gap:9px; padding:11px 18px;
-    font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.16em; text-transform:uppercase;
+    font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.16em; text-transform:uppercase;
     color:var(--cian-claro); cursor:pointer; border-radius:999px;
     background:rgba(13,19,34,.82); border:1px solid rgba(94,230,224,.42);
     backdrop-filter:blur(10px);
@@ -331,8 +344,9 @@
   .seccion-titulo p{ font-family:'Cormorant Garamond',serif; font-style:italic; color:var(--marfil-2); margin:0; font-size:1.1rem; }
 
   .tema{ margin:42px 0 22px; display:flex; align-items:center; gap:18px; }
-  .tema h3{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.2em; font-size:1.2rem;
+  .tema h2{ font-family:'Cinzel',serif; font-weight:500; letter-spacing:.2em; font-size:1.2rem;
     color:var(--marfil); margin:0; white-space:nowrap; }
+  .tema h2:focus-visible{ outline:2px solid var(--cian); outline-offset:5px; border-radius:4px; }
   .tema .raya{ flex:1; height:1px; background:linear-gradient(90deg, rgba(217,184,95,.5), transparent); }
 
   .rejilla{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
@@ -372,12 +386,13 @@
   .carta-img .play svg{ width:22px; height:22px; fill:var(--marfil); margin-left:3px; }
   /* Reproductor embebido: sustituye la miniatura al pulsar (ver <script>). */
   .carta-img iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
-  .carta h4{ margin:0 0 12px; font-family:'Cormorant Garamond',serif; font-weight:600;
+  .carta h3{ margin:0 0 12px; font-family:'Cormorant Garamond',serif; font-weight:600;
     font-size:clamp(1.15rem,2.5vw,1.35rem); line-height:1.28; }
-  .carta h4 a{ color:var(--marfil); text-decoration:none; transition:color .2s; }
-  .carta h4 a:hover{ color:var(--cian); }
+  .carta h3 a{ color:var(--marfil); text-decoration:none; transition:color .2s; }
+  .carta h3 a:hover{ color:var(--cian); }
   .carta .fuente{ display:flex; align-items:center; gap:10px; font-size:.76rem; letter-spacing:.04em;
     color:var(--tenue); margin-bottom:12px; flex-wrap:wrap; }
+  .tier-text{ color:var(--marfil-2); font-size:.72rem; }
   .carta .resumen{ font-size:.92rem; color:var(--marfil-2); line-height:1.6; margin:0; }
   .carta .tambien{ margin:12px 0 0; padding-top:10px; border-top:1px solid var(--panel-borde);
     font-size:.72rem; letter-spacing:.03em; color:var(--tenue); line-height:1.5; }
@@ -388,12 +403,12 @@
   /* ---- Botones Resumen / Original + panel desplegable ---- */
   .carta-acciones{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
   .btn-mini{ font-family:'Inter',sans-serif; font-size:.72rem; letter-spacing:.06em;
-    text-transform:uppercase; padding:7px 14px; border-radius:8px; cursor:pointer;
+    text-transform:uppercase; padding:9px 14px; min-height:40px; border-radius:8px; cursor:pointer;
     text-decoration:none; display:inline-flex; align-items:center; gap:6px;
     border:1px solid rgba(217,184,95,.32); background:transparent; color:var(--marfil-2);
     transition:color .2s, border-color .2s, background .2s; }
   .btn-mini:hover{ border-color:var(--oro-claro); color:var(--oro-claro); }
-  .btn-resumen::after{ content:'\25BE'; font-size:.6rem; transition:transform .25s; opacity:.8; }
+  .btn-resumen::after{ content:'\25BE'; font-size:.72rem; transition:transform .25s; opacity:.8; }
   .carta.resumen-open .btn-resumen{ color:#1a1305; background:linear-gradient(180deg,#F2DD93,#D9B85F);
     border-color:#F2DD93; }
   .carta.resumen-open .btn-resumen::after{ transform:rotate(180deg); }
@@ -415,7 +430,7 @@
   /* Contador como inscripción bajo el botón (absoluto: no deforma el círculo
      de 28px ni desplaza la fila cuando el número aparece). */
   .soc-num{ position:absolute; left:50%; bottom:-12px; transform:translateX(-50%);
-    font-size:.62rem; line-height:1; color:var(--tenue);
+    font-size:.72rem; line-height:1; color:var(--tenue);
     font-variant-numeric:tabular-nums; pointer-events:none; }
   .soc-btn{ position:relative; }
   .soc-btn svg{ width:16px; height:16px; }
@@ -435,7 +450,7 @@
     background:linear-gradient(180deg, rgba(94,230,224,.07), rgba(94,230,224,.025));
     border:1px solid rgba(94,230,224,.28); }
   .comentarios-panel[hidden]{ display:none; }
-  .comentarios-panel h5{ margin:0 0 12px; font-family:'Cinzel',serif; font-size:.82rem;
+  .comentarios-panel h4{ margin:0 0 12px; font-family:'Cinzel',serif; font-size:.82rem;
     letter-spacing:.12em; text-transform:uppercase; color:var(--cian-claro); }
   .comentarios-lista{ display:flex; flex-direction:column; gap:12px; }
   .comentario{ padding:11px 12px; border-radius:10px; background:rgba(255,255,255,.025);
@@ -516,7 +531,7 @@
   /* "Entrar" comparte la familia visual del chip de avatar (borde oro + glow):
      el estado sin-sesión y el con-sesión ocupan el mismo hueco y ahora riman. */
   .sesion-entrar{ font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--marfil-2); cursor:pointer; padding:7px 15px;
+    min-height:40px; text-transform:uppercase; color:var(--marfil-2); cursor:pointer; padding:7px 15px;
     border-radius:999px; background:rgba(217,184,95,.05); border:1px solid rgba(217,184,95,.35);
     transition:color .2s, border-color .2s, background .2s, box-shadow .2s; }
   .sesion-entrar:hover{ color:var(--oro-claro); border-color:rgba(242,221,147,.85);
@@ -566,8 +581,8 @@
     color:var(--marfil); background:rgba(8,11,20,.6); border:1px solid var(--panel-borde); }
   #sesion-apodo-input:focus{ outline:none; border-color:rgba(94,230,224,.6); }
   #sesion-apodo-input:disabled{ opacity:.5; }
-  #sesion-apodo-form .sesion-apodo-hint{ margin:0; font-size:.68rem; color:var(--tenue); }
-  #sesion-apodo-form .sesion-apodo-msg{ margin:0; font-size:.7rem; color:#E7A38F; }
+  #sesion-apodo-form .sesion-apodo-hint{ margin:0; font-size:.72rem; color:var(--tenue); }
+  #sesion-apodo-form .sesion-apodo-msg{ margin:0; font-size:.72rem; color:#E7A38F; }
   #sesion-apodo-form .sesion-apodo-msg[hidden]{ display:none; }
   #sesion-apodo-form button[type="submit"]{ padding:7px 10px; border-radius:8px; cursor:pointer;
     font-family:inherit; font-size:.74rem; letter-spacing:.06em; color:var(--noche);
@@ -637,7 +652,7 @@
   .sello.t3{ color:#0f2a23; background:radial-gradient(circle at 40% 35%, #A6D4C5, #6E9C8D); }
   .sello.sello-video{ border:1px solid var(--cian); color:var(--cian); background:transparent; }
   .sep{ color:rgba(217,184,95,.4); }
-  .pill{ display:inline-flex; align-items:center; gap:6px; font-size:.62rem; letter-spacing:.14em;
+  .pill{ display:inline-flex; align-items:center; gap:6px; font-size:.72rem; letter-spacing:.14em;
     text-transform:uppercase; padding:3px 10px; border-radius:20px; border:1px solid rgba(94,230,224,.45);
     color:var(--cian-claro); background:rgba(94,230,224,.08); }
 
@@ -657,7 +672,7 @@
   .apunte.neutro .busto{ border-color:rgba(142,137,121,.4); box-shadow:0 0 22px -6px rgba(142,137,121,.3); }
   .apunte .busto svg{ width:80%; }
   .apunte .dice{ margin:0; }
-  .apunte .dice .quien{ font-family:'Cinzel',serif; letter-spacing:.18em; font-size:.66rem;
+  .apunte .dice .quien{ font-family:'Cinzel',serif; letter-spacing:.18em; font-size:.72rem;
     color:var(--oro-claro); display:block; margin-bottom:4px; }
   .apunte.anticipa .dice .quien{ color:var(--cian-claro); }
   .apunte.neutro .dice .quien{ color:var(--marfil-2); }
@@ -721,6 +736,7 @@
     background:radial-gradient(circle at 40% 35%, #F2DD93, #C99B43);
     box-shadow:0 0 14px -3px rgba(242,221,147,.7); }
   .onb-acciones{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:24px; }
+  .onb.onb-primera #onb-estandar{ order:-1; }
   .onb button.boton{ cursor:pointer; }
   .onb .boton.fantasma{ background:transparent; }
   .onb .boton[disabled]{ opacity:.38; pointer-events:none; box-shadow:none; }
@@ -774,11 +790,18 @@
   @media (max-width:620px){ .onb-modos{ grid-template-columns:1fr; } }
 
   /* ---- Conmutador de modo (Ordenado / Aleatorio) sobre las secciones ---- */
-  .modo-fila{ display:flex; justify-content:flex-end; margin:0 0 18px; }
+  .modo-fila{ display:flex; justify-content:flex-end; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 18px; }
+  .editar-portada{ min-height:44px; padding:9px 14px; border-radius:8px; cursor:pointer;
+    font-size:.72rem; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--marfil-2); background:transparent; border:1px solid rgba(217,184,95,.24);
+    transition:color .2s, border-color .2s, background .2s; }
+  .editar-portada:hover, .editar-portada[aria-pressed="true"]{ color:var(--oro-claro);
+    border-color:rgba(242,221,147,.58); background:rgba(217,184,95,.09); }
+  .editar-portada:focus-visible{ outline:2px solid var(--cian); outline-offset:2px; }
   .modo-toggle{ display:inline-flex; padding:4px; gap:4px; border-radius:999px;
     background:rgba(217,184,95,.05); border:1px solid rgba(217,184,95,.24); }
-  .modo-btn{ font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
-    padding:8px 16px; border-radius:999px; cursor:pointer; border:1px solid transparent;
+  .modo-btn{ font-family:'Cinzel',serif; font-size:.72rem; letter-spacing:.14em; text-transform:uppercase;
+    min-height:44px; padding:8px 16px; border-radius:999px; cursor:pointer; border:1px solid transparent;
     background:transparent; color:var(--marfil-2);
     transition:color .2s, background .2s, box-shadow .2s; }
   .modo-btn:hover{ color:var(--oro-claro); }
@@ -792,7 +815,8 @@
      ocultan las secciones, sus controles y el botón Restaurar. */
   #feed{ margin-top:26px; }
   .feed-sentinel{ height:2px; }
-  body.modo-aleatorio .restaurar{ display:none; }
+  body.modo-aleatorio .restaurar,
+  body.modo-aleatorio .editar-portada{ display:none; }
 
   /* ================= Responsive: tablet ================= */
   @media (max-width:860px){
@@ -800,16 +824,18 @@
     .acciones, .marca-tiempo{ justify-content:center; }
     .portal-marco{ order:-1; }
     .rejilla{ grid-template-columns:1fr; }
-    .barra .fila{ position:relative; }
+    .barra .fila{ position:relative; padding:14px 20px; }
     .menu-icon{ display:flex; }
+    .sesion-entrar, #sesion-chip, .sec-btn, .card-ctrl-btn, .btn-mini{ min-height:44px; }
+    #sesion-chip, .sec-btn, .card-ctrl-btn{ width:44px; height:44px; }
     /* En móvil el avatar vuelve a la izquierda de la hamburguesa (order:0 +
        margin-left:auto) y el nav es un desplegable absoluto. */
     .sesion{ order:0; margin-left:auto; }
-    nav.menu{ display:none; position:absolute; top:calc(100% + 6px); right:0; margin-left:0;
+    nav.menu{ display:none; position:absolute; top:calc(100% + 6px); right:20px; margin-left:0;
       background:rgba(13,19,34,.96); border:1px solid var(--panel-borde);
       border-radius:var(--radio); padding:14px 20px; flex-direction:column; gap:14px;
       min-width:200px; backdrop-filter:blur(12px); z-index:20; }
-    .menu-toggle:checked ~ nav.menu{ display:flex; }
+    .menu-icon[aria-expanded="true"] ~ nav.menu{ display:flex; }
     nav.menu a{ padding:6px 0; }
   }
   /* ================= Responsive: teléfono ================= */
@@ -820,45 +846,53 @@
     .hero-texto .bajada{ margin-bottom:22px; }
     .portal{ width:220px; height:220px; }
     .portal .aro{ animation-duration:28s; }
-    .nombre-portal{ font-size:.68rem; margin-top:12px; }
+    .nombre-portal{ font-size:.72rem; margin-top:12px; }
     .laurel{ width:150px; top:-14px; }
     .acciones{ flex-direction:column; align-items:stretch; }
     .boton{ padding:13px 18px; text-align:center; }
     .carta{ padding:18px 16px; }
-    .carta .fuente{ font-size:.7rem; gap:6px; }
+    .carta .fuente{ font-size:.72rem; gap:6px; }
     .carta-img{ margin:-18px -16px 12px; }
-    .sello{ width:26px; height:26px; font-size:.66rem; }
+    .sello{ width:28px; height:28px; font-size:.72rem; }
     .rejilla{ gap:14px; }
     .tema{ margin:28px 0 14px; gap:8px 12px; flex-wrap:wrap; }
-    .tema h3{ font-size:1rem; letter-spacing:.14em; }
+    .tema h2{ font-size:1rem; letter-spacing:.14em; }
     .tema-ctrls{ flex:0 0 100%; justify-content:flex-end; }
-    .sec-btn, .card-ctrl-btn{ width:30px; height:30px; }
+    .sec-btn, .card-ctrl-btn{ width:44px; height:44px; }
+    .btn-mini{ min-height:44px; }
     .soc-grupo{ gap:6px; }
     .soc-btn svg{ width:14px; height:14px; }
-    .restaurar{ right:14px; bottom:14px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
-    .actualizar{ right:14px; bottom:58px; padding:9px 14px; font-size:.62rem; letter-spacing:.12em; }
+    .restaurar{ right:14px; bottom:14px; padding:9px 14px; font-size:.72rem; letter-spacing:.12em; }
+    .actualizar{ right:14px; bottom:58px; padding:9px 14px; font-size:.72rem; letter-spacing:.12em; }
     .seccion-titulo{ margin:16px 0 4px; }
     .seccion-titulo p{ font-size:.95rem; }
     .apunte{ flex-direction:column; align-items:flex-start; gap:14px; padding:16px 16px; margin:22px 0; }
     .apunte .busto{ width:48px; height:48px; }
     .meandro{ height:12px; }
-    .barra .fila{ justify-content:center; position:relative; padding:12px 0; }
-    .menu-icon{ position:absolute; right:0; top:50%; transform:translateY(-50%); }
-    /* Sesión a la izquierda de la hamburguesa (44px + aire); con la fila
-       centrada, el margin-left:auto la empujaría justo debajo del icono. */
-    .sesion{ position:absolute; right:54px; top:50%; transform:translateY(-50%); margin-left:0; }
-    nav.menu{ right:0; }
+    .barra .fila{ justify-content:center; position:relative; padding:12px 16px; }
+    .menu-icon{ position:absolute; right:16px; top:50%; transform:translateY(-50%); }
+    /* Sesión en el extremo izquierdo: reservar el centro para la marca evita
+       que «Entrar» o el avatar la invadan en pantallas de 320–360 px. */
+    .sesion{ position:absolute; left:16px; right:auto; top:50%; transform:translateY(-50%); margin-left:0; }
+    nav.menu{ right:16px; }
     .marca{ font-size:1.2rem; letter-spacing:.18em; }
-    .marca-sub{ font-size:.7rem; }
+    .marca-sub{ font-size:.72rem; }
     footer{ margin-top:40px; }
     .pie{ padding:28px 0 32px; }
     .pie .marca{ font-size:.95rem; }
     .leyenda{ gap:12px 18px; font-size:.72rem; margin:16px 0 12px; }
     .pie .lema{ font-size:.82rem; }
   }
+  @media (prefers-reduced-motion:reduce){
+    html{ scroll-behavior:auto; }
+    .skip-link, .card-ctrl-btn, .menu-icon span, article.carta, .carta-img img, .btn-resumen::after{ transition:none; }
+    article.carta:hover{ transform:none; }
+    .carta:hover .carta-img img{ transform:none; }
+  }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#presente">{{ t.skip_content }}</a>
 <div class="cielo" aria-hidden="true"></div>
 <div class="estrellas" aria-hidden="true"></div>
 
@@ -889,11 +923,11 @@
         <button type="button" id="sesion-salir">{{ t.auth_logout }}</button>
       </div>
     </span>
-    <input type="checkbox" id="menu-toggle" class="menu-toggle" aria-hidden="true">
-    <label for="menu-toggle" class="menu-icon" aria-label="Abrir menú" role="button" tabindex="0">
+    <button type="button" id="menu-toggle" class="menu-icon" aria-expanded="false" aria-controls="menu-principal"
+      aria-label="{{ t.menu_open }}" data-open-label="{{ t.menu_open }}" data-close-label="{{ t.menu_close }}">
       <span></span><span></span><span></span>
-    </label>
-    <nav class="menu">
+    </button>
+    <nav class="menu" id="menu-principal">
       <a href="#presente">{{ t.nav_present }}</a>
       <a href="#" id="nav-personalizar">{{ t.onb_edit }}</a>
       <a href="https://github.com/JavFuentes/sibylla" target="_blank" rel="noopener">{{ t.nav_github }}</a>
@@ -914,9 +948,10 @@
       <div class="acciones">
         <a href="#presente" class="boton oro">{{ t.hero_cta }}</a>
       </div>
-      <div class="marca-tiempo">
+      <div class="marca-tiempo" data-build="{{ build_v }}">
         <span class="pulso" aria-hidden="true"></span>
-        {{ hero_timestamp }}
+        <span>{{ hero_timestamp }}</span>
+        <strong class="stale-label">{{ t.hero_stale }}</strong>
       </div>
     </div>
 
@@ -941,6 +976,8 @@
     {{ apunte(t.observes, observa) }}
 
     <div class="modo-fila">
+      <button type="button" id="editar-portada" class="editar-portada" aria-pressed="false"
+        data-edit-label="{{ t.layout_edit }}" data-done-label="{{ t.layout_done }}">{{ t.layout_edit }}</button>
       <div id="modo-toggle" class="modo-toggle" role="group" aria-label="{{ t.mode_label }}">
         <button type="button" class="modo-btn" data-mode="ordenado" aria-pressed="true">{{ t.mode_ordered }}</button>
         <button type="button" class="modo-btn" data-mode="aleatorio" aria-pressed="false">{{ t.mode_random }}</button>
@@ -950,11 +987,11 @@
     <div id="secciones">
     {% for g in grupos %}
       <div class="bloque" data-topic="{{ g.id }}">
-        <div class="tema" data-topic="{{ g.id }}"><h3>{{ g.label }}</h3><span class="raya"></span>
+        <div class="tema" data-topic="{{ g.id }}"><h2 tabindex="-1">{{ g.label }}</h2><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in g.cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -964,11 +1001,11 @@
 
     {% if astro_cards %}
       <div class="bloque bloque-especial" id="astronomia" data-topic="astronomia">
-        <div class="tema" data-topic="astronomia"><h3>{{ t.astro_heading }}</h3><span class="raya"></span>
+        <div class="tema" data-topic="astronomia"><h2 tabindex="-1">{{ t.astro_heading }}</h2><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in astro_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -978,11 +1015,11 @@
 
     {% if divulgacion_cards %}
       <div class="bloque bloque-especial" id="divulgacion" data-topic="divulgacion">
-        <div class="tema" data-topic="divulgacion"><h3>{{ t.divulgacion_heading }}</h3><span class="raya"></span>
+        <div class="tema" data-topic="divulgacion"><h2 tabindex="-1">{{ t.divulgacion_heading }}</h2><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in divulgacion_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -996,7 +1033,7 @@
          controles de sección; fija al final, antes de RRSS (ver el JS del
          pie). Solo se renderiza si hay algo que publicar. #}
       <div class="bloque bloque-especial" id="sibylla" data-topic="sibylla">
-        <div class="tema" data-topic="sibylla"><h3>{{ t.sibylla_heading }}</h3><span class="raya"></span></div>
+        <div class="tema" data-topic="sibylla"><h2 tabindex="-1">{{ t.sibylla_heading }}</h2><span class="raya"></span></div>
         <div class="rejilla">
           {% for c in sibylla_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
         </div>
@@ -1005,11 +1042,11 @@
 
     {% if social_cards %}
       <div class="bloque bloque-especial" id="voces" data-topic="social">
-        <div class="tema" data-topic="social"><h3>{{ t.social_topic_label }}</h3><span class="raya"></span>
+        <div class="tema" data-topic="social"><h2 tabindex="-1">{{ t.social_topic_label }}</h2><span class="raya"></span>
         <span class="tema-ctrls"><span class="card-ctrl" data-steps="0,2,4,6" data-default="6">
-          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
-          <span class="card-ctrl-val">6</span>
           <button class="card-ctrl-btn" aria-label="{{ t.cards_less }}" data-dir="-1">&minus;</button>
+          <span class="card-ctrl-val">6</span>
+          <button class="card-ctrl-btn" aria-label="{{ t.cards_more }}" data-dir="1">+</button>
         </span>{{ sec_ctrl() }}</span></div>
         <div class="rejilla">
           {% for c in social_cards %}{{ tarjeta(c, t.also_in) }}{% endfor %}
@@ -1017,6 +1054,9 @@
       </div>
     {% endif %}
     </div>
+    <p id="layout-status" class="sr-only" aria-live="polite"
+      data-cards="{{ t.cards_status }}" data-moved="{{ t.section_moved }}"
+      data-removed="{{ t.section_removed }}" data-restored="{{ t.section_restored }}"></p>
 
     {# Modo aleatorio: el JS mueve aquí las tarjetas de los temas elegidos,
        mezcladas con sesgo por ranking, y las revela por lotes al hacer scroll. #}
@@ -1068,7 +1108,8 @@
       </div>
       <div class="onb-acciones">
         <button type="button" id="onb-continuar" class="boton oro" disabled>{{ t.onb_continue }}</button>
-        <button type="button" id="onb-estandar" class="boton fantasma">{{ t.onb_standard }}</button>
+        <button type="button" id="onb-estandar" class="boton fantasma"
+          data-first-label="{{ t.onb_first }}" data-standard-label="{{ t.onb_standard }}">{{ t.onb_standard }}</button>
       </div>
       <p class="onb-nota">{{ t.onb_note }}</p>
     </div>
@@ -1191,6 +1232,42 @@
 (function(){
   var CONT=document.getElementById('secciones');
   if(!CONT) return;
+  var menuBtn=document.getElementById('menu-toggle');
+  var menuNav=document.getElementById('menu-principal');
+  function setMenu(open){
+    if(!menuBtn) return;
+    menuBtn.setAttribute('aria-expanded', open?'true':'false');
+    menuBtn.setAttribute('aria-label', open ? menuBtn.dataset.closeLabel : menuBtn.dataset.openLabel);
+  }
+  if(menuBtn){
+    menuBtn.addEventListener('click', function(){ setMenu(menuBtn.getAttribute('aria-expanded')!=='true'); });
+    document.addEventListener('keydown', function(e){
+      if(e.key==='Escape' && menuBtn.getAttribute('aria-expanded')==='true'){
+        setMenu(false); menuBtn.focus();
+      }
+    });
+    document.addEventListener('click', function(e){
+      if(menuBtn.getAttribute('aria-expanded')!=='true') return;
+      if(e.target===menuBtn || menuBtn.contains(e.target) || (menuNav && menuNav.contains(e.target))) return;
+      setMenu(false);
+    });
+    if(menuNav) menuNav.addEventListener('click', function(){ setMenu(false); });
+  }
+  var layoutStatus=document.getElementById('layout-status');
+  function msg(template, values){
+    var out=template||'';
+    Object.keys(values).forEach(function(key){ out=out.replace('{'+key+'}', values[key]); });
+    return out;
+  }
+  function announce(text){
+    if(!layoutStatus) return;
+    layoutStatus.textContent='';
+    setTimeout(function(){ layoutStatus.textContent=text; }, 20);
+  }
+  function topicLabel(topic){
+    var t=temaOf(topic), h=t?t.querySelector('h2'):null;
+    return h ? h.textContent.trim() : topic;
+  }
   var defaultSteps=[0,2,4,6];
   /* Tarjetas por defecto según el onboarding: 1er interés 6, el resto 4;
      RRSS (social) no se elige: siempre visible con 2, al final;
@@ -1287,6 +1364,8 @@
     var next=steps[Math.min(steps.length-1, Math.max(0, idx+dir))];
     var c=loadCards(); c[topic]=next; saveCards(c);
     applyCards(topic, next); reflectRestore();
+    announce(msg(layoutStatus && layoutStatus.dataset.cards,
+      {section:topicLabel(topic), count:String(next)}));
   }
 
   /* ---------- orden / visibilidad ---------- */
@@ -1420,11 +1499,22 @@
     animateLayoutChange(topic, function(){
       var lay=loadLayout(); lay.order=ids; saveLayout(lay); applyLayout();
     });
+    var pos=visibleBlocks().map(function(b){return b.dataset.topic;}).indexOf(topic)+1;
+    announce(msg(layoutStatus && layoutStatus.dataset.moved,
+      {section:topicLabel(topic), position:String(pos)}));
   }
   function removeBlock(topic){
+    var label=topicLabel(topic);
+    var vis=visibleBlocks(), vpos=vis.map(function(b){return b.dataset.topic;}).indexOf(topic);
+    var focusBlock=vis[vpos+1] || vis[vpos-1] || null;
     var lay=loadLayout();
     if(lay.hidden.indexOf(topic)<0) lay.hidden.push(topic);
     saveLayout(lay); applyLayout();
+    if(focusBlock){
+      var heading=focusBlock.querySelector('.tema h2');
+      if(heading) heading.focus();
+    }
+    announce(msg(layoutStatus && layoutStatus.dataset.removed, {section:label}));
   }
 
   /* Si se entra con #n-..., la tarjeta enlazada debe verse aunque el usuario
@@ -1475,6 +1565,7 @@
     applyLayout();
     blocks().forEach(function(b){ var tp=b.dataset.topic; applyCards(tp, cardCountFor(tp)); });
     reflectRestore();
+    announce(layoutStatus && layoutStatus.dataset.restored);
   }
 
   /* ---------- modo de visualización: ordenado / aleatorio ----------
@@ -1650,6 +1741,7 @@
   var onbStd=document.getElementById('onb-estandar');
   var onbSel=[];                                   /* ranking en curso */
   var onbMode='ordenado';                          /* modo elegido en el overlay */
+  var onbPrevFocus=null;
   var ROMANOS=['I','II','III','IV','V','VI','VII','VIII','IX'];
 
   function knownTopics(){
@@ -1661,7 +1753,7 @@
     ORIGINAL.forEach(function(tp){
       if(PINNED.indexOf(tp)>=0) return;
       var b=blockOf(tp); if(!b) return;
-      var h=b.querySelector('.tema h3');
+      var h=b.querySelector('.tema h2');
       var btn=document.createElement('button');
       btn.type='button'; btn.className='chip-tema';
       btn.dataset.topic=tp; btn.setAttribute('aria-pressed','false');
@@ -1691,23 +1783,42 @@
   }
   function onbOpen(){
     if(!ONB || !onbChips) return;
+    onbPrevFocus=document.activeElement;
     var prefs=loadPrefs();
+    var firstVisit=!prefs;
     onbSel = (prefs && !prefs.estandar)
       ? prefs.ranking.filter(function(tp){ return ORIGINAL.indexOf(tp)>=0; })
       : [];
     onbMode = currentMode();
     onbBuildChips(); onbPaint(); onbPaintModo();
+    ONB.classList.toggle('onb-primera', firstVisit);
+    if(onbStd){
+      onbStd.textContent=firstVisit ? onbStd.dataset.firstLabel : onbStd.dataset.standardLabel;
+      onbStd.classList.toggle('oro', firstVisit);
+      onbStd.classList.toggle('fantasma', !firstVisit);
+    }
+    if(onbGo){
+      onbGo.classList.toggle('oro', !firstVisit);
+      onbGo.classList.toggle('fantasma', firstVisit);
+    }
     ONB.hidden=false;
     document.body.classList.add('onb-abierto');
     var first=onbChips.querySelector('.chip-tema');
-    if(first) first.focus();
+    if(firstVisit && onbStd) onbStd.focus();
+    else if(first) first.focus();
+  }
+  function restoreOnbFocus(){
+    var target=onbPrevFocus;
+    if(!target || target===document.body || !target.focus || !target.getClientRects().length) target=menuBtn;
+    if(target && target.focus) target.focus();
+    onbPrevFocus=null;
   }
   function onbClose(){
     if(!ONB) return;
     document.body.classList.remove('onb-abierto');
-    if(prefersReducedMotion()){ ONB.hidden=true; return; }
+    if(prefersReducedMotion()){ ONB.hidden=true; restoreOnbFocus(); return; }
     ONB.classList.add('is-closing');
-    setTimeout(function(){ ONB.hidden=true; ONB.classList.remove('is-closing'); }, 360);
+    setTimeout(function(){ ONB.hidden=true; ONB.classList.remove('is-closing'); restoreOnbFocus(); }, 360);
   }
   function onbSave(estandar){
     savePrefs({ v:1,
@@ -1745,7 +1856,9 @@
     function done(){
       ACERCA.hidden=true;
       ACERCA.classList.remove('is-closing');
-      if(acercaPrevFocus && acercaPrevFocus.focus) acercaPrevFocus.focus();
+      var target=acercaPrevFocus;
+      if(!target || !target.focus || !target.getClientRects().length) target=menuBtn;
+      if(target && target.focus) target.focus();
     }
     if(prefersReducedMotion()){ done(); return; }
     ACERCA.classList.add('is-closing');
@@ -1771,7 +1884,14 @@
   if(restore) restore.addEventListener('click', function(){ if(!REORDERING) restoreAll(); });
   window.addEventListener('hashchange', revealHashTarget);
 
-  /* Binds del conmutador de modo. */
+  /* Binds de ediciÃ³n y conmutador de modo. */
+  var editBtn=document.getElementById('editar-portada');
+  if(editBtn) editBtn.addEventListener('click', function(){
+    var editing=editBtn.getAttribute('aria-pressed')!=='true';
+    editBtn.setAttribute('aria-pressed', editing?'true':'false');
+    editBtn.textContent=editing ? editBtn.dataset.doneLabel : editBtn.dataset.editLabel;
+    document.body.classList.toggle('portada-editando', editing);
+  });
   var modoToggle=document.getElementById('modo-toggle');
   if(modoToggle) modoToggle.addEventListener('click', function(e){
     var btn=e.target.closest ? e.target.closest('.modo-btn') : null;
@@ -1798,13 +1918,13 @@
   var navPers=document.getElementById('nav-personalizar');
   if(navPers) navPers.addEventListener('click', function(e){
     e.preventDefault();
-    var mt=document.getElementById('menu-toggle'); if(mt) mt.checked=false;
+    setMenu(false);
     onbOpen();
   });
   var navAcerca=document.getElementById('nav-acerca');
   if(navAcerca) navAcerca.addEventListener('click', function(e){
     e.preventDefault();
-    var mt=document.getElementById('menu-toggle'); if(mt) mt.checked=false;
+    setMenu(false);
     acercaOpen();
   });
   if(ACERCA){
@@ -1823,10 +1943,14 @@
     if(acercaCerrar) acercaCerrar.addEventListener('click', acercaClose);
     if(acercaCerrarAccion) acercaCerrarAccion.addEventListener('click', acercaClose);
   }
+  if(ONB) ONB.addEventListener('click', function(e){
+    if(e.target!==ONB) return;
+    if(loadPrefs()) onbClose(); else onbSave(true);
+  });
   if(ONB) ONB.addEventListener('keydown', function(e){
-    /* Escape solo cierra si ya hay preferencias (cancelar edición); en la
-       primera visita se exige una elección explícita (o "un poco de todo"). */
-    if(e.key==='Escape'){ if(loadPrefs()) onbClose(); return; }
+    /* Escape conserva la elección anterior; en la primera visita abre la
+       portada estándar, para que personalizar nunca bloquee la lectura. */
+    if(e.key==='Escape'){ if(loadPrefs()) onbClose(); else onbSave(true); return; }
     if(e.key!=='Tab') return;
     var focos=ONB.querySelectorAll('button:not([disabled])');
     if(!focos.length) return;
@@ -1844,6 +1968,16 @@
   }};
   var boletinQuery=new URLSearchParams(location.search).get('boletin');
   if(!loadPrefs() && !boletinQuery) onbOpen();
+})();
+/* Honestidad temporal: una portada diaria no debe parecer viva si su build
+   lleva más de 36 horas sin renovarse. La fecha original siempre permanece. */
+(function(){
+  var stamp=document.querySelector('.marca-tiempo[data-build]');
+  if(!stamp) return;
+  var built=parseInt(stamp.dataset.build,10);
+  if(isNaN(built)) return;
+  var age=(Date.now()/1000)-built;
+  if(age>36*60*60) stamp.classList.add('is-stale');
 })();
 /* Miniaturas de Divulgación: al pulsar, sustituyen su contenido por el
    reproductor embebido (youtube-nocookie) en vez de navegar a YouTube. El

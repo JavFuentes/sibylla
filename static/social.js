@@ -801,7 +801,7 @@ function mapearError(code, TXT) {
     panel.hidden = true;
     panel.setAttribute('role', 'region');
     panel.setAttribute('aria-label', TXT.social_comments_title);
-    const title = document.createElement('h5');
+    const title = document.createElement('h4');
     title.textContent = TXT.social_comments_title;
     const list = document.createElement('div');
     list.className = 'comentarios-lista';
@@ -1251,6 +1251,27 @@ function mapearError(code, TXT) {
   const authPass = document.getElementById('auth-pass');
   let modoRegistro = false;
   let intencionBoletin = false;
+  let authPrevFocus = null;
+
+  function focosDialogo(dialogo) {
+    return Array.from(dialogo.querySelectorAll(
+      'a[href], button:not([disabled]):not([hidden]), input:not([disabled]):not([hidden]), textarea:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])'
+    )).filter((el) => !el.closest('[hidden]'));
+  }
+  function atraparTab(dialogo, evento) {
+    if (evento.key !== 'Tab') return;
+    const focos = focosDialogo(dialogo);
+    if (!focos.length) return;
+    const first = focos[0], last = focos[focos.length - 1];
+    if (evento.shiftKey && document.activeElement === first) { evento.preventDefault(); last.focus(); }
+    else if (!evento.shiftKey && document.activeElement === last) { evento.preventDefault(); first.focus(); }
+  }
+  function restaurarFoco(elemento, alternativo) {
+    const visible = (el) => !!(el && el.focus && document.body.contains(el)
+      && !el.closest('[hidden]') && el.getClientRects().length);
+    const destino = visible(elemento) ? elemento : (visible(alternativo) ? alternativo : null);
+    if (destino) destino.focus();
+  }
 
   function setModo(registro) {
     modoRegistro = registro;
@@ -1266,6 +1287,8 @@ function mapearError(code, TXT) {
   }
   function abrirAuth(motivo) {
     if (!AUTH) return;
+    authPrevFocus = document.activeElement && document.activeElement !== document.body
+      ? document.activeElement : sesionEntrar;
     authSub.textContent = motivo === 'comment' ? authSub.getAttribute('data-comment')
       : motivo === 'newsletter' ? authSub.getAttribute('data-newsletter')
       : authSub.getAttribute('data-vote');
@@ -1275,21 +1298,18 @@ function mapearError(code, TXT) {
     document.body.classList.add('auth-abierto');
     setTimeout(() => { (authEmail || AUTH).focus(); }, 0);
   }
-  function cerrarAuth() {
+  function cerrarAuth(restaurar = true) {
     if (!AUTH) return;
     AUTH.hidden = true;
     document.body.classList.remove('auth-abierto');
+    if (restaurar) restaurarFoco(authPrevFocus, sesionEntrar);
+    authPrevFocus = null;
   }
   document.getElementById('auth-cerrar').addEventListener('click', cerrarAuth);
   AUTH.addEventListener('click', (e) => { if (e.target === AUTH) cerrarAuth(); });
   AUTH.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { cerrarAuth(); return; }
-    if (e.key !== 'Tab') return;
-    const focos = AUTH.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]');
-    if (!focos.length) return;
-    const first = focos[0], last = focos[focos.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    atraparTab(AUTH, e);
   });
   authAlternar.addEventListener('click', () => setModo(!modoRegistro));
   document.getElementById('auth-google').addEventListener('click', () => {
@@ -1513,6 +1533,7 @@ function mapearError(code, TXT) {
   const correoGuardar = document.getElementById('correo-guardar');
   const correoBaja = document.getElementById('correo-baja');
   const correoBorrar = document.getElementById('correo-borrar');
+  let correoPrevFocus = null;
   const sesionBoletin = document.getElementById('sesion-boletin');
   const pieBoletin = document.getElementById('pie-boletin');
   let suscripcionActual = null;
@@ -1543,7 +1564,7 @@ function mapearError(code, TXT) {
     correoChips.innerHTML = '';
     TEMAS_BOLETIN.forEach((tema) => {
       const bloque = document.querySelector('.bloque[data-topic="' + tema + '"]');
-      const h = bloque && bloque.querySelector('.tema h3');
+      const h = bloque && bloque.querySelector('.tema h2');
       const btn = document.createElement('button');
       const pos = temasSeleccionados.indexOf(tema);
       btn.type = 'button';
@@ -1614,16 +1635,19 @@ function mapearError(code, TXT) {
   }
   function abrirBoletin() {
     if (!CORREO) return;
+    correoPrevFocus = document.activeElement;
     cerrarSesionMenu();
     CORREO.hidden = false;
     document.body.classList.add('auth-abierto');
     pintarBoletin();
     setTimeout(() => document.getElementById('correo-cerrar').focus(), 0);
   }
-  function cerrarBoletin() {
+  function cerrarBoletin(restaurar = true) {
     if (!CORREO) return;
     CORREO.hidden = true;
     document.body.classList.remove('auth-abierto');
+    if (restaurar) restaurarFoco(correoPrevFocus, sesionChip || pieBoletin);
+    correoPrevFocus = null;
   }
   async function guardarSuscripcion(activa) {
     if (!currentUser || !currentUser.emailVerified) return;
@@ -1671,7 +1695,7 @@ function mapearError(code, TXT) {
     } catch (e) { msgCorreo(TXT.news_err_generic); }
   });
   const correoEntrar = document.getElementById('correo-entrar');
-  if (correoEntrar) correoEntrar.addEventListener('click', () => { cerrarBoletin(); abrirAuth('newsletter'); });
+  if (correoEntrar) correoEntrar.addEventListener('click', () => { cerrarBoletin(false); abrirAuth('newsletter'); });
   const correoVerificar = document.getElementById('correo-verificar');
   if (correoVerificar) correoVerificar.addEventListener('click', async () => {
     if (!currentUser) return;
@@ -1681,7 +1705,10 @@ function mapearError(code, TXT) {
   if (CORREO) {
     document.getElementById('correo-cerrar').addEventListener('click', cerrarBoletin);
     CORREO.addEventListener('click', (e) => { if (e.target === CORREO) cerrarBoletin(); });
-    CORREO.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarBoletin(); });
+    CORREO.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { cerrarBoletin(); return; }
+      atraparTab(CORREO, e);
+    });
   }
   if (sesionBoletin) sesionBoletin.addEventListener('click', abrirBoletin);
   if (pieBoletin) pieBoletin.addEventListener('click', (e) => { e.preventDefault(); abrirBoletin(); });

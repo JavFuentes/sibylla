@@ -432,6 +432,20 @@ def test_render_html_incluye_modal_acerca():
     assert 'id="acerca"' in html
 
 
+def test_render_html_pulido_accesible_de_portada():
+    html = render_html([_item(title="A", url="https://a.example", tier=1)], ["ai"], {}, build_v=1)
+
+    assert '<button type="button" id="menu-toggle"' in html
+    assert 'aria-controls="menu-principal"' in html
+    assert '<input type="checkbox" id="menu-toggle"' not in html
+    assert '<h2 tabindex="-1">Frontera Digital</h2>' in html
+    assert '<h3>' in html and '>A</a>' in html
+    assert 'I · primaria / revisada por pares' in html
+    assert 'id="layout-status"' in html and 'aria-live="polite"' in html
+    assert 'class="marca-tiempo" data-build="1"' in html
+    assert 'Actualización atrasada' in html
+
+
 def test_copy_static_assets_publica_acerca_grafo(tmp_path, monkeypatch):
     static_dir = tmp_path / "static"
     site_dir = tmp_path / "web"
