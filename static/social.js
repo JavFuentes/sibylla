@@ -393,18 +393,26 @@ function mapearError(code, TXT) {
       b.removeAttribute('title');
     });
   }
-  document.addEventListener('click', (e) => {
-    const carta = e.target.closest('.carta');
-    if (!carta) return;
-    if (!e.target.closest('.btn-resumen, .btn-original, h4 a, .carta-img')) return;
+  function marcarLeida(carta) {
     const cardId = cardIdDe(carta);
     if (!cardId) return;
     Leidas.mark(cardId);
     const grupo = carta.querySelector('.soc-grupo');
     if (grupo) desbloquearGrupo(grupo);
+  }
+  // El reproductor de Divulgación sustituye la miniatura en el mismo clic.
+  // Su evento explícito evita depender de un target que ya fue retirado del DOM.
+  document.addEventListener('sibylla:contenido-visto', (e) => {
+    marcarLeida(e.target.closest('.carta'));
+  });
+  document.addEventListener('click', (e) => {
+    const accion = e.target.closest('.btn-resumen, .btn-original, h3 a, .carta-img');
+    if (!accion) return;
+    marcarLeida(accion.closest('.carta'));
   });
   document.querySelectorAll('.carta').forEach((carta) => {
     const cardId = cardIdDe(carta);
+    if (cardId && carta.dataset.contenidoVisto === 'true') Leidas.mark(cardId);
     if (cardId && Leidas.has(cardId)) {
       const grupo = carta.querySelector('.soc-grupo');
       if (grupo) desbloquearGrupo(grupo);

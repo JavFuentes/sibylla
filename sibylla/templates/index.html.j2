@@ -425,14 +425,15 @@
      cuando social.js carga Firebase y añade body.social-on. Sin JS o si gstatic
      falla, la página queda idéntica a la versión estática. El cardId de cada
      tarjeta es c.id ("n-"+sha256(dedup_key)[:12]), estable entre rebuilds. */
-  .soc-grupo{ display:none; margin-left:auto; align-items:center; gap:10px; }
+  .soc-grupo{ display:none; margin-left:auto; align-items:center; gap:8px; }
   body.social-on .soc-grupo{ display:inline-flex; }
-  /* Contador como inscripción bajo el botón (absoluto: no deforma el círculo
-     de 28px ni desplaza la fila cuando el número aparece). */
-  .soc-num{ position:absolute; left:50%; bottom:-12px; transform:translateX(-50%);
-    font-size:.72rem; line-height:1; color:var(--tenue);
+  /* Icono y contador forman una cápsula legible: el gap mantiene clara su
+     relación sin pegarlos ni sacar el número del flujo de la fila. */
+  .soc-btn{ position:relative; width:auto; min-width:40px; padding:0 10px;
+    display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .soc-num{ min-width:1ch; font-size:.72rem; line-height:1; color:var(--tenue);
+    text-align:center;
     font-variant-numeric:tabular-nums; pointer-events:none; }
-  .soc-btn{ position:relative; }
   .soc-btn svg{ width:16px; height:16px; }
   /* Reading gate: like/dislike nacen atenuados hasta leer la noticia */
   .soc-btn.is-locked{ opacity:.24; box-shadow:none; }
@@ -828,6 +829,7 @@
     .menu-icon{ display:flex; }
     .sesion-entrar, #sesion-chip, .sec-btn, .card-ctrl-btn, .btn-mini{ min-height:44px; }
     #sesion-chip, .sec-btn, .card-ctrl-btn{ width:44px; height:44px; }
+    .soc-btn{ width:auto; min-width:44px; padding:0 10px; }
     /* En móvil el avatar vuelve a la izquierda de la hamburguesa (order:0 +
        margin-left:auto) y el nav es un desplegable absoluto. */
     .sesion{ order:0; margin-left:auto; }
@@ -859,6 +861,7 @@
     .tema h2{ font-size:1rem; letter-spacing:.14em; }
     .tema-ctrls{ flex:0 0 100%; justify-content:flex-end; }
     .sec-btn, .card-ctrl-btn{ width:44px; height:44px; }
+    .soc-btn{ width:auto; min-width:44px; padding:0 10px; }
     .btn-mini{ min-height:44px; }
     .soc-grupo{ gap:6px; }
     .soc-btn svg{ width:14px; height:14px; }
@@ -1988,6 +1991,11 @@
       e.preventDefault();
       var id = a.dataset.videoId;
       if(!id || a.querySelector('iframe')) return;
+      var carta = a.closest('.carta');
+      if(carta){
+        carta.dataset.contenidoVisto = 'true';
+        carta.dispatchEvent(new CustomEvent('sibylla:contenido-visto', {bubbles:true}));
+      }
       var iframe = document.createElement('iframe');
       iframe.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id) + '?autoplay=1&playsinline=1';
       iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
