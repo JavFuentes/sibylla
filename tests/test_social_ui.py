@@ -26,6 +26,19 @@ def test_social_reconoce_video_visto_antes_de_cargar():
     assert "document.addEventListener('sibylla:contenido-visto'" in SOCIAL_JS
 
 
+def test_video_embebido_se_restaura_en_recarga_y_bfcache():
+    """Una recarga no debe conservar ni reanudar el iframe con autoplay."""
+    detener = "iframe.removeAttribute('src');"
+    vaciar = "a.replaceChildren();"
+
+    assert "data-video-href=" in TEMPLATE
+    assert "data-video-image=" in TEMPLATE
+    assert "function restaurarVideos()" in TEMPLATE
+    assert "window.addEventListener('pagehide', restaurarVideos);" in TEMPLATE
+    assert "window.addEventListener('pageshow', restaurarVideos);" in TEMPLATE
+    assert TEMPLATE.index(detener) < TEMPLATE.index(vaciar)
+
+
 def test_contadores_sociales_permanecen_en_flujo_con_separacion():
     """Los conteos no deben volver a quedar pegados bajo los iconos."""
     assert ".soc-btn{ position:relative; width:auto;" in TEMPLATE
