@@ -46,6 +46,10 @@ web/             # sitio estático generado — ignorado por git
 ## Convenciones
 
 - **Idioma:** comentarios y docs en **español** (coherente con el resto del repo).
+- **"Escríbelo" no autoriza implementar:** peticiones como "escríbelo", "redáctalo" o
+  "documenta el plan" significan crear o actualizar únicamente el documento solicitado.
+  No se modifica código, plantillas ni configuración hasta que el usuario pida de forma
+  explícita "impleméntalo", "haz los cambios" o un equivalente inequívoco.
 - **Modelo único:** todo fetcher devuelve `list[NewsItem]` (ver `models.py`). Normaliza fechas a UTC *aware*.
 - **Fallo aislado:** una fuente que falla solo registra un `log.warning`; **nunca** debe romper la corrida (`fetch_source` envuelve cada fuente en try/except).
 - **Tiers de confiabilidad:** 1 = primaria/peer-review, 2 = periodismo, 3 = agregador/discusión. El ranking pondera por tier.
@@ -124,9 +128,16 @@ web/             # sitio estático generado — ignorado por git
 
 El build con `--newsletter` reutiliza el contexto exacto de la portada y escribe
 `data/newsletter_edicion.json`; tras publicar `web/`, `--newsletter-send` lee
-`suscripciones/{uid}`, personaliza hasta 12 tarjetas por round-robin y envía una
-dirección por mensaje mediante SMTP. `data/newsletter_state.json` guarda solo
-uids y se flushea tras cada destinatario para reanudar sin duplicar. Cada
+`suscripciones/{uid}` y compone una edición **1+4**: una noticia destacada con
+resumen completo en español y hasta cuatro señales breves por round-robin. La
+destacada se elige por tier y posición, con rotación determinista por fecha+uid;
+si los temas del lector no tienen resumen, cae a una selección editorial global.
+Vídeos y publicaciones propias nunca son destacada. Sin resumen elegible no se
+envía un correo degradado y el uid queda pendiente para el cron de respaldo. La
+antigua síntesis de apertura se eliminó: los resúmenes ya generados para la web se
+reutilizan sin una llamada LLM adicional. El envío sigue siendo una dirección por
+mensaje mediante SMTP. `data/newsletter_state.json` guarda solo uids y se flushea
+tras cada destinatario para reanudar sin duplicar. Cada
 corrida relee Firestore: la idempotencia depende de `enviados`, no del flag
 informativo `terminado`, por lo que un alta posterior el mismo día sigue siendo
 elegible. Un fallo REST es distinto de una colección vacía y no avanza estado.

@@ -43,11 +43,9 @@
   },
 
   "newsletter": {
-    "system_prompt": "Scrivi una breve apertura quotidiana in spagnolo.",
-    "user_prompt": "Titoli:\n{items_json}",
-    "sintesis_fallback": "Oggi Sibylla ha esaminato {count} segnali da {sources} fonti.",
-    "subject": "Sibylla · {day} {month}", "subject_test": "[TEST] {subject}",
-    "saludo": "Sibylla osserva", "ver_en_sitio": "Vedi sul sito", "comentar": "Commenta",
+    "subject": "Sibylla · {title}", "subject_test": "[TEST] {subject}",
+    "destacada": "Il segnale del giorno", "seleccion_editorial": "Selezione editoriale del giorno",
+    "en_breve": "In breve", "leer_original": "Leggi la pubblicazione originale",
     "footer_baja": "Annulla iscrizione", "footer_gestion": "Cambia argomenti",
     "footer_por_que": "Ricevi questa email perché l'hai attivata su Sibylla.", "baja_mailto_asunto": "disiscrizione"
   },

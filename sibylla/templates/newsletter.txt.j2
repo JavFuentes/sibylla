@@ -1,17 +1,22 @@
 SIBYLLA
 {{ edicion.generado }}
 
-{{ t.saludo }}
-{{ edicion.sintesis | wrap72 }}
+{% if respaldo_editorial %}{{ t.seleccion_editorial | upper }}{% else %}{{ t.destacada | upper }}{% endif %} · {{ destacada.section_label | upper }}
 
-{% for seccion in secciones %}{{ seccion.label | upper }}
-{% for card in seccion.cards %}{{ card.title | wrap72 }}
-{{ card.source_name }} · {{ card.date }} · T{{ card.seal_roman }}
-{% set extracto = card.snippet or card.resumen or '' %}{% if extracto %}{{ (extracto[:260] ~ ('…' if extracto|length > 260 else '')) | wrap72 }}
-{% endif %}{{ card.url }}
-{{ t.comentar }}: {{ site_url }}/#{{ card.id }}
+{{ destacada.title | wrap72 }}
+{{ destacada.source_name }} · {{ destacada.date }} · T{{ destacada.seal_roman }}
 
-{% endfor %}{% endfor %}{{ footer_motto }}
+{{ destacada.resumen | wrap72 }}
+
+{{ t.leer_original }}: {{ destacada.url }}
+
+{% if breves %}{{ t.en_breve | upper }}
+
+{% for card in breves %}{{ card.title | wrap72 }}
+{{ card.source_name }} · {{ card.section_label }} · T{{ card.seal_roman }}
+{{ card.url }}
+
+{% endfor %}{% endif %}{{ footer_motto }}
 
 {{ t.footer_baja }}: {{ baja_url }}
 {{ t.footer_gestion }}: {{ site_url }}/?boletin=temas

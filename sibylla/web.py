@@ -1487,9 +1487,11 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # sidecar en data/: no forma parte del conjunto web que se sube por glob.
     if newsletter is not None:
         try:
-            from .newsletter import construir_sintesis, edicion_desde_contexto, escribir_edicion
-            sintesis = construir_sintesis(ctx, tracker=translate_tracker)
-            newsletter.update(edicion_desde_contexto(ctx, sintesis=sintesis))
+            from .newsletter import cobertura_resumenes, edicion_desde_contexto, escribir_edicion
+            newsletter.update(edicion_desde_contexto(ctx))
+            con_resumen, elegibles = cobertura_resumenes(newsletter.get("secciones") or [])
+            log.info("boletín: resúmenes elegibles %s/%s tarjetas visibles",
+                     con_resumen, elegibles)
             escribir_edicion(newsletter)
         except Exception as ex:  # noqa: BLE001 - fallo aislado del build
             log.warning("boletín: no se pudo construir la edición (%s)", ex)

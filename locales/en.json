@@ -43,11 +43,9 @@
   },
 
   "newsletter": {
-    "system_prompt": "Write one short daily newsletter opening in Spanish.",
-    "user_prompt": "Headlines:\n{items_json}",
-    "sintesis_fallback": "Sibylla reviewed {count} signals from {sources} sources today.",
-    "subject": "Sibylla · {day} {month}", "subject_test": "[TEST] {subject}",
-    "saludo": "Sibylla observes", "ver_en_sitio": "View on site", "comentar": "Comment",
+    "subject": "Sibylla · {title}", "subject_test": "[TEST] {subject}",
+    "destacada": "The signal of the day", "seleccion_editorial": "Editorial selection of the day",
+    "en_breve": "In brief", "leer_original": "Read the original publication",
     "footer_baja": "Unsubscribe", "footer_gestion": "Change my topics",
     "footer_por_que": "You receive this because you enabled it in Sibylla.", "baja_mailto_asunto": "unsubscribe"
   },

@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, parseaddr
+import hashlib
 import json
 import logging
 import os
@@ -20,7 +21,7 @@ import smtplib
 import ssl
 import textwrap
 import time
-from typing import Any, Iterable
+from typing import Iterable
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -28,7 +29,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .config import ROOT, get_site_url, load_env
 from .i18n import load_translations, t
-from .llm import get_provider
 from .suscriptores import Suscriptor
 
 log = logging.getLogger("sibylla")
@@ -39,17 +39,18 @@ TEMAS_VALIDOS = ("nacional", "ai", "medicine", "astronomia", "divulgacion")
 SECCION_FIJA = "sibylla"
 MAX_POR_TEMA = 3
 MAX_TARJETAS = 12
+MAX_BREVES = 4
+MAX_RESUMEN_DESTACADA = 1500
+MAX_ASUNTO = 65
 CAMPOS_TARJETA = (
     "id", "url", "title", "source_name", "date", "snippet", "resumen",
     "seal_roman", "is_video",
 )
 EDICION_PATH = ROOT / "data" / "newsletter_edicion.json"
 ESTADO_PATH = ROOT / "data" / "newsletter_state.json"
-EDICION_SCHEMA = "cl.sibylla.newsletter_edicion.v1"
+EDICION_SCHEMA = "cl.sibylla.newsletter_edicion.v2"
 ESTADO_SCHEMA = "cl.sibylla.newsletter_state.v1"
 TZ = ZoneInfo("America/Santiago")
-MESES_ES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-            "agosto", "septiembre", "octubre", "noviembre", "diciembre")
 
 
 def _hoy() -> str:
@@ -69,7 +70,7 @@ def _secciones_contexto(ctx: dict) -> list[tuple[str, str, list[dict]]]:
             if sid in (*TEMAS_VALIDOS, SECCION_FIJA) and cards]
 
 
-def edicion_desde_contexto(ctx: dict, *, sintesis: str, fecha: str | date | None = None) -> dict:
+def edicion_desde_contexto(ctx: dict, *, fecha: str | date | None = None) -> dict:
     """Crea la edición podada desde las mismas tarjetas de la portada."""
     if isinstance(fecha, date):
         fecha_s = fecha.isoformat()
@@ -79,15 +80,10 @@ def edicion_desde_contexto(ctx: dict, *, sintesis: str, fecha: str | date | None
     for sid, label, cards in _secciones_contexto(ctx):
         podadas = [{k: card.get(k) for k in CAMPOS_TARJETA} for card in cards]
         secciones.append({"id": sid, "label": label, "cards": podadas})
-    fallback = t(load_translations("es"), "newsletter.sintesis_fallback",
-                 count=ctx.get("total", 0), sources=ctx.get("n_fuentes", 0))
-    sintesis_limpia = (sintesis or fallback).strip()
     return {
         "schema": EDICION_SCHEMA,
         "fecha": fecha_s,
         "generado": ctx.get("generado", ""),
-        "sintesis": sintesis_limpia,
-        "sintesis_llm": sintesis_limpia != fallback,
         "total": int(ctx.get("total", 0) or 0),
         "n_fuentes": int(ctx.get("n_fuentes", 0) or 0),
         "site_url": ctx.get("site_url") or get_site_url(),
@@ -113,41 +109,6 @@ def cargar_edicion(path: Path | str = EDICION_PATH) -> dict | None:
         return data
     except (OSError, ValueError, AttributeError):
         return None
-
-
-def construir_sintesis(ctx: dict, *, tracker: list[dict] | None = None) -> str:
-    """Genera una síntesis global; ante cualquier fallo usa texto determinista."""
-    tr = load_translations("es")
-    fallback = t(tr, "newsletter.sintesis_fallback",
-                 count=ctx.get("total", 0), sources=ctx.get("n_fuentes", 0))
-    filas: list[str] = []
-    for _sid, label, cards in _secciones_contexto(ctx):
-        for card in cards:
-            if len(filas) >= 30:
-                break
-            filas.append(f"{label}: {card.get('title', '')}")
-    try:
-        provider = get_provider()
-        if provider is None:
-            return fallback
-        system = t(tr, "newsletter.system_prompt")
-        user = t(tr, "newsletter.user_prompt", items_json="\n".join(filas))
-        resp = provider.complete(system, user, max_tokens=400, temperature=0.5)
-        texto = (resp.text or "").strip()
-        if not texto:
-            return fallback
-        if tracker is not None:
-            usage = resp.usage or {}
-            tracker.append({
-                "purpose": "newsletter_sintesis",
-                "model": f"{provider.name}:{provider.model}",
-                "input": usage.get("input", 0),
-                "output": usage.get("output", 0),
-            })
-        return texto
-    except Exception as ex:  # noqa: BLE001 - degradación obligatoria a fallback
-        log.warning("boletín: síntesis LLM no disponible (%s); uso fallback", ex)
-        return fallback
 
 
 def repartir(secciones: Iterable[dict], temas: Iterable[str], *,
@@ -176,6 +137,129 @@ def repartir(secciones: Iterable[dict], temas: Iterable[str], *,
     return [elegidas[sid] for sid in orden if elegidas[sid]["cards"]]
 
 
+def cobertura_resumenes(secciones: Iterable[dict]) -> tuple[int, int]:
+    """Devuelve (con resumen, elegibles) sin contar vídeos ni publicaciones propias."""
+    elegibles = [
+        card
+        for seccion in secciones
+        if seccion.get("id") != SECCION_FIJA
+        for card in (seccion.get("cards") or [])
+        if not card.get("is_video")
+    ]
+    return sum(bool(str(c.get("resumen") or "").strip()) for c in elegibles), len(elegibles)
+
+
+def _tier(card: dict) -> int:
+    return {"I": 1, "II": 2, "III": 3}.get(str(card.get("seal_roman") or ""), 4)
+
+
+def _candidatas(secciones: Iterable[dict]) -> list[dict]:
+    candidatas: list[dict] = []
+    for seccion in secciones:
+        sid = str(seccion.get("id") or "")
+        if sid == SECCION_FIJA:
+            continue
+        for posicion, card in enumerate(seccion.get("cards") or []):
+            resumen = str(card.get("resumen") or "").strip()
+            if not resumen or card.get("is_video"):
+                continue
+            candidatas.append({
+                **dict(card),
+                "section_id": sid,
+                "section_label": seccion.get("label", sid),
+                "position": posicion,
+            })
+    return candidatas
+
+
+def _indice_rotacion(fecha: str, uid: str, total: int) -> int:
+    if total <= 1:
+        return 0
+    semilla = f"{fecha}\0{uid}".encode("utf-8", errors="replace")
+    return int.from_bytes(hashlib.sha256(semilla).digest()[:8], "big") % total
+
+
+def _elegir_destacada(secciones: Iterable[dict], *, fecha: str, uid: str) -> dict | None:
+    """Elige por confianza/posición y rota la sección en los empates de mayor calidad."""
+    candidatas = _candidatas(secciones)
+    if not candidatas:
+        return None
+    mejor_tier = min(_tier(c) for c in candidatas)
+    candidatas = [c for c in candidatas if _tier(c) == mejor_tier]
+    mejor_posicion = min(int(c["position"]) for c in candidatas)
+    candidatas = [c for c in candidatas if int(c["position"]) == mejor_posicion]
+    ids_seccion = sorted({str(c["section_id"]) for c in candidatas})
+    sid = ids_seccion[_indice_rotacion(fecha, uid, len(ids_seccion))]
+    return min((c for c in candidatas if c["section_id"] == sid),
+               key=lambda c: str(c.get("id") or ""))
+
+
+def _limitar_resumen(texto: str, limite: int = MAX_RESUMEN_DESTACADA) -> str:
+    limpio = re.sub(r"\s+", " ", str(texto or "")).strip()
+    if len(limpio) <= limite:
+        return limpio
+    tramo = limpio[:limite + 1]
+    finales = [tramo.rfind(marca) for marca in (". ", "! ", "? ")]
+    corte = max(finales)
+    if corte >= limite // 2:
+        return tramo[:corte + 1].strip()
+    corte_palabra = tramo.rfind(" ", 0, limite)
+    return tramo[:corte_palabra if corte_palabra > 0 else limite].rstrip(" ,;:") + "…"
+
+
+def _cards_breves(secciones: list[dict], destacada: dict, *,
+                   max_breves: int = MAX_BREVES) -> list[dict]:
+    temas = [s for s in secciones if s.get("id") != SECCION_FIJA]
+    fija = next((s for s in secciones if s.get("id") == SECCION_FIJA), None)
+    sid_destacada = destacada.get("section_id")
+    if temas and any(s.get("id") == sid_destacada for s in temas):
+        indice = next(i for i, s in enumerate(temas) if s.get("id") == sid_destacada)
+        temas = temas[indice + 1:] + temas[:indice + 1]
+
+    breves: list[dict] = []
+    id_destacada = destacada.get("id")
+    rondas = max((len(s.get("cards") or []) for s in temas), default=0)
+    if fija:
+        rondas = max(rondas, len(fija.get("cards") or []))
+    for ronda in range(rondas):
+        for seccion in temas:
+            cards = seccion.get("cards") or []
+            if ronda >= len(cards) or cards[ronda].get("id") == id_destacada:
+                continue
+            breves.append({**dict(cards[ronda]),
+                            "section_id": seccion.get("id", ""),
+                            "section_label": seccion.get("label", "")})
+            if len(breves) >= max_breves:
+                return breves
+        if fija:
+            cards_fijas = fija.get("cards") or []
+            if ronda < len(cards_fijas) and cards_fijas[ronda].get("id") != id_destacada:
+                breves.append({**dict(cards_fijas[ronda]),
+                                "section_id": fija.get("id", ""),
+                                "section_label": fija.get("label", "")})
+                if len(breves) >= max_breves:
+                    return breves
+    return breves
+
+
+def componer_boletin(secciones_personales: list[dict], secciones_globales: list[dict], *,
+                     fecha: str, uid: str, max_breves: int = MAX_BREVES) -> dict | None:
+    """Compone una destacada resumida y hasta cuatro señales personalizadas."""
+    destacada = _elegir_destacada(secciones_personales, fecha=fecha, uid=uid)
+    respaldo_editorial = destacada is None
+    if destacada is None:
+        destacada = _elegir_destacada(secciones_globales, fecha=fecha, uid=uid)
+    if destacada is None:
+        return None
+    destacada = dict(destacada)
+    destacada["resumen"] = _limitar_resumen(destacada.get("resumen") or "")
+    return {
+        "destacada": destacada,
+        "breves": _cards_breves(secciones_personales, destacada, max_breves=max_breves),
+        "respaldo_editorial": respaldo_editorial,
+    }
+
+
 def _env_plantillas() -> Environment:
     env = Environment(
         loader=FileSystemLoader(str(ROOT / "sibylla" / "templates")),
@@ -187,31 +271,53 @@ def _env_plantillas() -> Environment:
     return env
 
 
-def render_correo(edicion: dict, secciones: list[dict], *, site_url: str,
+def _normalizar_card(card: dict, base: str) -> dict:
+    copia = dict(card)
+    url = str(copia.get("url") or "")
+    if url and not url.startswith(("http://", "https://")):
+        copia["url"] = f"{base}/{url.lstrip('/')}"
+    elif not url:
+        copia["url"] = f"{base}/#{copia.get('id', '')}"
+    return copia
+
+
+def _acortar(texto: str, limite: int) -> str:
+    limpio = re.sub(r"\s+", " ", str(texto or "")).strip()
+    if len(limpio) <= limite:
+        return limpio
+    corte = limpio.rfind(" ", 0, max(1, limite - 1))
+    return limpio[:corte if corte > 0 else limite - 1].rstrip(" ,;:") + "…"
+
+
+def construir_asunto(title: str, *, prueba: bool = False) -> str:
+    """Construye un Subject informativo, acotado y sin posibilidad de CR/LF."""
+    tr = load_translations("es")
+    prefijo = t(tr, "newsletter.subject", title="")
+    prefijo_prueba = t(tr, "newsletter.subject_test", subject="") if prueba else ""
+    espacio = max(8, MAX_ASUNTO - len(prefijo_prueba) - len(prefijo))
+    asunto = t(tr, "newsletter.subject", title=_acortar(title, espacio))
+    if prueba:
+        asunto = t(tr, "newsletter.subject_test", subject=asunto)
+    return _acortar(asunto, MAX_ASUNTO)
+
+
+def render_correo(edicion: dict, composicion: dict, *, site_url: str,
                   baja_url: str, baja_mailto: str) -> tuple[str, str]:
     tr = load_translations("es")
     base = site_url.rstrip("/")
-    normalizadas: list[dict] = []
-    for seccion in secciones:
-        copia = {**seccion, "cards": []}
-        for card in seccion.get("cards") or []:
-            c = dict(card)
-            url = str(c.get("url") or "")
-            if url and not url.startswith(("http://", "https://")):
-                c["url"] = f"{base}/{url.lstrip('/')}"
-            elif not url:
-                c["url"] = f"{base}/#{c.get('id', '')}"
-            copia["cards"].append(c)
-        normalizadas.append(copia)
+    destacada = _normalizar_card(composicion["destacada"], base)
+    breves = [_normalizar_card(c, base) for c in composicion.get("breves") or []]
     ctx = {
         "edicion": edicion,
-        "secciones": normalizadas,
+        "destacada": destacada,
+        "breves": breves,
+        "respaldo_editorial": bool(composicion.get("respaldo_editorial")),
         "site_url": base,
         "baja_url": baja_url,
         "baja_mailto": baja_mailto,
         "t": tr["newsletter"],
         "footer_motto": tr["web"]["footer_motto"],
-        "preheader": (edicion.get("sintesis") or "")[:90],
+        "preheader": _acortar(destacada.get("resumen") or "", 140),
     }
     env = _env_plantillas()
     html = env.get_template("newsletter.html.j2").render(**ctx)
@@ -379,10 +485,7 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
     baja_url = f"{site_url.rstrip('/')}/?boletin=baja"
     baja_mailto = ("mailto:baja@sibylla.cl?subject=" +
                    quote(tr["newsletter"]["baja_mailto_asunto"]))
-    fecha = datetime.fromisoformat(edicion["fecha"]).date()
-    asunto = t(tr, "newsletter.subject", day=fecha.day, month=MESES_ES[fecha.month - 1])
-    if asunto_prueba:
-        asunto = t(tr, "newsletter.subject_test", subject=asunto)
+    fecha = str(edicion["fecha"])
     todos = list(suscriptores)
     for clave in ("enviados", "fallidos", "omitidos"):
         estado.setdefault(clave, [])
@@ -394,27 +497,42 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
     reconexiones = 0
     fatal = False
     try:
-        if not dry_run and lista:
-            conn = _abrir_smtp(cfg)
         for pos, suscriptor in enumerate(lista):
             secciones = repartir(edicion.get("secciones") or [], suscriptor.temas)
-            if not any(s["cards"] for s in secciones):
+            composicion = componer_boletin(
+                secciones,
+                edicion.get("secciones") or [],
+                fecha=fecha,
+                uid=suscriptor.uid,
+            )
+            if composicion is None:
+                if dry_run:
+                    log.info("boletín dry-run: uid=%s omitido; edición sin resumen elegible",
+                             suscriptor.uid[:6])
+                    continue
                 if suscriptor.uid not in estado["omitidos"]:
                     estado["omitidos"].append(suscriptor.uid)
                 guardar_estado(estado, estado_path)
+                log.warning("boletín: omitido uid=%s; edición sin resumen elegible",
+                            suscriptor.uid[:6])
                 continue
             try:
-                html, texto = render_correo(edicion, secciones, site_url=site_url,
+                html, texto = render_correo(edicion, composicion, site_url=site_url,
                                             baja_url=baja_url, baja_mailto=baja_mailto)
+                asunto = construir_asunto(
+                    composicion["destacada"].get("title") or "",
+                    prueba=asunto_prueba,
+                )
                 msg = construir_mensaje(suscriptor.email, asunto, html, texto,
                                         remitente=cfg.remitente, baja_url=baja_url,
                                         baja_mailto=baja_mailto)
                 if dry_run:
                     log.info("boletín dry-run: uid=%s destino=%s tarjetas=%s bytes=%s",
                              suscriptor.uid[:6], _enmascarar(suscriptor.email),
-                             sum(len(s["cards"]) for s in secciones), len(msg.as_bytes()))
+                             1 + len(composicion["breves"]), len(msg.as_bytes()))
                     continue
-                assert conn is not None
+                if conn is None:
+                    conn = _abrir_smtp(cfg)
                 conn.send_message(msg)
                 _log_aceptacion(conn, suscriptor.uid)
             except smtplib.SMTPServerDisconnected:
@@ -493,7 +611,7 @@ def enviar_boletin_cli() -> int:
             elif resultado_prueba.get("enviados"):
                 log.warning("boletín prueba: mensaje aceptado por el servidor SMTP")
             elif resultado_prueba.get("omitidos"):
-                log.warning("boletín prueba: omitido porque la edición no tiene tarjetas")
+                log.warning("boletín prueba: omitido porque la edición no tiene resumen elegible")
             else:
                 errores = resultado_prueba.get("fallidos") or []
                 causa = errores[0].get("error", "desconocida") if errores else "desconocida"
