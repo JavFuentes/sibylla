@@ -8,6 +8,9 @@ fetchers/LLM del proyecto.
 """
 
 import json
+import logging
+import re
+
 from sibylla.models import LLMResponse
 
 import pytest
@@ -251,11 +254,59 @@ def test_translate_cards_trocea_en_lotes(monkeypatch):
     assert fake.calls == 2  # 2 chunks -> 2 llamadas, sin reintentos
 
 
-def test_translate_cards_truncamiento_no_reintenta(monkeypatch):
-    """Si el output pega max_tokens (JSON cortado), no se reintenta el lote: 1 sola llamada."""
-    cards = [{"id": "u:1", "title": "A", "snippet": "a"},
-             {"id": "u:2", "title": "B", "snippet": "b"}]
-    fake = _TruncFakeProvider()
+class _BisectFakeProvider:
+    """Trunca cualquier lote de más de `umbral` tarjetas; los menores responden bien."""
+    name = "fake"
+    model = "fake-1"
+
+    def __init__(self, umbral: int = 1):
+        self.umbral = umbral
+        self.calls = 0
+        self.tamanos: list[int] = []
+
+    def complete(self, system, user, **kwargs):
+        self.calls += 1
+        mt = kwargs.get("max_tokens", 6000)
+        # El lote viaja en el prompt de usuario como JSON: recuperamos sus ids.
+        ids = re.findall(r'"id": "([^"]+)"', user)
+        self.tamanos.append(len(ids))
+        if len(ids) > self.umbral:
+            # JSON a medias (sin cerrar) + output == tope -> señal de truncamiento.
+            return LLMResponse(text='[{"id": "%s", "title": "Cor' % ids[0],
+                               usage={"input": 100, "output": mt})
+        filas = [{"id": i, "title": "T" + i, "snippet": "s" + i} for i in ids]
+        return LLMResponse(text=json.dumps(filas), usage={"input": 100, "output": 50})
+
+
+def test_translate_cards_truncamiento_bisecta(monkeypatch):
+    """Un lote que trunca se parte en mitades hasta recuperar todas las tarjetas."""
+    cards = [{"id": f"u:{i}", "title": f"T{i}", "snippet": f"s{i}"} for i in range(1, 5)]
+    fake = _BisectFakeProvider(umbral=2)  # lotes de 4 truncan; los de 2 no
     monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
     out = translate_cards(cards, "pt", {}, max_tokens=6000)
-    assert out == {} and fake.calls == 1  # truncó -> break, sin reintento
+    assert set(out) == {"u:1", "u:2", "u:3", "u:4"}  # ninguna cae al original
+    assert out["u:1"] == {"title": "Tu:1", "snippet": "su:1"}
+    assert fake.tamanos == [4, 2, 2]  # 1 lote truncado + sus dos mitades
+
+
+def test_translate_cards_truncamiento_recursivo(monkeypatch):
+    """La bisección es recursiva: si una mitad vuelve a truncar, se parte otra vez."""
+    cards = [{"id": f"u:{i}", "title": f"T{i}", "snippet": f"s{i}"} for i in range(1, 5)]
+    fake = _BisectFakeProvider(umbral=1)  # solo los lotes de 1 responden
+    monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
+    out = translate_cards(cards, "pt", {}, max_tokens=6000)
+    assert set(out) == {"u:1", "u:2", "u:3", "u:4"}
+    assert fake.tamanos == [4, 2, 1, 1, 2, 1, 1]
+
+
+def test_translate_cards_truncamiento_tarjeta_unica(monkeypatch, caplog):
+    """Una tarjeta que trunca ella sola no tiene qué partir: cae al original con su id."""
+    cards = [{"id": "u:1", "title": "A", "snippet": "a"},
+             {"id": "u:2", "title": "B", "snippet": "b"}]
+    fake = _TruncFakeProvider()  # trunca siempre, sea cual sea el tamaño
+    monkeypatch.setattr("sibylla.translate.get_provider", lambda: fake)
+    with caplog.at_level(logging.WARNING, logger="sibylla"):
+        out = translate_cards(cards, "pt", {}, max_tokens=6000)
+    assert out == {}  # ninguna se pudo traducir
+    assert fake.calls == 3  # el lote de 2 + sus dos mitades de 1
+    assert "u:1" in caplog.text and "u:2" in caplog.text  # ids registrados
