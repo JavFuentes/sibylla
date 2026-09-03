@@ -716,12 +716,18 @@ def _render_jsonld(site_url: str, description: str,
     if cards:
         items_json: list[str] = []
         for i, c in enumerate(cards, start=1):
+            # schema.org exige ISO 8601. `date` es el texto de presentación
+            # ("24 ago 2026"), que no es una fecha válida; `published` sí lo es.
+            # Sin fecha conocida se omite la propiedad en vez de emitir una
+            # inválida.
+            fecha_iso = str(c.get("published") or "")
+            publicada = f'"datePublished":"{esc(fecha_iso)}",' if fecha_iso else ""
             item = (
                 '{"@type":"ListItem","position":' + str(i) + ','
                 '"item":{"@type":"NewsArticle",'
                 f'"headline":"{esc(c["title"])}",'
                 f'"url":"{esc(c["url"])}",'
-                f'"datePublished":"{esc(c["date"])}",'
+                f'{publicada}'
                 '"sourceOrganization":{"@type":"Organization",'
                 f'"name":"{esc(c["source_name"])}"'
                 '},'

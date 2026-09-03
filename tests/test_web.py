@@ -4,6 +4,7 @@ Cubre _snippet (corte en palabra, elipsis), _fecha / _instante (formato de
 fechas), _agrupar (orden y "otros" al final), y _assert_min_items.
 """
 
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -308,6 +309,28 @@ def test_es_espanol_sin_registro_legible(monkeypatch):
     monkeypatch.setattr(web_mod, "_idiomas_por_fuente", lambda: {})
     card = _tarjeta(_item(source_id="cata"), MESES_ES, NO_DATE_ES)
     assert card["es_espanol"] is False
+
+
+# ---------------------------------------------------------------------------
+# _render_jsonld (datePublished en ISO 8601, como exige schema.org)
+# ---------------------------------------------------------------------------
+def _jsonld_articles(cards):
+    """Devuelve los NewsArticle del bloque ItemList ya parseados."""
+    bloques = web_mod._render_jsonld("https://sibylla.cl", "desc", cards, "es").split("\n")
+    lista = json.loads(bloques[1])
+    return [e["item"] for e in lista["itemListElement"]]
+
+
+def test_jsonld_date_published_en_iso():
+    """No el texto de presentación ('21 jun 2026'), que no es una fecha válida."""
+    card = _tarjeta(_item(published=FECHA), MESES_ES, NO_DATE_ES)
+    assert _jsonld_articles([card])[0]["datePublished"] == "2026-06-21T00:00:00Z"
+
+
+def test_jsonld_omite_date_published_sin_fecha():
+    """Sin fecha conocida se omite la propiedad, en vez de emitir una inválida."""
+    card = _tarjeta(_item(published=None), MESES_ES, NO_DATE_ES)
+    assert "datePublished" not in _jsonld_articles([card])[0]
 
 
 # ---------------------------------------------------------------------------

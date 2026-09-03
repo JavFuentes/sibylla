@@ -1,8 +1,12 @@
 # PLAN-BOLETIN-FRESCURA-IDIOMA.md — La destacada debe ser del día y estar en español
 
-> **Estado:** propuesta. Diagnóstico verificado contra el código y contra los logs
-> del run `33539752377` (cron del 1 de septiembre de 2026), que es la corrida que
-> produjo el correo objetado. Ningún cambio aplicado todavía.
+> **Estado:** aplicado en código el 3 de septiembre de 2026, pendiente de verificar
+> contra una corrida real (§7.5 en adelante). Diagnóstico verificado contra el
+> código y contra los logs del run `33539752377` (cron del 1 de septiembre de
+> 2026), que es la corrida que produjo el correo objetado.
+>
+> Commits: `e6b22d7` (§4.6, aislado) y `ec69b67` (§4.1–4.5 y §4.7). El hallazgo
+> lateral de §10 se arregló aparte. La suite pasa con 605 tests.
 
 ## 1. Qué salió mal
 
@@ -110,6 +114,11 @@ el autor no puede escribirse sin añadir antes esa marca.
 
 `"date"` se conserva: es el texto que ya usan las plantillas.
 
+**Aplicado.** Con dos precisiones sobre lo escrito arriba: la función se llama
+`web._tarjeta()`, no `_card()` (el nombre antiguo aparece también en §4.4), y el
+valor se emite con el helper `_iso()` que ya existía en `web.py`, que normaliza a
+UTC con sufijo `Z`.
+
 ### 4.2 Bandas de frescura para la destacada (`newsletter.py`)
 
 La antigüedad se mide en **días de calendario de Santiago**, no en horas, para que
@@ -133,6 +142,8 @@ exactamente lo que pide el autor.
 Las tarjetas sin `published` (fecha desconocida, «s/f») quedan fuera de las
 candidatas a destacada: no se puede afirmar que sean del día.
 
+**Aplicado** en `_bandas_frescura()` + `_elegir_destacada()`.
+
 ### 4.3 Tope de antigüedad para las señales breves (`newsletter.py`)
 
 Las breves no necesitan ser del día —su función es descubrir— pero tampoco pueden ser
@@ -146,6 +157,16 @@ de hace un mes. En `_cards_breves()`:
 
 Si tras el filtro hay menos de cuatro breves, el correo sale con las que haya. La
 destacada es la que sostiene la edición.
+
+**Aplicado** en `_breve_es_fresca()` (constante `MAX_DIAS_BREVE`), con dos
+decisiones que este plan no cubría:
+
+- Una **breve noticiosa sin `published` se descarta**, por coherencia con la regla
+  de la destacada: no se puede demostrar que sea reciente. Aquí el plan solo
+  hablaba de la destacada.
+- Una tarjeta con **fecha futura no se descarta**: el tope es
+  `(día de la edición − publicada) ≤ 7`, sin cota inferior, para que un desfase de
+  zona horaria no elimine material fresco.
 
 ### 4.4 Marca de idioma en la tarjeta (`web.py`)
 
@@ -174,6 +195,14 @@ LLM sigue teniendo las 53 fuentes en español disponibles.
 El campo se calcula con `config.load_registry()` + `index_by_id()`, resueltos una vez
 por build y no por tarjeta.
 
+**Aplicado** en `web._es_espanol()`, con `_idiomas_por_fuente()` cacheada con
+`lru_cache(maxsize=1)`. Correcciones al conteo de arriba: el registro tiene hoy
+**98 fuentes, 54 en español** (53 `es` + 1 `es-419`), no 97/53. Si el registro no
+se puede leer, se registra un warning y **nada** se da por español. El APOD no
+necesita caso propio: su título en español se inyecta en `translations` en
+`build_all_sites`, así que la regla «hay traducción» ya lo cubre, y cuando esa
+inyección falla no hay entrada y la tarjeta queda marcada como no española.
+
 ### 4.5 Filtro de idioma en el boletín (`newsletter.py`)
 
 - `_candidatas()` descarta toda tarjeta con `es_espanol` falso: nunca será destacada.
@@ -184,6 +213,10 @@ El sitio sí lo llevará hasta la siguiente corrida; eso lo ataca 4.6.
 
 Compatibilidad: si el campo no existe (edición de un build anterior), se trata como
 **verdadero**, para que un despliegue a medias no vacíe el boletín.
+
+**Aplicado** en `newsletter._es_espanol()`. La compatibilidad cubre tanto la clave
+ausente como el valor `None`, que es lo que deja la poda de `CAMPOS_TARJETA` si la
+tarjeta viniera de un `web.py` anterior.
 
 ### 4.6 Causa raíz: bisecar el lote truncado (`translate.py`)
 
@@ -201,6 +234,10 @@ traducir cada una por separado, recursivamente, hasta un lote de tamaño 1:
 Este cambio beneficia al sitio tanto como al boletín, y es independiente de todo lo
 anterior: puede implementarse y desplegarse solo.
 
+**Aplicado** en `e6b22d7`. La recursión vive en `_traducir_lote()`, que separa las
+dos causas que antes compartían bucle: las omisiones del modelo se reintentan una
+vez y el truncamiento bisecta. El commit no toca el boletín.
+
 ### 4.7 Observabilidad
 
 Junto a la línea que ya existe (`boletín: resúmenes elegibles 22/24`), registrar en
@@ -216,6 +253,9 @@ medir cuánto material pierde el filtro de idioma, y alimentar con datos reales 
 umbral de la política «sin resumen, no se envía» que quedó pendiente en
 [PLAN-BOLETIN-EDITORIAL.md](PLAN-BOLETIN-EDITORIAL.md).
 
+**Aplicado** en `newsletter.diagnostico_candidatas()`, que emite `web.py` junto a la
+línea de cobertura de resúmenes.
+
 ## 5. Qué pasa si no hay destacada fresca
 
 `componer_boletin()` devuelve `None`, que es el camino que el código ya recorre
@@ -230,6 +270,9 @@ Si a esa hora tampoco hay nada del día ni del anterior, ese día no sale correo
 consecuencia deliberada de la regla que pide el autor, y es preferible a enviar una
 edición que incumple su propia promesa. Debe emitirse un `::warning::` visible en el
 run para que la ausencia de correo nunca sea silenciosa.
+
+**Aplicado**: `enviar()` cuenta los omitidos y emite **un** aviso agregado por
+corrida (no uno por suscriptor), que también sale en dry-run.
 
 ## 6. Riesgos
 
@@ -274,6 +317,21 @@ run para que la ausencia de correo nunca sea silenciosa.
    ausencia de inglés, cuatro breves o menos.
 7. Solo entonces, cron normal.
 
+**Puntos 1 a 4: hechos.** La suite quedó en **605 tests** (553 antes del formato
+editorial, 587 tras §4.1/§4.4, 603 tras §4.2/§4.3/§4.5/§4.7 y 605 con §10). Además
+de lo listado arriba se cubrió: frescura medida en horario de Santiago (23:00 CLT
+del día 25 es 26 UTC y sigue siendo «hoy»); breve de 7 días justos conservada;
+breve noticiosa sin fecha descartada; publicación propia antigua conservada; el
+diagnóstico de §4.7; y el `::warning::` de §5 en dry-run.
+
+Un test existente hubo que ajustarlo:
+`test_rotacion_destacada_es_determinista_y_varia` recorría fechas del 20 al 29 de
+julio con tarjetas fijadas al 25, así que casi todas caían fuera de banda. Ahora
+cada edición usa tarjetas publicadas ese día; comprueba lo mismo que antes.
+
+**Puntos 5 a 7: pendientes.** No se ha hecho ninguna corrida real, ni dry-run ni
+envío de prueba. Nada se ha subido a `origin`.
+
 ## 8. Criterios de aceptación
 
 - La destacada es del día de la edición o, como máximo, del día anterior.
@@ -299,9 +357,15 @@ run para que la ausencia de correo nunca sea silenciosa.
 4. **4.7** (observabilidad) junto con el punto 3.
 5. Dry-run, destinatario de prueba y cron normal, en ese orden.
 
-## 10. Hallazgo lateral, fuera de alcance
+Los puntos 1 a 4 están hechos, en dos commits: `e6b22d7` (§4.6, aislado y
+desplegable solo) y `ec69b67` (todo lo demás). El punto 5 sigue pendiente.
 
-`web.py:679` emite el JSON-LD con `"datePublished":"24 ago 2026"`, que no es una
-fecha válida para schema.org: debería ser ISO 8601. El campo `published` que añade
-4.1 lo dejaría a un cambio de una línea. No forma parte de este plan; queda anotado
-para decidirlo aparte.
+## 10. Hallazgo lateral
+
+`_render_jsonld()` emitía el JSON-LD con `"datePublished":"24 ago 2026"`, que no es
+una fecha válida para schema.org: debería ser ISO 8601. El campo `published` que
+añade 4.1 lo dejó a un cambio de una línea.
+
+**Arreglado** por decisión posterior, fuera de los dos commits del plan: ahora usa
+`published` y, cuando la tarjeta no tiene fecha, **omite la propiedad** en vez de
+emitir una inválida. Dos tests en `tests/test_web.py` lo cubren.
