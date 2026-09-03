@@ -24,12 +24,14 @@ import json
 import logging
 import random as _random
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from .apod import APOD_SOURCE_ID, build_apod_card, build_apod_i18n, fetch_apod
-from .config import ROOT, get_google_verification, get_nasa_api_key, get_site_url, load_env, load_social_config
+from .config import (ROOT, get_google_verification, get_nasa_api_key, get_site_url,
+                     index_by_id, load_env, load_registry, load_social_config)
 from .i18n import load_translations, t
 from .models import NewsItem
 from .pipeline import _score, _social_score
@@ -445,6 +447,44 @@ def _label(topic: str, topic_labels: dict[str, str]) -> str:
     return topic_labels.get(topic, topic.replace("_", " ").capitalize())
 
 
+# Códigos de `lang` en config/sources.yaml que ya publican en español.
+_LANGS_ES = {"es", "es-419"}
+# Fuentes en español que NO están en el registro (se construyen en código).
+_FUENTES_ES_FUERA_DEL_REGISTRO = {"sibylla"}
+
+
+@lru_cache(maxsize=1)
+def _idiomas_por_fuente() -> dict[str, str]:
+    """{source_id: lang} del registro de fuentes, resuelto UNA vez por build."""
+    try:
+        _meta, sources = load_registry()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("No se pudo leer el idioma de las fuentes (%s); se asume no español.", exc)
+        return {}
+    return {sid: (src.lang or "").lower() for sid, src in index_by_id(sources).items()}
+
+
+def _es_espanol(it: NewsItem, tr: dict | None) -> bool:
+    """¿El texto que se publica de esta tarjeta está en español?
+
+    Combina dos señales a propósito:
+
+    - **La fuente ya publica en español** (`lang: es` / `es-419` en el registro).
+    - **Se aplicó traducción** (`tr` no es None), que es lo que salva a las
+      fuentes en inglés y al APOD (su título ES se inyecta como traducción en
+      `build_all_sites`; si esa inyección falla, no hay `tr` y queda en inglés).
+
+    Usar solo la segunda dejaría TODAS las tarjetas marcadas como no españolas
+    en una corrida sin proveedor LLM, y el boletín se quedaría sin material.
+    La sección SIBYLLA se escribe en español y no vive en el registro.
+    """
+    if tr is not None:
+        return True
+    if it.source_id in _FUENTES_ES_FUERA_DEL_REGISTRO:
+        return True
+    return _idiomas_por_fuente().get(it.source_id, "") in _LANGS_ES
+
+
 def _tarjeta(it: NewsItem, months: list[str], no_date: str,
              translations: dict | None = None,
              resumenes: dict | None = None,
@@ -474,6 +514,11 @@ def _tarjeta(it: NewsItem, months: list[str], no_date: str,
         "title": title,
         "source_name": it.source_name,
         "date": _fecha(it.published, months, no_date),
+        # `date` es el texto de presentación ("24 ago 2026"); `published` es la
+        # misma fecha en ISO 8601 UTC, que es lo único filtrable aguas abajo
+        # (frescura de la destacada en newsletter.py, JSON-LD del sitio).
+        "published": _iso(it.published) or "",
+        "es_espanol": _es_espanol(it, tr),
         "seal_roman": roman,
         "seal_class": clase,
         "seal_color": color,
@@ -1487,11 +1532,16 @@ def build_all_sites(items: list[NewsItem], topics: list[str], meta: dict,
     # sidecar en data/: no forma parte del conjunto web que se sube por glob.
     if newsletter is not None:
         try:
-            from .newsletter import cobertura_resumenes, edicion_desde_contexto, escribir_edicion
+            from .newsletter import (cobertura_resumenes, diagnostico_candidatas,
+                                     edicion_desde_contexto, escribir_edicion)
             newsletter.update(edicion_desde_contexto(ctx))
-            con_resumen, elegibles = cobertura_resumenes(newsletter.get("secciones") or [])
+            secciones_ed = newsletter.get("secciones") or []
+            con_resumen, elegibles = cobertura_resumenes(secciones_ed)
             log.info("boletín: resúmenes elegibles %s/%s tarjetas visibles",
                      con_resumen, elegibles)
+            diag = diagnostico_candidatas(secciones_ed, fecha=newsletter.get("fecha"))
+            log.info("boletín: candidatas hoy=%s ayer=%s sin_fecha=%s descartadas_idioma=%s",
+                     diag["hoy"], diag["ayer"], diag["sin_fecha"], diag["descartadas_idioma"])
             escribir_edicion(newsletter)
         except Exception as ex:  # noqa: BLE001 - fallo aislado del build
             log.warning("boletín: no se pudo construir la edición (%s)", ex)

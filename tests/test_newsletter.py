@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import date
 from email import message_from_bytes
 
@@ -11,9 +13,10 @@ from sibylla.suscriptores import Suscriptor
 def _card(n, **extra):
     out = {
         "id": f"n-{n}", "url": f"https://fuente.cl/{n}", "title": f"Título {n}",
-        "source_name": "Fuente", "date": "25 jul 2026", "snippet": "A & B",
+        "source_name": "Fuente", "date": "25 jul 2026",
+        "published": "2026-07-25T12:00:00Z", "snippet": "A & B",
         "resumen": f"Resumen completo en español de la noticia {n}.",
-        "seal_roman": "I", "is_video": False,
+        "seal_roman": "I", "is_video": False, "es_espanol": True,
     }
     out.update(extra)
     return out
@@ -86,6 +89,33 @@ def test_edicion_excluye_social_y_poda_campos():
     assert set(ed["secciones"][0]["cards"][0]) == set(nl.CAMPOS_TARJETA)
 
 
+def test_edicion_transporta_published_y_marca_de_idioma():
+    """La edición lleva la fecha ISO y la marca de idioma que emite web._tarjeta."""
+    card = _card(1, published="2026-07-25T12:00:00Z", es_espanol=False)
+    ctx = {
+        "grupos": [{"id": "ai", "label": "IA", "cards": [card]}],
+        "social_cards": [], "astro_cards": [], "divulgacion_cards": [],
+        "sibylla_cards": [], "t": {}, "total": 1, "n_fuentes": 1,
+        "site_url": "https://sibylla.cl", "generado": "hoy",
+    }
+    podada = nl.edicion_desde_contexto(ctx, fecha=date(2026, 7, 25))["secciones"][0]["cards"][0]
+    assert (podada["published"], podada["es_espanol"]) == ("2026-07-25T12:00:00Z", False)
+
+
+def test_edicion_declara_esquema_v3():
+    """El esquema sube a v3 al añadir `published` y `es_espanol`."""
+    assert nl.EDICION_SCHEMA == "cl.sibylla.newsletter_edicion.v3"
+
+
+def test_cargar_edicion_rechaza_esquema_anterior(tmp_path):
+    """Una edición v2 (sin los campos nuevos) se descarta en vez de usarse a medias."""
+    path = tmp_path / "edicion.json"
+    edicion = _edicion()
+    edicion["schema"] = "cl.sibylla.newsletter_edicion.v2"
+    path.write_text(json.dumps(edicion), encoding="utf-8")
+    assert nl.cargar_edicion(path) is None
+
+
 def test_enmascarar_no_deja_correo_legible():
     masked = nl._enmascarar("persona@gmail.com")
     assert "persona" not in masked and "gmail" not in masked and "@" in masked
@@ -126,20 +156,196 @@ def test_destacada_prioriza_tier_y_no_el_orden_de_temas():
     assert got["destacada"]["id"] == "n-a"
 
 
+def _secciones_del_dia(dia: int, temas=("nacional", "ai", "medicine", "astronomia")):
+    """Una tarjeta por tema, todas publicadas el día de la edición."""
+    return [{"id": tema, "label": tema,
+             "cards": [_card(tema, published=f"2026-07-{dia:02d}T12:00:00Z")]}
+            for tema in temas]
+
+
 def test_rotacion_destacada_es_determinista_y_varia():
-    secciones = [
-        {"id": tema, "label": tema, "cards": [_card(tema)]}
-        for tema in ("nacional", "ai", "medicine", "astronomia")
-    ]
+    secciones = _secciones_del_dia(25)
     primera = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
     repetida = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
     assert primera["destacada"]["id"] == repetida["destacada"]["id"]
     elegidas = {
-        nl.componer_boletin(secciones, secciones, fecha=f"2026-07-{dia:02d}", uid="u1")
+        nl.componer_boletin(_secciones_del_dia(dia), _secciones_del_dia(dia),
+                            fecha=f"2026-07-{dia:02d}", uid="u1")
         ["destacada"]["section_id"]
         for dia in range(20, 30)
     }
     assert len(elegidas) > 1
+
+
+# ---------------------------------------------------------------------------
+# Bandas de frescura de la destacada
+# ---------------------------------------------------------------------------
+def test_destacada_de_hoy_gana_a_una_vieja_de_mejor_sello():
+    """La banda manda sobre el sello: hoy con III gana a hace ocho días con I."""
+    secciones = [
+        {"id": "astronomia", "label": "Astro",
+         "cards": [_card("vieja", seal_roman="I", published="2026-07-17T12:00:00Z")]},
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", seal_roman="III", published="2026-07-25T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert got["destacada"]["id"] == "n-hoy"
+
+
+def test_destacada_cae_a_ayer_si_no_hay_de_hoy():
+    """Sin candidatas del día de la edición, se usa la banda del día anterior."""
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("ayer", published="2026-07-24T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert got["destacada"]["id"] == "n-ayer"
+
+
+def test_ayer_solo_se_usa_si_hoy_esta_vacia():
+    """Con material de hoy, el de ayer no compite aunque tenga mejor sello."""
+    secciones = [
+        {"id": "astronomia", "label": "Astro",
+         "cards": [_card("ayer", seal_roman="I", published="2026-07-24T12:00:00Z")]},
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", seal_roman="III", published="2026-07-25T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert got["destacada"]["id"] == "n-hoy"
+
+
+def test_sin_destacada_fresca_no_hay_boletin():
+    """Ni de hoy ni de ayer: no se compone correo degradado."""
+    secciones = [
+        {"id": "astronomia", "label": "Astro",
+         "cards": [_card("vieja", seal_roman="I", published="2026-07-17T12:00:00Z")]},
+    ]
+    assert nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1") is None
+
+
+def test_tarjeta_sin_published_nunca_es_destacada():
+    """Sin fecha no se puede afirmar que sea del día: fuera de las candidatas."""
+    secciones = [
+        {"id": "nacional", "label": "Chile", "cards": [_card("sf", published="")]},
+    ]
+    assert nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1") is None
+
+
+def test_frescura_se_mide_en_dias_de_santiago():
+    """23:00 en Santiago del día 25 es UTC del 26, y sigue siendo «hoy» para el lector."""
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("tarde", published="2026-07-26T03:00:00Z")]},  # 25 jul, 23:00 CLT
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert got["destacada"]["id"] == "n-tarde"
+
+
+# ---------------------------------------------------------------------------
+# Filtro de idioma
+# ---------------------------------------------------------------------------
+def test_tarjeta_en_otro_idioma_no_es_destacada():
+    secciones = [
+        {"id": "medicine", "label": "Medicina",
+         "cards": [_card("en", published="2026-07-25T12:00:00Z", es_espanol=False)]},
+    ]
+    assert nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1") is None
+
+
+def test_tarjeta_en_otro_idioma_no_es_breve():
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", published="2026-07-25T12:00:00Z")]},
+        {"id": "medicine", "label": "Medicina",
+         "cards": [_card("en", published="2026-07-25T12:00:00Z", es_espanol=False)]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert [b["id"] for b in got["breves"]] == []
+
+
+def test_edicion_sin_marca_de_idioma_se_comporta_como_antes():
+    """Compatibilidad: sin el campo `es_espanol`, la tarjeta se trata como española."""
+    card = _card("hoy", published="2026-07-25T12:00:00Z")
+    del card["es_espanol"]
+    secciones = [{"id": "nacional", "label": "Chile", "cards": [card]}]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert got["destacada"]["id"] == "n-hoy"
+
+
+# ---------------------------------------------------------------------------
+# Ventana de antigüedad de las señales breves
+# ---------------------------------------------------------------------------
+def test_breve_noticiosa_de_diez_dias_se_descarta():
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", published="2026-07-25T12:00:00Z")]},
+        {"id": "astronomia", "label": "Astro",
+         "cards": [_card("vieja", published="2026-07-15T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert [b["id"] for b in got["breves"]] == []
+
+
+def test_breve_de_siete_dias_justos_se_conserva():
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", published="2026-07-25T12:00:00Z")]},
+        {"id": "ai", "label": "IA",
+         "cards": [_card("borde", published="2026-07-18T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert [b["id"] for b in got["breves"]] == ["n-borde"]
+
+
+def test_video_viejo_de_divulgacion_se_conserva_como_breve():
+    """Los vídeos son atemporales: su sección ya aplica su propia ventana."""
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", published="2026-07-25T12:00:00Z")]},
+        {"id": "divulgacion", "label": "Divulgación",
+         "cards": [_card("video", is_video=True, published="2026-06-25T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert [b["id"] for b in got["breves"]] == ["n-video"]
+
+
+def test_publicacion_propia_vieja_se_conserva_como_breve():
+    """La sección SIBYLLA está exenta de la ventana de 7 días."""
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", published="2026-07-25T12:00:00Z")]},
+        {"id": "sibylla", "label": "SIBYLLA",
+         "cards": [_card("propia", published="2026-01-10T12:00:00Z")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert [b["id"] for b in got["breves"]] == ["n-propia"]
+
+
+def test_breve_noticiosa_sin_fecha_se_descarta():
+    """Sin fecha no se puede demostrar que sea reciente."""
+    secciones = [
+        {"id": "nacional", "label": "Chile",
+         "cards": [_card("hoy", published="2026-07-25T12:00:00Z")]},
+        {"id": "ai", "label": "IA", "cards": [_card("sf", published="")]},
+    ]
+    got = nl.componer_boletin(secciones, secciones, fecha="2026-07-25", uid="u1")
+    assert [b["id"] for b in got["breves"]] == []
+
+
+# ---------------------------------------------------------------------------
+# Observabilidad (línea del build)
+# ---------------------------------------------------------------------------
+def test_diagnostico_cuenta_bandas_y_descartes():
+    secciones = [
+        {"id": "nacional", "label": "Chile", "cards": [
+            _card("hoy", published="2026-07-25T12:00:00Z"),
+            _card("ayer", published="2026-07-24T12:00:00Z"),
+            _card("sf", published=""),
+            _card("en", published="2026-07-25T12:00:00Z", es_espanol=False),
+        ]},
+    ]
+    assert nl.diagnostico_candidatas(secciones, fecha="2026-07-25") == {
+        "hoy": 1, "ayer": 1, "sin_fecha": 1, "descartadas_idioma": 1}
 
 
 def test_video_y_sibylla_no_pueden_ser_destacada():
@@ -260,6 +466,21 @@ def test_dry_run_sin_resumen_no_modifica_estado(monkeypatch, tmp_path):
               estado=estado, cfg=cfg, site_url="https://sibylla.cl", tope=1,
               estado_path=tmp_path / "state.json", dry_run=True)
     assert estado == original and not (tmp_path / "state.json").exists()
+
+
+def test_sin_edicion_fresca_deja_warning_visible(caplog, tmp_path):
+    """La ausencia de correo nunca es silenciosa: queda un ::warning:: en el run."""
+    edicion = _edicion()
+    for seccion in edicion["secciones"]:
+        for card in seccion["cards"]:
+            card["published"] = "2026-07-01T12:00:00Z"  # todo viejo
+    cfg = nl.SmtpConfig("dry", 465, "u", "p", "noticias@sibylla.cl", throttle_s=0)
+    with caplog.at_level(logging.WARNING, logger="sibylla"):
+        nl.enviar(edicion, [Suscriptor("u1", "a@example.com", ("ai",))],
+                  estado=nl._estado_nuevo("2026-07-25", 1), cfg=cfg,
+                  site_url="https://sibylla.cl", tope=1,
+                  estado_path=tmp_path / "state.json", dry_run=True)
+    assert "::warning::" in caplog.text and "sin edición fresca" in caplog.text
 
 
 def test_dry_run_no_avanza_estado(tmp_path):

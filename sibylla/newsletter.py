@@ -8,7 +8,7 @@ riesgo la publicación del sitio.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, parseaddr
 import hashlib
@@ -40,15 +40,22 @@ SECCION_FIJA = "sibylla"
 MAX_POR_TEMA = 3
 MAX_TARJETAS = 12
 MAX_BREVES = 4
+# Antigüedad máxima de una señal breve noticiosa, en días de calendario de
+# Santiago. Los vídeos y las publicaciones propias quedan exentos: son
+# atemporales y su sección ya aplica su propia ventana en web.py.
+MAX_DIAS_BREVE = 7
 MAX_RESUMEN_DESTACADA = 1500
 MAX_ASUNTO = 65
 CAMPOS_TARJETA = (
-    "id", "url", "title", "source_name", "date", "snippet", "resumen",
-    "seal_roman", "is_video",
+    "id", "url", "title", "source_name", "date", "published", "snippet", "resumen",
+    "seal_roman", "is_video", "es_espanol",
 )
 EDICION_PATH = ROOT / "data" / "newsletter_edicion.json"
 ESTADO_PATH = ROOT / "data" / "newsletter_state.json"
-EDICION_SCHEMA = "cl.sibylla.newsletter_edicion.v2"
+# v3 añade `published` (ISO 8601 UTC) y `es_espanol` a cada tarjeta. Sin período
+# de compatibilidad: el workflow construye y envía en la misma corrida, y
+# `cargar_edicion()` rechaza cualquier otro esquema.
+EDICION_SCHEMA = "cl.sibylla.newsletter_edicion.v3"
 ESTADO_SCHEMA = "cl.sibylla.newsletter_state.v1"
 TZ = ZoneInfo("America/Santiago")
 
@@ -149,11 +156,67 @@ def cobertura_resumenes(secciones: Iterable[dict]) -> tuple[int, int]:
     return sum(bool(str(c.get("resumen") or "").strip()) for c in elegibles), len(elegibles)
 
 
+def _dia_santiago(iso: str) -> date | None:
+    """Día de calendario en Santiago de un instante ISO 8601. None si no parsea.
+
+    La frescura se mide en días locales, no en horas, para que coincida con lo
+    que el lector entiende por «hoy» y con `edicion["fecha"]`.
+    """
+    texto = str(iso or "").strip()
+    if not texto:
+        return None
+    try:
+        dt = datetime.fromisoformat(texto.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(TZ).date()
+
+
+def _dia_edicion(fecha: str) -> date:
+    try:
+        return date.fromisoformat(str(fecha))
+    except ValueError:
+        return datetime.now(TZ).date()
+
+
+def _es_espanol(card: dict) -> bool:
+    """¿La tarjeta está en español? (la marca la pone `web._tarjeta`).
+
+    Compatibilidad: una edición sin el campo se trata como española, para que
+    un despliegue a medias no vacíe el boletín.
+    """
+    valor = card.get("es_espanol")
+    return True if valor is None else bool(valor)
+
+
+def _breve_es_fresca(card: dict, seccion_id: str, dia: date, *,
+                     max_dias: int = MAX_DIAS_BREVE) -> bool:
+    """¿La breve entra en la ventana de antigüedad?
+
+    Vídeos y publicaciones propias están exentos: son atemporales y filtrarlos
+    dejaría sin correo a quien solo eligió Divulgación. Una tarjeta noticiosa
+    sin fecha no puede demostrar que sea reciente, así que queda fuera.
+    """
+    if card.get("is_video") or seccion_id == SECCION_FIJA:
+        return True
+    publicada = _dia_santiago(card.get("published"))
+    if publicada is None:
+        return False
+    return (dia - publicada).days <= max_dias
+
+
 def _tier(card: dict) -> int:
     return {"I": 1, "II": 2, "III": 3}.get(str(card.get("seal_roman") or ""), 4)
 
 
-def _candidatas(secciones: Iterable[dict]) -> list[dict]:
+def _candidatas(secciones: Iterable[dict], *, solo_espanol: bool = True) -> list[dict]:
+    """Tarjetas que pueden ser destacada: con resumen, no vídeo, fuera de SIBYLLA.
+
+    `solo_espanol=False` conserva las que no están en español; lo usa el
+    diagnóstico del build para poder contar cuántas descarta el filtro.
+    """
     candidatas: list[dict] = []
     for seccion in secciones:
         sid = str(seccion.get("id") or "")
@@ -162,6 +225,8 @@ def _candidatas(secciones: Iterable[dict]) -> list[dict]:
         for posicion, card in enumerate(seccion.get("cards") or []):
             resumen = str(card.get("resumen") or "").strip()
             if not resumen or card.get("is_video"):
+                continue
+            if solo_espanol and not _es_espanol(card):
                 continue
             candidatas.append({
                 **dict(card),
@@ -179,9 +244,56 @@ def _indice_rotacion(fecha: str, uid: str, total: int) -> int:
     return int.from_bytes(hashlib.sha256(semilla).digest()[:8], "big") % total
 
 
+def _bandas_frescura(candidatas: list[dict], fecha: str) -> tuple[list[dict], list[dict]]:
+    """Parte las candidatas en (publicadas el día de la edición, el día anterior).
+
+    Las que no traen `published` no aparecen en ninguna banda: no se puede
+    afirmar que sean del día.
+    """
+    dia = _dia_edicion(fecha)
+    ayer_dia = dia - timedelta(days=1)
+    hoy: list[dict] = []
+    ayer: list[dict] = []
+    for c in candidatas:
+        publicada = _dia_santiago(c.get("published"))
+        if publicada == dia:
+            hoy.append(c)
+        elif publicada == ayer_dia:
+            ayer.append(c)
+    return hoy, ayer
+
+
+def diagnostico_candidatas(secciones: Iterable[dict], *, fecha: str | None = None) -> dict:
+    """Conteos de la selección de destacada, para la línea de log del build.
+
+    Mide tres cosas: si la banda «hoy» se queda vacía a menudo (el cron corre a
+    media mañana de Santiago, así que cubre pocas horas de publicación), cuánto
+    material pierde el filtro de idioma, y cuántas tarjetas llegan sin fecha.
+    """
+    fecha_s = fecha or _hoy()
+    todas = _candidatas(secciones, solo_espanol=False)
+    en_espanol = [c for c in todas if _es_espanol(c)]
+    hoy, ayer = _bandas_frescura(en_espanol, fecha_s)
+    return {
+        "hoy": len(hoy),
+        "ayer": len(ayer),
+        "sin_fecha": sum(1 for c in en_espanol if _dia_santiago(c.get("published")) is None),
+        "descartadas_idioma": len(todas) - len(en_espanol),
+    }
+
+
 def _elegir_destacada(secciones: Iterable[dict], *, fecha: str, uid: str) -> dict | None:
-    """Elige por confianza/posición y rota la sección en los empates de mayor calidad."""
-    candidatas = _candidatas(secciones)
+    """Elige la destacada: primero por frescura, luego por confianza/posición.
+
+    La banda manda sobre el sello: una noticia de hoy con sello III gana a una
+    de hace ocho días con sello I. La promesa del formato es «lo que está
+    sucediendo», y sin este filtro la ventana ancha de Astronomía (30 días para
+    fuentes chilenas) hacía que casi siempre ganara una nota de observatorio.
+    Dentro de la banda elegida el orden es el de siempre: sello, posición en la
+    sección y rotación determinista por (fecha, uid).
+    """
+    hoy, ayer = _bandas_frescura(_candidatas(secciones), fecha)
+    candidatas = hoy or ayer
     if not candidatas:
         return None
     mejor_tier = min(_tier(c) for c in candidatas)
@@ -208,7 +320,17 @@ def _limitar_resumen(texto: str, limite: int = MAX_RESUMEN_DESTACADA) -> str:
 
 
 def _cards_breves(secciones: list[dict], destacada: dict, *,
-                   max_breves: int = MAX_BREVES) -> list[dict]:
+                   fecha: str, max_breves: int = MAX_BREVES) -> list[dict]:
+    """Reparte hasta `max_breves` señales, en español y dentro de la ventana.
+
+    Si tras los filtros quedan menos de `max_breves`, el correo sale con las que
+    haya: la destacada es la que sostiene la edición.
+    """
+    dia = _dia_edicion(fecha)
+
+    def _apta(card: dict, seccion_id: str) -> bool:
+        return _es_espanol(card) and _breve_es_fresca(card, seccion_id, dia)
+
     temas = [s for s in secciones if s.get("id") != SECCION_FIJA]
     fija = next((s for s in secciones if s.get("id") == SECCION_FIJA), None)
     sid_destacada = destacada.get("section_id")
@@ -226,6 +348,8 @@ def _cards_breves(secciones: list[dict], destacada: dict, *,
             cards = seccion.get("cards") or []
             if ronda >= len(cards) or cards[ronda].get("id") == id_destacada:
                 continue
+            if not _apta(cards[ronda], str(seccion.get("id") or "")):
+                continue
             breves.append({**dict(cards[ronda]),
                             "section_id": seccion.get("id", ""),
                             "section_label": seccion.get("label", "")})
@@ -233,7 +357,8 @@ def _cards_breves(secciones: list[dict], destacada: dict, *,
                 return breves
         if fija:
             cards_fijas = fija.get("cards") or []
-            if ronda < len(cards_fijas) and cards_fijas[ronda].get("id") != id_destacada:
+            if (ronda < len(cards_fijas) and cards_fijas[ronda].get("id") != id_destacada
+                    and _apta(cards_fijas[ronda], SECCION_FIJA)):
                 breves.append({**dict(cards_fijas[ronda]),
                                 "section_id": fija.get("id", ""),
                                 "section_label": fija.get("label", "")})
@@ -255,7 +380,8 @@ def componer_boletin(secciones_personales: list[dict], secciones_globales: list[
     destacada["resumen"] = _limitar_resumen(destacada.get("resumen") or "")
     return {
         "destacada": destacada,
-        "breves": _cards_breves(secciones_personales, destacada, max_breves=max_breves),
+        "breves": _cards_breves(secciones_personales, destacada,
+                                fecha=fecha, max_breves=max_breves),
         "respaldo_editorial": respaldo_editorial,
     }
 
@@ -496,6 +622,7 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
     conn = None
     reconexiones = 0
     fatal = False
+    omitidos = 0
     try:
         for pos, suscriptor in enumerate(lista):
             secciones = repartir(edicion.get("secciones") or [], suscriptor.temas)
@@ -506,14 +633,15 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
                 uid=suscriptor.uid,
             )
             if composicion is None:
+                omitidos += 1
                 if dry_run:
-                    log.info("boletín dry-run: uid=%s omitido; edición sin resumen elegible",
+                    log.info("boletín dry-run: uid=%s omitido; sin destacada fresca en español",
                              suscriptor.uid[:6])
                     continue
                 if suscriptor.uid not in estado["omitidos"]:
                     estado["omitidos"].append(suscriptor.uid)
                 guardar_estado(estado, estado_path)
-                log.warning("boletín: omitido uid=%s; edición sin resumen elegible",
+                log.warning("boletín: omitido uid=%s; sin destacada fresca en español",
                             suscriptor.uid[:6])
                 continue
             try:
@@ -563,6 +691,12 @@ def enviar(edicion: dict, suscriptores: Iterable[Suscriptor], *, estado: dict,
                 conn.quit()
             except (smtplib.SMTPException, OSError):
                 pass
+    if omitidos:
+        # La ausencia de correo nunca debe ser silenciosa: si no hay destacada
+        # del día ni del anterior, este aviso lo deja visible en el run.
+        log.warning("::warning::boletín: %s de %s destinatarios sin edición fresca "
+                    "(no hay destacada del día ni del anterior); no se les envió correo.",
+                    omitidos, len(lista))
     if dry_run:
         return estado
     estado["terminado"] = not fatal and not truncado and not pendientes(todos, estado)

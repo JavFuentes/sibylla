@@ -262,6 +262,55 @@ def test_tarjeta_snippet_prefiere_fuente_sobre_resumen():
 
 
 # ---------------------------------------------------------------------------
+# _tarjeta (published ISO y marca de idioma)
+# ---------------------------------------------------------------------------
+def test_tarjeta_published_en_iso_utc():
+    """`published` viaja en ISO 8601 UTC, junto al `date` de presentación."""
+    card = _tarjeta(_item(published=FECHA), MESES_ES, NO_DATE_ES)
+    assert card["published"] == "2026-06-21T00:00:00Z"
+
+
+def test_tarjeta_published_vacio_sin_fecha():
+    """Sin fecha de publicación, `published` queda vacío (y `date` dice 's/f')."""
+    card = _tarjeta(_item(published=None), MESES_ES, NO_DATE_ES)
+    assert card["published"] == ""
+
+
+ES_ESPANOL_CASES = [
+    ("cata", None, True, "fuente declarada lang: es en el registro"),
+    ("google_news_nacional", None, True, "fuente declarada lang: es-419"),
+    ("pubmed_eutils", None, False, "fuente en inglés sin traducción"),
+    ("google_news_rss", None, False, "fuente lang: multi sin traducción"),
+    ("sibylla", None, True, "publicación propia, fuera del registro"),
+    ("apod", None, False, "APOD sin inyección de su título en español"),
+    ("desconocida", None, False, "fuente ausente del registro"),
+]
+
+
+@pytest.mark.parametrize("source_id,_tr,esperado,_desc", ES_ESPANOL_CASES)
+def test_tarjeta_es_espanol_sin_traduccion(source_id, _tr, esperado, _desc):
+    """Sin traducción, la marca depende del `lang` declarado por la fuente."""
+    card = _tarjeta(_item(source_id=source_id), MESES_ES, NO_DATE_ES)
+    assert card["es_espanol"] is esperado
+
+
+@pytest.mark.parametrize("source_id", ["pubmed_eutils", "apod", "google_news_rss"])
+def test_tarjeta_es_espanol_con_traduccion(source_id):
+    """Traducida (o, en el APOD, con su título ES inyectado), la tarjeta es español."""
+    it = _item(source_id=source_id)
+    card = _tarjeta(it, MESES_ES, NO_DATE_ES,
+                    translations={it.dedup_key: {"title": "Título", "snippet": "Resumen"}})
+    assert card["es_espanol"] is True
+
+
+def test_es_espanol_sin_registro_legible(monkeypatch):
+    """Si el registro de fuentes no se puede leer, nada se da por español."""
+    monkeypatch.setattr(web_mod, "_idiomas_por_fuente", lambda: {})
+    card = _tarjeta(_item(source_id="cata"), MESES_ES, NO_DATE_ES)
+    assert card["es_espanol"] is False
+
+
+# ---------------------------------------------------------------------------
 # _assert_min_items
 # ---------------------------------------------------------------------------
 def test_assert_min_items_levanta_cuando_pocos():
