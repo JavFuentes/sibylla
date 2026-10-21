@@ -14,6 +14,7 @@ import sys
 import time
 from datetime import datetime, timezone
 
+from .apod import parse_apod_date
 from .config import OUTPUT_DIR
 from .digest import render_digest
 from .fetchers import TOPIC_CONFIG, x_usage_reads
@@ -31,6 +32,13 @@ def _setup_logging(verbose: bool) -> None:
         level=logging.INFO if verbose else logging.WARNING,
         format="%(message)s",
     )
+
+
+def _apod_date_arg(value: str) -> str:
+    try:
+        return parse_apod_date(value).isoformat()
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -75,10 +83,15 @@ def main(argv: list[str] | None = None) -> int:
                              "antes del build completo de las 11 (ver sibylla/apod.py)")
     parser.add_argument("--newsletter", action="store_true",
                         help="construye data/newsletter_edicion.json junto con la web")
+    parser.add_argument("--apod-date", type=_apod_date_arg, default=None, metavar="YYYY-MM-DD",
+                        help="con --apod-only, regenera SOLO el archivo histórico de esa fecha; "
+                             "no reemplaza apod-i18n.json")
     parser.add_argument("--newsletter-send", action="store_true",
                         help="envía la edición ya construida; no corre el pipeline")
     parser.add_argument("-q", "--quiet", action="store_true", help="menos logs")
     args = parser.parse_args(argv)
+    if args.apod_date is not None and (not args.apod_only or args.dashboard or args.newsletter_send):
+        parser.error("--apod-date requiere --apod-only y no se combina con --dashboard/--newsletter-send")
 
     _setup_logging(verbose=not args.quiet)
 
@@ -96,10 +109,10 @@ def main(argv: list[str] | None = None) -> int:
     # y .github/workflows/regenerate-apod.yml).
     if args.apod_only:
         from .web import write_apod_sidecar
-        path = write_apod_sidecar(translate=args.translate != "off")
+        options = {"date": args.apod_date} if args.apod_date is not None else {}
+        path = write_apod_sidecar(translate=args.translate != "off", **options)
         if path is None:
-            log.warning("No se pudo obtener el APOD de hoy; sidecar omitido "
-                        "(el build de las 11 lo reintentará).")
+            log.warning("No se pudo obtener el APOD solicitado; sidecar omitido.")
             return 1
         print(f"✓ Sidecar APOD escrito: {path}")
         return 0

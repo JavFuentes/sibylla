@@ -18,19 +18,21 @@ al ingles de NASA para la fecha de hoy. Nunca rompe el build.
 """
 from __future__ import annotations
 
+import html
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import date as Date, datetime, timezone
+from urllib.parse import urlsplit
 
 import requests
 
-from .models import NewsItem
+from .models import NewsItem, clean_text
 from .net import safe_error
 from .translate import load_cache, save_cache, translate_cards
 
 log = logging.getLogger("sibylla")
 
-APOD_URL = "https://api.nasa.gov/planetary/apod"
+APOD_URL = "https://science.nasa.gov/wp-json/wp/v2/apod-basic"
 APOD_I18N_SCHEMA = "cl.sibylla.apod_i18n.v1"
 # source_id reservado para la tarjeta APOD dentro de la sección Astronomía.
 # Debe estar FUERA de ASTRO_SOURCE_IDS (web.py) para que el pipeline no lo procese:
@@ -47,8 +49,52 @@ APOD_I18N_LANGS = ("es", "it")
 _RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 
 
-def fetch_apod(api_key: str, *, timeout: int = 20, attempts: int = 3) -> dict | None:
-    """Descarga el APOD de HOY desde la API de NASA. None ante cualquier fallo.
+def parse_apod_date(value: str) -> Date:
+    """Fecha ISO del archivo APOD, entre su inicio y hoy (UTC)."""
+    day = Date.fromisoformat(value)
+    if day.isoformat() != value or not Date(1995, 6, 16) <= day <= datetime.now(timezone.utc).date():
+        raise ValueError("La fecha APOD debe ser YYYY-MM-DD, entre 1995-06-16 y hoy (UTC).")
+    return day
+
+
+def _http_url(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = html.unescape(value.strip())
+    if value.startswith("//"):
+        value = "https:" + value
+    try:
+        parts = urlsplit(value)
+        if parts.scheme in ("http", "https") and parts.hostname and not parts.username:
+            return value
+    except ValueError:
+        pass
+    return None
+
+
+def _image_url(value: object) -> str | None:
+    """WordPress usa `url` para el permalink: nunca debe acabar en un <img>."""
+    url = _http_url(value)
+    if url is None:
+        return None
+    parts = urlsplit(url)
+    path = parts.path.lower()
+    if (path in ("", "/") or "nasa-logo" in path or path.endswith((".html", ".htm"))
+            or (parts.hostname == "science.nasa.gov" and
+                path.startswith(("/image-article/", "/wp-json/")))):
+        return None
+    return url
+
+
+def _apod_image(apod: dict) -> str | None:
+    if apod.get("media_type") == "image":
+        return _image_url(apod.get("hdurl")) or _image_url(apod.get("url"))
+    return _image_url(apod.get("thumbnail_url")) or _image_url(apod.get("hdurl"))
+
+
+def fetch_apod(api_key: str, *, date: str | None = None,
+               timeout: int = 20, attempts: int = 3) -> dict | None:
+    """Descarga y normaliza el APOD de la fecha indicada (hoy UTC por defecto).
 
     Reintenta con backoff corto (2s, 4s) ante fallos transitorios (ver
     _RETRY_STATUS, mas timeouts/errores de conexion): el cron que llama a esto
@@ -56,31 +102,52 @@ def fetch_apod(api_key: str, *, timeout: int = 20, attempts: int = 3) -> dict | 
     .github/workflows/regenerate-apod.yml). Un error permanente (p.ej. API key
     invalida) se abandona en el primer intento, sin reintentar en vano.
     """
+    try:
+        day = parse_apod_date(date if date is not None else datetime.now(timezone.utc).date().isoformat())
+    except (TypeError, ValueError):
+        log.warning("Fecha APOD inválida; sidecar omitido.")
+        return None
+    # La API WordPress ignora ?date; el identificador va en la ruta, yyMMdd.
+    url = f"{APOD_URL}/{day.strftime('%y%m%d')}"
     last_err = ""
     for i in range(attempts):
         try:
-            r = requests.get(APOD_URL, params={"api_key": api_key}, timeout=timeout)
+            r = requests.get(url, params={"api_key": api_key}, timeout=timeout)
             r.raise_for_status()
             data = r.json()
             break
+        except ValueError as exc:
+            # requests.JSONDecodeError también hereda RequestException: un JSON
+            # inválido debe salir aquí, antes de los reintentos de transporte.
+            log.warning("No se pudo obtener el APOD de %s (%s). Sidecar omitido.",
+                        day.isoformat(), safe_error(exc))
+            return None
         except requests.RequestException as exc:
             last_err = safe_error(exc)
             status = getattr(exc.response, "status_code", None)
             if status is not None and status not in _RETRY_STATUS:
-                log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", last_err)
+                log.warning("No se pudo obtener el APOD de %s (%s). Sidecar omitido.",
+                            day.isoformat(), last_err)
                 return None
-        except ValueError as exc:
-            log.warning("No se pudo obtener el APOD de hoy (%s). Sidecar de traduccion omitido.", safe_error(exc))
-            return None
         if i < attempts - 1:
             time.sleep(2 ** (i + 1))  # 2s, 4s
     else:
-        log.warning("No se pudo obtener el APOD de hoy tras %d intentos (%s). Sidecar de traduccion omitido.",
-                    attempts, last_err)
+        log.warning("No se pudo obtener el APOD de %s tras %d intentos (%s). Sidecar omitido.",
+                    day.isoformat(), attempts, last_err)
         return None
 
-    if not isinstance(data, dict) or not data.get("title") or not data.get("explanation") or not data.get("date"):
-        log.warning("Respuesta de APOD incompleta. Sidecar de traduccion omitido.")
+    if (not isinstance(data, dict) or data.get("date") != day.isoformat()
+            or not isinstance(data.get("title"), str)
+            or not isinstance(data.get("explanation"), str)
+            or data.get("media_type") not in ("image", "video", "iframe")):
+        log.warning("Respuesta de APOD incompleta o de otra fecha. Sidecar omitido.")
+        return None
+    data = dict(data, title=clean_text(data["title"]), explanation=clean_text(data["explanation"]))
+    if data["media_type"] == "iframe":
+        data["media_type"] = "video"
+    if (not data["title"] or data["title"].casefold() == "nasa science" or not data["explanation"]
+            or (data["media_type"] == "image" and _apod_image(data) is None)):
+        log.warning("Respuesta de APOD genérica o sin contenido utilizable. Sidecar omitido.")
         return None
     return data
 
@@ -88,17 +155,19 @@ def fetch_apod(api_key: str, *, timeout: int = 20, attempts: int = 3) -> dict | 
 def build_apod_i18n(apod: dict, *, translate: bool, tracker: list[dict] | None = None) -> dict:
     """Contrato publico que consume Stellar-View (`apod-i18n.json`).
 
-    `apod` es la respuesta cruda de la API de NASA (ver `fetch_apod`). `title` y
+    `apod` es la respuesta normalizada de NASA (ver `fetch_apod`). `title` y
     `explanation` son dicts que siempre traen 'en'; 'es'/'it' se agregan si la
     traduccion tuvo exito (si no, la app cae a 'en' para esos idiomas).
     """
     date = apod["date"]
+    title = clean_text(apod["title"])
+    explanation = clean_text(apod["explanation"])
     payload: dict = {
         "schema": APOD_I18N_SCHEMA,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "date": date,
-        "title": {"en": apod["title"]},
-        "explanation": {"en": apod["explanation"]},
+        "title": {"en": title},
+        "explanation": {"en": explanation},
     }
     if not translate:
         return payload
@@ -107,13 +176,13 @@ def build_apod_i18n(apod: dict, *, translate: bool, tracker: list[dict] | None =
     # Titulo+explicacion viajan como una sola card (title/snippet) para
     # traducirse en UNA llamada por idioma, igual que translate_cards ya hace
     # para las tarjetas de noticias.
-    card = {"id": f"apod:{date}", "title": apod["title"], "snippet": apod["explanation"]}
+    card = {"id": f"apod:{date}", "title": title, "snippet": explanation}
     for lang in APOD_I18N_LANGS:
         got = translate_cards([card], lang, cache, tracker=tracker).get(card["id"])
         if got and got.get("title"):
-            payload["title"][lang] = got["title"]
+            payload["title"][lang] = clean_text(got["title"])
         if got and got.get("snippet"):
-            payload["explanation"][lang] = got["snippet"]
+            payload["explanation"][lang] = clean_text(got["snippet"])
     save_cache(cache)
     return payload
 
@@ -126,16 +195,14 @@ def build_apod_card(apod: dict, payload: dict) -> NewsItem | None:
     ponen los valores originales en inglés como base (y como fallback si falla
     la inyección). Devuelve None ante cualquier dato malformado.
 
-    `apod`    — respuesta cruda de la API de NASA (ver `fetch_apod`).
+    `apod`    — respuesta normalizada de NASA (ver `fetch_apod`).
     `payload` — resultado de `build_apod_i18n` (tiene title/explanation en "en").
     """
     try:
         date_obj = datetime.strptime(apod["date"], "%Y-%m-%d")
-        apod_url = f"https://apod.nasa.gov/apod/ap{date_obj.strftime('%y%m%d')}.html"
-        image = (
-            apod["url"] if apod.get("media_type") == "image"
-            else apod.get("thumbnail_url")
-        )
+        apod_url = (_http_url(apod.get("permalink"))
+                    or f"https://apod.nasa.gov/apod/ap{date_obj.strftime('%y%m%d')}.html")
+        image = _apod_image(apod)
         return NewsItem(
             title=payload["title"]["en"],
             url=apod_url,

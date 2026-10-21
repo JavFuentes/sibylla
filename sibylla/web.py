@@ -1035,10 +1035,10 @@ def _write_apod_i18n(payload: dict) -> Path:
 
 
 def _write_apod_i18n_archive(payload: dict) -> Path:
-    """Copia inmutable en `apod-i18n/<fecha>.json`.
+    """Copia por fecha en `apod-i18n/<fecha>.json`, reparable al regenerar ese día.
 
     A diferencia de `apod-i18n.json` (que se pisa cada corrida), este archivo
-    nunca se reescribe una vez publicado: los workflows lo suben con `scp -r`
+    conserva los otros días: los workflows lo suben con `scp -r`
     sobre un directorio remoto existente, que MERGEA en vez de purgar, así se
     acumula un archivo por dia sin necesitar el patron descargar/subir que usa
     el historial de metricas (runs.json)."""
@@ -1054,6 +1054,7 @@ def write_apod_sidecar(
     translate: bool = True,
     tracker: list[dict] | None = None,
     payload: dict | None = None,
+    date: str | None = None,
 ) -> Path | None:
     """Genera y escribe `apod-i18n.json` + su copia historica, sin tocar el resto del sitio.
 
@@ -1066,7 +1067,11 @@ def write_apod_sidecar(
 
     Si se pasa `payload` (ya construido por `build_all_sites`), se reutiliza sin
     volver a llamar a NASA ni al LLM. Sin `payload` (corrida independiente via
-    `--apod-only`), lo obtiene y traduce desde cero."""
+    `--apod-only`), lo obtiene y traduce desde cero. Con `date` explícita solo
+    escribe el archivo histórico de ese día, sin reemplazar el sidecar actual.
+    """
+    if date is not None and payload is not None:
+        raise ValueError("No se puede combinar una fecha APOD con un payload ya construido.")
     if payload is None:
         # Corrida independiente (--apod-only): carga .env, baja y traduce el APOD.
         # Se auto-suficiente en .env: `--apod-only` llega aqui SIN pasar por
@@ -1074,14 +1079,17 @@ def write_apod_sidecar(
         # (las vars ya vienen inyectadas por el workflow), pero en corridas locales
         # sin esto NASA_API_KEY y el proveedor LLM quedan sin configurar.
         load_env()
-        apod_data = fetch_apod(get_nasa_api_key())
+        apod_data = (fetch_apod(get_nasa_api_key(), date=date) if date is not None
+                     else fetch_apod(get_nasa_api_key()))
         if apod_data is None:
             return None
         SITE_DIR.mkdir(parents=True, exist_ok=True)
         payload = build_apod_i18n(apod_data, translate=translate, tracker=tracker)
     else:
         SITE_DIR.mkdir(parents=True, exist_ok=True)
-    _write_apod_i18n_archive(payload)
+    archive_path = _write_apod_i18n_archive(payload)
+    if date is not None:
+        return archive_path
     return _write_apod_i18n(payload)
 
 

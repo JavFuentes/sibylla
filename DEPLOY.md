@@ -199,14 +199,14 @@ esa ventana y Stellar-View mostraba el texto en inglés de NASA hasta las 11.
 
 El workflow [`.github/workflows/regenerate-apod.yml`](.github/workflows/regenerate-apod.yml)
 corre `python -m sibylla.cli --apod-only` en un cron aparte y más temprano
-(07:00 y 10:00 UTC), publicando `apod-i18n.json` — no toca noticias,
+(07:17 y 10:17 UTC), publicando `apod-i18n.json` — no toca noticias,
 YouTube, X ni el historial de métricas. Reusa los mismos secrets de la tabla
 de arriba (`NASA_API_KEY`, `LLM_*`, `DEPLOY_*`); no requiere configurar nada
 adicional. Es idempotente: el build de las 11 lo vuelve a escribir sin
 problema.
 
-Cada corrida además deja una copia inmutable en `apod-i18n/<fecha>.json`
-(dentro de `DEPLOY_PATH`), que nunca se sobrescribe: es el archivo histórico
+Cada corrida además deja una copia por fecha en `apod-i18n/<fecha>.json`
+(dentro de `DEPLOY_PATH`), conservando los otros días: es el archivo histórico
 que le permite a Stellar-View mostrar traducciones de APODs de días
 anteriores (desde que este mecanismo empezó a correr; antes de eso, la app
 cae al inglés de NASA). Se sube con `scp -r` sobre un directorio remoto ya
@@ -215,6 +215,32 @@ sin necesitar el patrón descargar/subir que usa `runs.json`. La subida del
 histórico es *best-effort*: si falla, no aborta el workflow (el APOD de
 "hoy" ya quedó publicado; ese día solo no se archiva hasta la próxima
 corrida exitosa).
+
+APOD se consulta directamente en NASA Science:
+`https://science.nasa.gov/wp-json/wp/v2/apod-basic/{yyMMdd}`. La fecha se
+calcula en UTC; el parámetro antiguo `?date=` no se usa. `url` es ahora una
+página: la tarjeta enlaza a `permalink` y usa `hdurl` como imagen (también como
+miniatura de videos si no hay `thumbnail_url`). Título y explicación se limpian
+antes de traducir. Se rechazan fechas distintas y respuestas genéricas como
+«NASA Science», sin sustituir los JSON existentes con datos inválidos.
+
+Para reparar **una fecha histórica concreta** que ya tenga un título incorrecto:
+
+```bash
+python -m sibylla.cli --apod-only --apod-date 2026-10-18 --translate auto
+```
+
+Solo se regenera `web/apod-i18n/2026-10-18.json`: el JSON actual no se toca,
+incluso si se pide explícitamente la fecha de hoy. Repetir únicamente para los
+días afectados y subir solo esos archivos al directorio remoto `apod-i18n/`,
+conservando el resto. Las entradas de caché con `src_title: NASA Science` se
+invalidan automáticamente cuando llega el título correcto; no borrar la caché
+completa. El esquema público y las claves `apod:<fecha>` se conservan.
+
+Tras desplegar esta migración, ejecutar manualmente **Publicar APOD temprano**
+para corregir `apod-i18n.json` y su copia de hoy, y después **Regenerar sitio
+Sibylla** para renovar la portada. El respaldo programado solo comprueba la
+fecha publicada: puede omitir la corrida aunque el título sea incorrecto.
 
 ### B) GitHub Actions → GitHub Pages
 

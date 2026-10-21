@@ -9,7 +9,9 @@ test_stellar.py: logica pura, cero red.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
+import pytest
 import requests
 
 import sibylla.apod as apod_mod
@@ -51,7 +53,7 @@ def test_fetch_apod_feliz(monkeypatch):
         calls.append(1)
         return _FakeResponse(_APOD)
     monkeypatch.setattr(requests, "get", _get)
-    assert fetch_apod("DEMO_KEY") == _APOD
+    assert fetch_apod("DEMO_KEY", date=_APOD["date"]) == _APOD
     assert len(calls) == 1
 
 
@@ -64,7 +66,7 @@ def test_fetch_apod_503_persistente_agota_reintentos_y_devuelve_none(monkeypatch
         calls.append(1)
         return _FakeResponse({}, status=503)
     monkeypatch.setattr(requests, "get", _get)
-    assert fetch_apod("DEMO_KEY", attempts=3) is None
+    assert fetch_apod("DEMO_KEY", date=_APOD["date"], attempts=3) is None
     assert len(calls) == 3
 
 
@@ -75,7 +77,7 @@ def test_fetch_apod_503_se_recupera_en_reintento(monkeypatch):
     monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
     respuestas = [_FakeResponse({}, status=503), _FakeResponse(_APOD)]
     monkeypatch.setattr(requests, "get", lambda *a, **k: respuestas.pop(0))
-    assert fetch_apod("DEMO_KEY") == _APOD
+    assert fetch_apod("DEMO_KEY", date=_APOD["date"]) == _APOD
 
 
 def test_fetch_apod_error_permanente_no_reintenta(monkeypatch):
@@ -86,20 +88,21 @@ def test_fetch_apod_error_permanente_no_reintenta(monkeypatch):
         calls.append(1)
         return _FakeResponse({}, status=401)
     monkeypatch.setattr(requests, "get", _get)
-    assert fetch_apod("DEMO_KEY") is None
+    assert fetch_apod("DEMO_KEY", date=_APOD["date"]) is None
     assert len(calls) == 1
 
 
-def test_fetch_apod_excepcion_red_reintenta_y_devuelve_none(monkeypatch):
+@pytest.mark.parametrize("error", [requests.ConnectionError("boom"), requests.Timeout("timeout")])
+def test_fetch_apod_excepcion_red_reintenta_y_devuelve_none(monkeypatch, error):
     """Un fallo de transporte (timeout, DNS...) es transitorio: se reintenta,
     y si persiste, no rompe (devuelve None)."""
     monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
     calls = []
     def _raise(*a, **k):
         calls.append(1)
-        raise requests.ConnectionError("boom")
+        raise error
     monkeypatch.setattr(requests, "get", _raise)
-    assert fetch_apod("DEMO_KEY", attempts=3) is None
+    assert fetch_apod("DEMO_KEY", date=_APOD["date"], attempts=3) is None
     assert len(calls) == 3
 
 
@@ -108,7 +111,7 @@ def test_fetch_apod_respuesta_incompleta_devuelve_none(monkeypatch):
     monkeypatch.setattr(apod_mod.time, "sleep", lambda *_a, **_k: None)
     incompleta = {"date": "2026-06-30", "title": "X"}
     monkeypatch.setattr(requests, "get", lambda *a, **k: _FakeResponse(incompleta))
-    assert fetch_apod("DEMO_KEY") is None
+    assert fetch_apod("DEMO_KEY", date=_APOD["date"]) is None
 
 
 # ---------------------------------------------------------------------------
@@ -283,3 +286,198 @@ def test_build_apod_card_datos_malformados_devuelve_none():
     malo = {"title": {}, "explanation": {"en": "x"}}
     result = build_apod_card(_APOD, malo)
     assert result is None
+
+
+# Respuesta representativa de NASA Science: `url` es una página, no la imagen.
+_WP_APOD = {
+    "date": "2026-10-18",
+    "title": "Sonified: Eagle Nebula Pillars",
+    "explanation": "<strong>Explanation:</strong> Stars &amp; galaxies.<br>Tomorrow.",
+    "media_type": "video",
+    "url": "https://science.nasa.gov/image-article/apod-2026-october-18-sonified-eagle-nebula-pillars/",
+    "permalink": "https://science.nasa.gov/image-article/apod-2026-october-18-sonified-eagle-nebula-pillars/",
+    "hdurl": "https://assets.science.nasa.gov/dynamicimage/SonifiedEagleNebulaPillars.jpg?w=3048&h=1708",
+    "basic_html": '<iframe src="//www.youtube.com/embed/DzrCEm1ZBRY?rel=0"></iframe>',
+}
+
+
+def test_fetch_apod_usa_ruta_por_fecha_y_solo_parametro_de_credencial(monkeypatch):
+    seen = []
+
+    def _get(url, **kwargs):
+        seen.append((url, kwargs))
+        return _FakeResponse(_WP_APOD)
+
+    monkeypatch.setattr(requests, "get", _get)
+    result = fetch_apod("test-key", date="2026-10-18", timeout=7)
+    assert seen == [("https://science.nasa.gov/wp-json/wp/v2/apod-basic/261018",
+                     {"params": {"api_key": "test-key"}, "timeout": 7})]
+    assert result["explanation"] == "Explanation: Stars & galaxies. Tomorrow."
+
+
+def test_fetch_apod_hoy_se_calcula_en_utc(monkeypatch):
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz):
+            assert tz is timezone.utc
+            return cls(2026, 10, 18, 1, 0, tzinfo=tz)
+
+    seen = []
+    monkeypatch.setattr(apod_mod, "datetime", _Clock)
+    monkeypatch.setattr(requests, "get", lambda url, **kwargs:
+                        (seen.append(url), _FakeResponse(_WP_APOD))[1])
+    assert fetch_apod("") is not None
+    assert seen == ["https://science.nasa.gov/wp-json/wp/v2/apod-basic/261018"]
+
+
+@pytest.mark.parametrize("date", ["2026-02-30", "20261018", "1995-06-15", "2999-01-01", "", 7])
+def test_fetch_apod_fecha_invalida_no_consulta_red(monkeypatch, date):
+    def _unexpected(*args, **kwargs):
+        pytest.fail("Una fecha inválida no debe consultar NASA")
+
+    monkeypatch.setattr(requests, "get", _unexpected)
+    assert fetch_apod("", date=date) is None
+
+
+@pytest.mark.parametrize("changes", [
+    {"date": "2026-10-17"}, {"date": "2026-10-32"}, {"title": "NASA Science"},
+    {"title": " <b>NASA Science</b> "}, {"title": "<br>"}, {"explanation": " "},
+    {"title": ["malformado"]}, {"explanation": {}}, {"media_type": "other"},
+    {"media_type": "image", "hdurl": None},
+    {"media_type": "image", "hdurl": "https://science.nasa.gov/wp-content/themes/nasa-child/assets/images/nasa-logo@2x.png"},
+])
+def test_fetch_apod_rechaza_respuestas_que_antes_contaminaban_el_sidecar(monkeypatch, changes):
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs:
+                        _FakeResponse({**_WP_APOD, **changes}))
+    assert fetch_apod("", date="2026-10-18") is None
+
+
+@pytest.mark.parametrize("payload", [[], None, "NASA Science", {}])
+def test_fetch_apod_json_inesperado(monkeypatch, payload):
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: _FakeResponse(payload))
+    assert fetch_apod("", date="2026-10-18") is None
+
+
+def test_fetch_apod_json_invalido_se_omite_sin_reintento(monkeypatch):
+    response = _FakeResponse(None)
+    def _invalid_json():
+        raise requests.exceptions.JSONDecodeError("invalid JSON", "x", 0)
+    response.json = _invalid_json
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: response)
+    monkeypatch.setattr(apod_mod.time, "sleep", lambda *args: pytest.fail("No debe reintentar JSON inválido"))
+    assert fetch_apod("", date="2026-10-18") is None
+
+
+def test_fetch_apod_iframe_se_normaliza_como_video(monkeypatch):
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs:
+                        _FakeResponse({**_WP_APOD, "media_type": "iframe"}))
+    assert fetch_apod("", date="2026-10-18")["media_type"] == "video"
+
+
+@pytest.mark.parametrize("media_type", ["image", "video"])
+def test_tarjeta_wordpress_usa_asset_y_permalink(media_type):
+    apod = {**_WP_APOD, "media_type": media_type}
+    payload = build_apod_i18n(apod, translate=False)
+    card = build_apod_card(apod, payload)
+    assert card.image == apod["hdurl"]
+    assert card.url == apod["permalink"]
+
+
+@pytest.mark.parametrize("image", [
+    "https://science.nasa.gov/image-article/apod-wrong/",
+    "https://apod.nasa.gov/apod/ap261018.html",
+    "javascript:alert(1)", "https://science.nasa.gov/", "https://science.nasa.gov/wp-json/wp/v2/apod-basic/261018",
+    "https://science.nasa.gov/nasa-logo.png", {"url": "malformado"},
+])
+def test_tarjeta_no_muestra_paginas_o_logos_como_imagen(image):
+    apod = {**_WP_APOD, "hdurl": image}
+    assert build_apod_card(apod, build_apod_i18n(apod, translate=False)).image is None
+
+
+def test_tarjeta_normaliza_url_relativa_al_protocolo_y_entidades():
+    apod = {**_WP_APOD, "hdurl": "//assets.science.nasa.gov/image.jpg?w=960&amp;h=640"}
+    assert build_apod_card(apod, build_apod_i18n(apod, translate=False)).image == (
+        "https://assets.science.nasa.gov/image.jpg?w=960&h=640")
+
+
+def test_build_apod_i18n_limpia_original_y_texto_enviado_al_traductor(monkeypatch):
+    seen = []
+    monkeypatch.setattr(apod_mod, "load_cache", lambda: {})
+    monkeypatch.setattr(apod_mod, "save_cache", lambda cache: None)
+    def _translate(cards, lang, cache, tracker=None):
+        seen.append(cards[0])
+        return {}
+    monkeypatch.setattr(apod_mod, "translate_cards", _translate)
+    payload = build_apod_i18n(_WP_APOD, translate=True)
+    assert payload["explanation"]["en"] == "Explanation: Stars & galaxies. Tomorrow."
+    assert all(card["snippet"] == payload["explanation"]["en"] for card in seen)
+    assert payload["schema"] == "cl.sibylla.apod_i18n.v1"
+
+
+def test_cache_de_titulo_generico_se_invalida_sin_borrar_otras_traducciones(monkeypatch):
+    from sibylla.translate import _split_by_cache
+    bad = {"title": "NASA Science", "snippet": "viejo", "src_title": "NASA Science"}
+    cache = {lang: {"apod:2026-10-18": bad, "otra": {"title": "Conservar"}} for lang in ("es", "it")}
+    monkeypatch.setattr(apod_mod, "load_cache", lambda: cache)
+    monkeypatch.setattr(apod_mod, "save_cache", lambda cache: None)
+    def _translate(cards, lang, cache, tracker=None):
+        hits, misses = _split_by_cache(cards, lang, cache)
+        assert hits == {}
+        assert len(misses) == 1
+        return {cards[0]["id"]: {"title": "Pilares del Águila", "snippet": "Texto corregido"}}
+    monkeypatch.setattr(apod_mod, "translate_cards", _translate)
+    payload = build_apod_i18n(_WP_APOD, translate=True)
+    assert payload["title"]["es"] == "Pilares del Águila"
+    assert cache["es"]["otra"] == {"title": "Conservar"}
+
+
+def test_reparar_fecha_solo_reemplaza_su_archivo_historico(monkeypatch, tmp_path):
+    _patch_sidecar_deps(monkeypatch, tmp_path)
+    today_path = write_apod_sidecar(translate=False)
+    today_bytes = today_path.read_bytes()
+    archive = tmp_path / "apod-i18n" / "2026-10-18.json"
+    archive.write_text('{"title":{"en":"NASA Science"}}', encoding="utf-8")
+    seen = []
+    def _fetch(api_key, *, date):
+        seen.append(date)
+        return _WP_APOD
+    monkeypatch.setattr(web_mod, "fetch_apod", _fetch)
+    path = write_apod_sidecar(translate=False, date="2026-10-18")
+    assert path == archive
+    assert json.loads(path.read_text(encoding="utf-8"))["title"]["en"] == _WP_APOD["title"]
+    assert today_path.read_bytes() == today_bytes
+    assert seen == ["2026-10-18"]
+
+
+def test_reparacion_fallida_conserva_archivo_existente(monkeypatch, tmp_path):
+    _patch_sidecar_deps(monkeypatch, tmp_path)
+    write_apod_sidecar(translate=False)
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    monkeypatch.setattr(web_mod, "fetch_apod", lambda *args, **kwargs: None)
+    assert write_apod_sidecar(translate=False, date="2026-06-30") is None
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*.json")} == before
+
+
+def test_cli_apod_date_solicita_solo_archivo_historico(monkeypatch, tmp_path):
+    from sibylla.cli import main
+    seen = []
+    def _write(**kwargs):
+        seen.append(kwargs)
+        return tmp_path / "2026-10-18.json"
+    monkeypatch.setattr(web_mod, "write_apod_sidecar", _write)
+    assert main(["--apod-only", "--apod-date", "2026-10-18", "--translate", "off"]) == 0
+    assert seen == [{"translate": False, "date": "2026-10-18"}]
+
+
+@pytest.mark.parametrize("args", [
+    ["--apod-date", "2026-10-18"],
+    ["--apod-only", "--apod-date", "../escape"],
+    ["--apod-only", "--apod-date", "20261018"],
+    ["--apod-only", "--apod-date", "2999-01-01"],
+    ["--apod-only", "--apod-date", "2026-10-18", "--dashboard"],
+])
+def test_cli_rechaza_reparacion_invalida(args):
+    from sibylla.cli import main
+    with pytest.raises(SystemExit) as exc:
+        main(args)
+    assert exc.value.code == 2
