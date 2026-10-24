@@ -121,7 +121,7 @@ jobs:
       # (el más reciente de la mañana) dejaría a este build sin los demás.
       # El historial (runs.json) NO se cachea aquí; vive en el host.
       - name: Restaurar cache regenerable (traducciones + resúmenes + YouTube)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             data/translations.json

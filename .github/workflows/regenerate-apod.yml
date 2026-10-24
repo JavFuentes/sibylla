@@ -139,7 +139,7 @@ jobs:
       # de resumenes, dejandolos frios cada mañana. Restaurar + re-guardar los
       # cuatro archivos los preserva sin tocarlos.
       - name: Restaurar cache regenerable (compartido con regenerate.yml)
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             data/translations.json
