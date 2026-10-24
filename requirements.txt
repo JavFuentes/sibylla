@@ -1,5 +1,5 @@
 # Sibylla — dependencias del ingestor (prototipo)
-feedparser>=6.0.11        # RSS/Atom (arXiv, Google News, medios)
+feedparser>=6.0.12        # RSS/Atom (arXiv, Google News, medios)
 requests>=2.32.0          # HTTP para APIs (PubMed, Hacker News, X)
 PyYAML>=6.0.2             # cargar config/sources.yaml
 python-dotenv>=1.0.1      # cargar claves desde .env
